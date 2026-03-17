@@ -1,5 +1,6 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+import os, uuid as _uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, text, or_
 from typing import Optional, List
@@ -64,6 +65,36 @@ def update_produit(produit_id: UUID, body: dict = None, db: Session = Depends(ge
     for k, v in body.items():
         if hasattr(prod, k): setattr(prod, k, v)
     db.commit(); return {"ok": True}
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads", "produits")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@cat_router.post("/produits/{produit_id}/image")
+async def upload_produit_image(
+    produit_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    prod = db.query(Produit).filter(Produit.id == produit_id).first()
+    if not prod:
+        raise HTTPException(404, "Produit introuvable")
+    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    if ext.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        raise HTTPException(400, "Format image non supporté (jpg, png, webp, gif)")
+    fname = f"{_uuid.uuid4().hex}{ext.lower()}"
+    fpath = os.path.join(UPLOAD_DIR, fname)
+    contents = await file.read()
+    with open(fpath, "wb") as f:
+        f.write(contents)
+    # Delete old local file if any
+    if prod.image_url and prod.image_url.startswith("/uploads/"):
+        old = os.path.join(os.path.dirname(UPLOAD_DIR), *prod.image_url.split("/")[2:])
+        if os.path.exists(old):
+            os.remove(old)
+    prod.image_url = f"/uploads/produits/{fname}"
+    db.commit()
+    return {"ok": True, "image_url": prod.image_url}
 
 @cat_router.delete("/produits/{produit_id}")
 def delete_produit(produit_id: UUID, db: Session = Depends(get_db), _=Depends(get_current_admin)):

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Users, Bike, Settings, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck } from 'lucide-react'
+import { LayoutDashboard, Package, Users, Bike, Settings, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera } from 'lucide-react'
 import api from '../utils/api'
 import { useAuth } from '../store'
 
@@ -12,6 +12,7 @@ const MENU = [
   { to:'/admin/stats',        icon:<TrendingUp size={16}/>,      label:'Statistiques',  group:'principal' },
   { to:'/admin/suggestions',  icon:<Lightbulb size={16}/>,       label:'Suggestions',   group:'catalogue',  badge:'new' },
   { to:'/admin/prix',         icon:<DollarSign size={16}/>,      label:'Gestion Prix',  group:'catalogue' },
+  { to:'/admin/images',       icon:<Camera size={16}/>,          label:'Photos Produits', group:'catalogue' },
   { to:'/admin/livraison',    icon:<Truck size={16}/>,           label:'Livraison',     group:'catalogue' },
 ]
 

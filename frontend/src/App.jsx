@@ -18,6 +18,7 @@ import AdminStats from './pages/AdminStats'
 import AdminSuggestions from './pages/AdminSuggestions'
 import AdminPrix from './pages/AdminPrix'
 import AdminLivraison from './pages/AdminLivraison'
+import AdminImages from './pages/AdminImages'
 import { LiveurDashboard } from './pages/Livreur'
 import { useAuth } from './store'
 
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="/admin/suggestions"      element={<ProtectedRoute roles={['admin','super_admin']}><AdminSuggestions/></ProtectedRoute>}/>
         <Route path="/admin/prix"             element={<ProtectedRoute roles={['admin','super_admin']}><AdminPrix/></ProtectedRoute>}/>
         <Route path="/admin/livraison"        element={<ProtectedRoute roles={['admin','super_admin']}><AdminLivraison/></ProtectedRoute>}/>
+        <Route path="/admin/images"           element={<ProtectedRoute roles={['admin','super_admin']}><AdminImages/></ProtectedRoute>}/>
 
         {/* 404 */}
         <Route path="*" element={
