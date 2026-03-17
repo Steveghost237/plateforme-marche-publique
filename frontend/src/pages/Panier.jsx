@@ -191,6 +191,7 @@ export function Checkout() {
   const [fraisInfo, setFraisInfo]     = useState(null)   // résultat API /zones-livraison/calcul
   const [fraisLoading, setFraisLoading] = useState(false)
   const [cmdNumero, setCmdNumero]     = useState('')
+  const [lignesSnap, setLignesSnap]   = useState([])
   const [loading, setLoading]         = useState(false)
   const [newAdr, setNewAdr]           = useState({ quartier:'', ville:'Yaoundé', libelle:'Domicile' })
   const [showNewAdr, setShowNewAdr]   = useState(false)
@@ -253,6 +254,7 @@ export function Checkout() {
       // Confirmer paiement (simulation)
       await api.post(`/commandes/${cmd.id}/payer`)
       setCmdNumero(cmd.numero)
+      setLignesSnap(lignes)
       clear()
       setStep(4)
     } catch(err) {
@@ -289,9 +291,9 @@ export function Checkout() {
 
           {/* Lignes produits */}
           <div className="space-y-1 mb-3 max-h-32 overflow-y-auto">
-            {lignes.map(l => (
+            {lignesSnap.map(l => (
               <div key={l.produit?.id || Math.random()} className="flex justify-between text-xs text-gray-600">
-                <span className="truncate flex-1">{l.produit?.nom} <span className="text-gray-400">x{l.quantite}</span></span>
+                <span className="truncate flex-1">{l.produit?.nom} <span className="text-gray-400">×{l.quantite}</span></span>
                 <span className="font-semibold ml-2 shrink-0">{(l.prixUnit * l.quantite).toLocaleString()} F</span>
               </div>
             ))}
@@ -478,9 +480,9 @@ export function Checkout() {
                   {fraisLoading && <div className="w-4 h-4 border-2 border-gray-300 border-t-[#0D2137] rounded-full animate-spin shrink-0"/>}
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1.5">Une estimation du poids total permet de calculer les frais de livraison précis. Laissez à 0 pour le tarif standard.</p>
-                {fraisInfo && fraisInfo.prix_par_kg_fcfa > 0 && poidsKg > 0 && (
+                {fraisInfo && fraisInfo.prix_par_kg > 0 && poidsKg > 0 && (
                   <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
-                    {poidsKg} kg × {fraisInfo.prix_par_kg_fcfa} F/kg = +{(fraisInfo.supplement_poids||0).toLocaleString()} F de supplément
+                    {poidsKg} kg × {fraisInfo.prix_par_kg} F/kg = +{(fraisInfo.part_poids||0).toLocaleString()} F de supplément
                   </div>
                 )}
               </div>

@@ -57,7 +57,8 @@ def create_produit(p: ProduitCreateIn, db: Session = Depends(get_db), _=Depends(
     prod = Produit(**p.model_dump()); db.add(prod); db.commit(); db.refresh(prod); return prod
 
 @cat_router.put("/produits/{produit_id}")
-def update_produit(produit_id: UUID, body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def update_produit(produit_id: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    body = body or {}
     prod = db.query(Produit).filter(Produit.id == produit_id).first()
     if not prod: raise HTTPException(404)
     for k, v in body.items():
@@ -204,7 +205,8 @@ def accepter(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_curre
     db.commit(); return {"message": "Commande acceptée"}
 
 @cmd_router.post("/{cmd_id}/statut")
-def changer_statut(cmd_id: UUID, body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def changer_statut(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    body = body or {}
     nouveau = body.get("statut")
     if nouveau not in ("en_cours_marche", "en_livraison", "livree"): raise HTTPException(400, "Statut invalide")
     livreur = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
@@ -356,7 +358,8 @@ def assigner(cmd_id: UUID, livreur_id: UUID, db: Session = Depends(get_db), _=De
     liv.statut = "occupe"; db.commit(); return {"ok": True}
 
 @admin_router.put("/utilisateurs/{user_id}/statut")
-def admin_change_user_statut(user_id: UUID, body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_change_user_statut(user_id: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    body = body or {}
     u = db.query(Utilisateur).filter(Utilisateur.id == user_id).first()
     if not u: raise HTTPException(404)
     u.statut = body.get("statut", u.statut); db.commit()
@@ -396,7 +399,8 @@ def get_params(db: Session = Depends(get_db), _=Depends(get_current_admin)):
     return db.query(Parametre).all()
 
 @admin_router.put("/parametres/{cle}")
-def update_param(cle: str, body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def update_param(cle: str, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    body = body or {}
     p = db.query(Parametre).filter(Parametre.cle == cle).first()
     if not p: raise HTTPException(404)
     p.valeur = str(body.get("valeur", p.valeur)); db.commit(); return {"ok": True}
@@ -415,13 +419,15 @@ def profil_livreur(db: Session = Depends(get_db), user=Depends(get_current_user)
             "total_gains_fcfa": liv.total_gains_fcfa, "est_verifie": liv.est_verifie}
 
 @liv_router.put("/statut")
-def changer_statut_livreur(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def changer_statut_livreur(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    body = body or {}
     liv = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
     if not liv: raise HTTPException(404)
     liv.statut = body.get("statut", liv.statut); db.commit(); return {"statut": liv.statut}
 
 @liv_router.put("/localisation")
-def update_localisation(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def update_localisation(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    body = body or {}
     liv = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
     if not liv: raise HTTPException(404)
     liv.latitude_actuelle = body.get("latitude"); liv.longitude_actuelle = body.get("longitude")

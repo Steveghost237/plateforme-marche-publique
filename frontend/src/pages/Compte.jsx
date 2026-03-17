@@ -38,11 +38,11 @@ export function Profil() {
   const initials = user?.nom_complet?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || '?'
 
   const MENU_ITEMS = [
-    { to:'/commandes',     emoji:'📦', label:'Mes commandes',      sub:`${12} commandes passées` },
-    { to:'/adresses',      emoji:'📍', label:'Mes adresses',       sub:'2 adresses enregistrées' },
+    { to:'/commandes',     emoji:'📦', label:'Mes commandes',      sub:'Voir l\'historique de mes commandes' },
+    { to:'/profil',        emoji:'📍', label:'Mes adresses',       sub:'Gérer mes adresses de livraison' },
     { to:'/fidelite',      emoji:'⭐', label:'Programme fidélité', sub: fidelite ? `${fidelite.points_actuels?.toLocaleString()} pts · Niveau ${niv?.label}` : 'Chargement...' },
     { to:'/notifications', emoji:'🔔', label:'Notifications',      sub:'Gérer mes notifications' },
-    { to:'/aide',          emoji:'❓', label:'Aide & Support',     sub:'FAQ, nous contacter' },
+    { to:'/notifications',  emoji:'❓', label:'Aide & Support',     sub:'contact@marche.cm' },
   ]
 
   return (
