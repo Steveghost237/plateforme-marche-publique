@@ -107,9 +107,8 @@ def get_zones(db: Session = Depends(get_db)):
     return db.query(ZoneLivraison).filter(ZoneLivraison.actif == True).order_by(ZoneLivraison.ordre).all()
 
 @zones_router.post("/calcul")
-def calculer_frais(body: dict = None, db: Session = Depends(get_db)):
+def calculer_frais(body: dict, db: Session = Depends(get_db)):
     """Calcule les frais de livraison (formule combinée distance + poids)."""
-    body = body or {}
     lat        = body.get("latitude")
     lon        = body.get("longitude")
     adresse_id = body.get("adresse_id")
@@ -173,8 +172,7 @@ def suggestions_en_attente(page: int = 1, db: Session = Depends(get_db)):
     return {"total": total, "items": [_fmt_suggestion(s) for s in items]}
 
 @suggest_router.post("/")
-def creer_suggestion(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    body = body or {}
+def creer_suggestion(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
     nom = (body.get("nom") or "").strip()
     if not nom or len(nom) < 2:
         raise HTTPException(400, "Nom du produit requis (min 2 caractères)")
@@ -366,8 +364,7 @@ def get_tous_prix(
     }
 
 @admin_prix_router.put("/{produit_id}")
-def update_prix(produit_id: UUID, body: dict = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    body = body or {}
+def update_prix(produit_id: UUID, body: dict, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     prod = db.query(Produit).filter(Produit.id == produit_id).first()
     if not prod: raise HTTPException(404)
 
@@ -393,9 +390,8 @@ def update_prix(produit_id: UUID, body: dict = None, db: Session = Depends(get_d
     return {"ok": True, "nouveau_prix": prod.prix_base_fcfa}
 
 @admin_prix_router.post("/bulk-update")
-def bulk_update_prix(body: dict = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def bulk_update_prix(body: dict, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     """Mise à jour en masse : +/- % ou valeur fixe sur toute une section."""
-    body = body or {}
     section_code = body.get("section_code")
     mode         = body.get("mode", "pourcentage")  # pourcentage | fixe
     valeur       = body.get("valeur", 0)
@@ -450,8 +446,7 @@ def admin_get_zones(db: Session = Depends(get_db), _=Depends(get_current_admin))
     return db.query(ZoneLivraison).order_by(ZoneLivraison.ordre).all()
 
 @admin_zones_router.post("/")
-def admin_creer_zone(body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
-    body = body or {}
+def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     z = ZoneLivraison(
         nom=body["nom"],
         ville=body.get("ville", "Yaoundé"),
@@ -469,8 +464,7 @@ def admin_creer_zone(body: dict = None, db: Session = Depends(get_db), _=Depends
     return z
 
 @admin_zones_router.put("/{zone_id}")
-def admin_update_zone(zone_id: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
-    body = body or {}
+def admin_update_zone(zone_id: UUID, body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     z = db.query(ZoneLivraison).filter(ZoneLivraison.id == zone_id).first()
     if not z: raise HTTPException(404)
     for k, v in body.items():
@@ -486,9 +480,8 @@ def admin_delete_zone(zone_id: UUID, db: Session = Depends(get_db), _=Depends(ge
     return {"ok": True}
 
 @admin_zones_router.post("/simuler")
-def simuler_frais(body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def simuler_frais(body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     """Simule les frais (formule combinée distance+poids) pour l'outil admin."""
-    body = body or {}
     dist     = float(body.get("distance_km", 0))
     pointe   = bool(body.get("est_pointe", False))
     poids_kg = float(body.get("poids_kg") or 0)

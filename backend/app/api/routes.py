@@ -173,12 +173,58 @@ def mes_commandes(page: int = 1, db: Session = Depends(get_db), user=Depends(get
     return (db.query(Commande).filter(Commande.client_id == user.id)
             .order_by(Commande.created_at.desc()).offset((page-1)*10).limit(10).all())
 
-@cmd_router.get("/{cmd_id}", response_model=CommandeOut)
+@cmd_router.get("/{cmd_id}")
 def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    cmd = db.query(Commande).filter(Commande.id == cmd_id).first()
+    cmd = (db.query(Commande)
+           .options(
+               joinedload(Commande.client),
+               joinedload(Commande.livreur).joinedload(Livreur.utilisateur),
+               joinedload(Commande.adresse),
+               joinedload(Commande.lignes).joinedload(CommandeLigne.produit),
+           )
+           .filter(Commande.id == cmd_id).first())
     if not cmd: raise HTTPException(404)
     if user.role == "client" and str(cmd.client_id) != str(user.id): raise HTTPException(403)
-    return cmd
+    liv_user = cmd.livreur.utilisateur if cmd.livreur else None
+    client   = cmd.client
+    return {
+        "id": str(cmd.id), "numero": cmd.numero, "statut": cmd.statut,
+        "creneau": cmd.creneau,
+        "date_livraison": str(cmd.date_livraison) if cmd.date_livraison else None,
+        "sous_total_fcfa": cmd.sous_total_fcfa, "frais_livraison": cmd.frais_livraison,
+        "reduction_points": cmd.reduction_points, "total_fcfa": cmd.total_fcfa,
+        "points_gagnes": cmd.points_gagnes,
+        "note_client": cmd.note_client,
+        "created_at": cmd.created_at.isoformat() if cmd.created_at else None,
+        "livree_at":  cmd.livree_at.isoformat()  if cmd.livree_at  else None,
+        "assignee_at": cmd.assignee_at.isoformat() if cmd.assignee_at else None,
+        # ── Livreur (visible au client) ───────────────────────────────
+        "livreur_nom":       liv_user.nom_complet if liv_user else None,
+        "livreur_telephone": liv_user.telephone   if liv_user else None,
+        "livreur_photo":     liv_user.avatar_url  if liv_user else None,
+        "livreur_note":      float(cmd.livreur.note_moyenne or 0) if cmd.livreur else None,
+        "livreur_niveau":    cmd.livreur.niveau   if cmd.livreur else None,
+        "livreur_total_livraisons": cmd.livreur.total_livraisons if cmd.livreur else 0,
+        # ── Client (visible au livreur / admin seulement) ────────────
+        "client_nom":       client.nom_complet if client else None,
+        "client_telephone": client.telephone   if (client and user.role in ("livreur","admin","super_admin")) else None,
+        # ── Adresse ──────────────────────────────────────────────────
+        "adresse": {
+            "libelle":   cmd.adresse.libelle   if cmd.adresse else None,
+            "quartier":  cmd.adresse.quartier  if cmd.adresse else None,
+            "ville":     cmd.adresse.ville     if cmd.adresse else None,
+            "latitude":  float(cmd.adresse.latitude)  if cmd.adresse and cmd.adresse.latitude  else None,
+            "longitude": float(cmd.adresse.longitude) if cmd.adresse and cmd.adresse.longitude else None,
+        } if cmd.adresse else None,
+        # ── Lignes ───────────────────────────────────────────────────
+        "lignes": [{
+            "id": str(l.id),
+            "produit_nom": l.produit.nom if l.produit else None,
+            "quantite": l.quantite,
+            "prix_unitaire": l.prix_unitaire,
+            "prix_total": l.prix_total,
+        } for l in (cmd.lignes or [])],
+    }
 
 @cmd_router.post("/{cmd_id}/payer")
 def confirmer_paiement(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
@@ -220,7 +266,41 @@ def evaluer(cmd_id: UUID, p: EvaluationIn, db: Session = Depends(get_db), user=D
 @cmd_router.get("/livreur/disponibles")
 def cmd_disponibles(db: Session = Depends(get_db), user=Depends(get_current_user)):
     if user.role not in ("livreur", "admin", "super_admin"): raise HTTPException(403)
-    return db.query(Commande).filter(Commande.statut == "payee").order_by(Commande.created_at).limit(20).all()
+    cmds = (db.query(Commande)
+            .options(joinedload(Commande.client), joinedload(Commande.adresse))
+            .filter(Commande.statut == "payee")
+            .order_by(Commande.created_at).limit(20).all())
+    return [{
+        "id": str(c.id), "numero": c.numero, "statut": c.statut,
+        "total_fcfa": c.total_fcfa, "creneau": c.creneau,
+        "client_nom":       c.client.nom_complet if c.client else None,
+        "client_telephone": c.client.telephone   if c.client else None,
+        "adresse_quartier": c.adresse.quartier   if c.adresse else None,
+        "adresse_ville":    c.adresse.ville       if c.adresse else None,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    } for c in cmds]
+
+@cmd_router.get("/livreur/en-cours")
+def cmd_en_cours(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role not in ("livreur", "admin", "super_admin"): raise HTTPException(403)
+    livreur = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
+    if not livreur: raise HTTPException(404, "Profil livreur introuvable")
+    cmds = (db.query(Commande)
+            .options(joinedload(Commande.client), joinedload(Commande.adresse))
+            .filter(
+                Commande.livreur_id == livreur.id,
+                Commande.statut.in_(["assignee", "en_cours_marche", "en_livraison"])
+            )
+            .order_by(Commande.assignee_at.desc()).all())
+    return [{
+        "id": str(c.id), "numero": c.numero, "statut": c.statut,
+        "total_fcfa": c.total_fcfa, "creneau": c.creneau,
+        "client_nom":       c.client.nom_complet if c.client else None,
+        "client_telephone": c.client.telephone   if c.client else None,
+        "adresse_quartier": c.adresse.quartier   if c.adresse else None,
+        "adresse_ville":    c.adresse.ville       if c.adresse else None,
+        "assignee_at": c.assignee_at.isoformat() if c.assignee_at else None,
+    } for c in cmds]
 
 @cmd_router.post("/{cmd_id}/accepter")
 def accepter(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):

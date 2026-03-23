@@ -19,7 +19,7 @@ function getStatutIndex(statut) {
 }
 
 // Simulation GPS dots
-function GPSMap({ statut }) {
+function GPSMap({ statut, livreurNom = 'Livreur' }) {
   const [dots, setDots] = useState([
     { id: 1, x: 30, y: 60, type: 'marche', label: 'Marché Mokolo' },
     { id: 2, x: 70, y: 35, type: 'client', label: 'Votre adresse' },
@@ -75,7 +75,7 @@ function GPSMap({ statut }) {
           <span className="text-base">🛵</span>
         </div>
         <div className="bg-[#0D2137] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 whitespace-nowrap shadow">
-          Kofi N.
+          {livreurNom}
         </div>
       </div>
       {/* Overlay statut */}
@@ -180,7 +180,7 @@ export default function SuiviCommande() {
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
 
         {/* Carte GPS */}
-        {showGPS && <GPSMap statut={commande.statut}/>}
+        {showGPS && <GPSMap statut={commande.statut} livreurNom={commande.livreur_nom ? commande.livreur_nom.split(' ')[0] : 'Livreur'}/>}
 
         {/* Commande livrée : message de confirmation */}
         {isLivree && (
@@ -235,25 +235,56 @@ export default function SuiviCommande() {
 
         {/* Info livreur */}
         {commande.livreur_nom && showGPS && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#0D2137] rounded-full flex items-center justify-center text-xl shrink-0 border-2 border-amber-400">
-              🧑‍🦱
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-[#0D2137] text-sm">{commande.livreur_nom}</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star size={11} className="text-amber-400" fill="currentColor"/>
-                <span className="text-xs text-gray-500">4.8 · Livreur Senior</span>
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Votre livreur</p>
+            <div className="flex items-center gap-4">
+              {/* Photo livreur */}
+              <div className="relative shrink-0">
+                {commande.livreur_photo ? (
+                  <img src={commande.livreur_photo} alt={commande.livreur_nom}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow"/>
+                ) : (
+                  <div className="w-14 h-14 bg-[#0D2137] rounded-full flex items-center justify-center text-2xl border-2 border-amber-400 shadow">
+                    🛵
+                  </div>
+                )}
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"/>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <a href="tel:+237600000001"
-                className="w-10 h-10 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white transition-colors shadow-sm">
-                <Phone size={15}/>
-              </a>
-              <button className="w-10 h-10 bg-[#0D2137] hover:bg-blue-700 rounded-full flex items-center justify-center text-white transition-colors shadow-sm">
-                <MessageCircle size={15}/>
-              </button>
+              {/* Infos */}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-[#0D2137] text-sm truncate">{commande.livreur_nom}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Star size={11} className="text-amber-400" fill="currentColor"/>
+                  <span className="text-xs text-gray-500">
+                    {commande.livreur_note?.toFixed(1) || '0.0'} ·
+                    <span className="capitalize ml-1">{commande.livreur_niveau || 'Junior'}</span>
+                    {commande.livreur_total_livraisons > 0 && (
+                      <span className="ml-1">· {commande.livreur_total_livraisons} livraisons</span>
+                    )}
+                  </span>
+                </div>
+                {/* Numéro visible */}
+                {commande.livreur_telephone && (
+                  <p className="text-xs text-gray-400 mt-0.5 font-mono">{commande.livreur_telephone}</p>
+                )}
+              </div>
+              {/* Bouton appel */}
+              <div className="flex gap-2 shrink-0">
+                {commande.livreur_telephone ? (
+                  <a href={`tel:${commande.livreur_telephone}`}
+                    className="w-11 h-11 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white transition-colors shadow-sm">
+                    <Phone size={16}/>
+                  </a>
+                ) : (
+                  <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center text-gray-300">
+                    <Phone size={16}/>
+                  </div>
+                )}
+                <a href={commande.livreur_telephone ? `sms:${commande.livreur_telephone}` : '#'}
+                  className="w-11 h-11 bg-[#0D2137] hover:bg-blue-700 rounded-full flex items-center justify-center text-white transition-colors shadow-sm">
+                  <MessageCircle size={16}/>
+                </a>
+              </div>
             </div>
           </div>
         )}
