@@ -10,6 +10,8 @@ class ApiService {
 
   String? _token;
 
+  bool get hasToken => _token != null;
+
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
@@ -39,11 +41,13 @@ class ApiService {
 
   Future<Map<String, dynamic>> get(String endpoint, {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.get(url, headers: _getHeaders(includeAuth: auth));
+    final response =
+        await http.get(url, headers: _getHeaders(includeAuth: auth));
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> data, {bool auth = true}) async {
+  Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> data,
+      {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response = await http.post(
       url,
@@ -53,7 +57,8 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> put(String endpoint, Map<String, dynamic> data, {bool auth = true}) async {
+  Future<Map<String, dynamic>> put(String endpoint, Map<String, dynamic> data,
+      {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response = await http.put(
       url,
@@ -63,9 +68,11 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> delete(String endpoint, {bool auth = true}) async {
+  Future<Map<String, dynamic>> delete(String endpoint,
+      {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.delete(url, headers: _getHeaders(includeAuth: auth));
+    final response =
+        await http.delete(url, headers: _getHeaders(includeAuth: auth));
     return _handleResponse(response);
   }
 
@@ -76,7 +83,9 @@ class ApiService {
     } else {
       throw ApiException(
         statusCode: response.statusCode,
-        message: response.body.isNotEmpty ? jsonDecode(response.body)['detail'] ?? 'Erreur inconnue' : 'Erreur réseau',
+        message: response.body.isNotEmpty
+            ? jsonDecode(response.body)['detail'] ?? 'Erreur inconnue'
+            : 'Erreur réseau',
       );
     }
   }

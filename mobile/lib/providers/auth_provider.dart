@@ -15,7 +15,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> init() async {
     await _api.loadToken();
-    if (_api._token != null) {
+    if (_api.hasToken) {
       try {
         await loadUser();
       } catch (e) {
@@ -47,7 +47,7 @@ class AuthProvider with ChangeNotifier {
         {'telephone': telephone, 'mot_de_passe': password},
         auth: false,
       );
-      
+
       await _api.saveToken(data['access_token']);
       _user = User.fromJson(data['utilisateur']);
       _isLoading = false;
@@ -81,7 +81,7 @@ class AuthProvider with ChangeNotifier {
         },
         auth: false,
       );
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
