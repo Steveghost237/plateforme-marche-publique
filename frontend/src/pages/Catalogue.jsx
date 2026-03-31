@@ -556,18 +556,7 @@ export function ProduitDetail() {
                           <div>
                             <input type="range"
                               min={qMin} max={qMax}
-                              step={
-                                ing.unite === 'g' ? 50 : 
-                                ing.unite === 'kg' ? 0.1 :
-                                ing.unite === 'ml' ? 10 :
-                                ing.unite === 'cl' ? 1 : 
-                                ing.unite === 'l' ? 0.1 :
-                                ing.unite === 'pcs' || ing.unite === 'pièce' || ing.unite === 'piece' ? 1 :
-                                ing.unite === 'gousse' || ing.unite === 'cube' || ing.unite === 'feuille' ? 1 :
-                                ing.unite === 'pincée' || ing.unite === 'c. à café' || ing.unite === 'c. à soupe' ? 0.5 :
-                                ing.unite === 'botte' || ing.unite === 'morceau' ? 1 :
-                                qMax <= 10 ? 0.5 : 1
-                              }
+                              step={ing.unite === 'g' ? 50 : ing.unite === 'cl' ? 1 : ing.unite === 'pcs' ? 1 : 50}
                               value={curQte}
                               onChange={e => updateCurseur(ing, Number(e.target.value))}
                               className="w-full h-1.5 rounded-full appearance-none cursor-pointer"

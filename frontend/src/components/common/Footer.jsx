@@ -8,19 +8,11 @@ export default function Footer() {
 
         {/* Brand */}
         <div className="col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="white" strokeWidth="2.5">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/>
-              </svg>
-            </div>
-            <div>
-              <span className="font-serif text-white font-bold tracking-[.1em]">MARCHÉ</span>
-              <span className="text-amber-400 text-sm font-bold">.CM</span>
-            </div>
+          <div className="mb-4">
+            <img src="/logo-comebuy.png" alt="ComeBuy" className="h-18 w-auto" />
           </div>
           <p className="text-white/25 text-xs leading-relaxed mb-5">
-            Votre marché local livré à domicile en moins d'une heure. Produits frais, menus camerounais, épices authentiques.
+            Votre marché en ligne livré à domicile en moins d'une heure. Produits frais, menus camerounais, épices authentiques.
           </p>
           <div className="flex gap-2">
             {['f', 'in', 'tw', 'wa'].map(s => (
@@ -73,7 +65,7 @@ export default function Footer() {
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Mail size={12} className="text-amber-400 shrink-0"/>
-              <span>contact@marche.cm</span>
+              <span>contact@comebuy.cm</span>
             </div>
           </div>
           <p className="text-white/50 font-medium mt-5 mb-2 text-xs">Horaires de livraison</p>
@@ -92,7 +84,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-white/8 py-4 text-center text-xs text-white/18">
-        © 2026 Marché en Ligne · Cameroun — Tous droits réservés
+        © 2026 ComeBuy · Cameroun — Tous droits réservés
       </div>
     </footer>
   )
