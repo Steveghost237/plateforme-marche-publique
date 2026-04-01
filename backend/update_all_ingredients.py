@@ -1,0 +1,266 @@
+"""Script pour mettre à jour TOUS les ingrédients détaillés des 71 menus camerounais."""
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+
+from app.core.database import SessionLocal
+from app.models.models import Produit, Ingredient
+
+db = SessionLocal()
+
+# Fonction helper pour créer un ingrédient
+def ing(nom, oblig=True, unite="g", qte_def=100, qte_min=0, qte_max=200, prix_min=0, prix_max=500, prix_def=200):
+    return dict(
+        nom=nom, est_obligatoire=oblig, type_saisie="curseur", unite=unite,
+        quantite_defaut=qte_def, quantite_min=qte_min, quantite_max=qte_max,
+        prix_min_fcfa=prix_min, prix_max_fcfa=prix_max, prix_defaut_fcfa=prix_def
+    )
+
+# Dictionnaire complet des ingrédients
+INGREDIENTS = {}
+
+# RÉGION DU LITTORAL (10 menus)
+INGREDIENTS["ndole-metet"] = [
+    ing("Feuilles de Ndolè", True, "g", 300, 200, 600, 400, 1200, 600),
+    ing("Arachides crues", True, "g", 300, 150, 500, 300, 1000, 500),
+    ing("Crevettes fraîches", True, "g", 600, 300, 1000, 1500, 5000, 2500),
+    ing("Poisson fumé", False, "g", 100, 0, 300, 0, 1500, 600),
+    ing("Viande de bœuf", True, "g", 500, 200, 800, 1000, 4000, 2000),
+    ing("Oignons", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Gingembre", False, "g", 50, 0, 100, 0, 200, 100),
+    ing("Tomate", False, "pcs", 1, 0, 3, 0, 300, 100),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Huile de palme rouge", True, "cl", 10, 5, 20, 150, 500, 250),
+    ing("Cubes Maggi", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+INGREDIENTS["mbongo-tchobi-sauce-ebene"] = [
+    ing("Poisson (machoiron/carpe)", True, "g", 1000, 500, 1500, 2000, 7500, 4000),
+    ing("Mbongo (poivre sauvage)", True, "g", 50, 30, 100, 300, 1000, 500),
+    ing("Djansang", True, "g", 30, 15, 60, 200, 600, 300),
+    ing("Rondelles", False, "g", 10, 0, 30, 0, 300, 100),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Gingembre", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Oignon", True, "pcs", 1, 1, 3, 50, 300, 100),
+    ing("Huile de palme", True, "cl", 8, 4, 20, 100, 500, 200),
+]
+
+INGREDIENTS["ndomba-papillote-beti"] = [
+    ing("Poulet/Porc/Poisson", True, "g", 1000, 500, 1500, 2000, 7500, 3500),
+    ing("Feuilles de bananier", True, "pcs", 3, 2, 6, 100, 300, 150),
+    ing("Oignons", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Gingembre", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Rondelles", False, "g", 10, 0, 30, 0, 300, 100),
+    ing("Djansang", True, "g", 20, 10, 50, 150, 500, 250),
+    ing("Sel gemme", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Poivre blanc", False, "g", 5, 0, 15, 0, 100, 30),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+]
+
+INGREDIENTS["koki-gateau-cornille"] = [
+    ing("Graines de cornille", True, "g", 1000, 500, 2000, 500, 2000, 1000),
+    ing("Huile de palme rouge", True, "ml", 600, 300, 1000, 600, 2000, 1000),
+    ing("Feuilles de bananier", True, "pcs", 4, 2, 8, 100, 400, 200),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+]
+
+INGREDIENTS["mets-pistache-ngonda-mukon"] = [
+    ing("Graines de courge (pistache)", True, "g", 500, 250, 800, 500, 1600, 800),
+    ing("Crevettes", False, "g", 200, 0, 500, 0, 2500, 1000),
+    ing("Poisson fumé", True, "g", 150, 100, 300, 500, 1500, 800),
+    ing("Huile de palme", True, "cl", 10, 5, 20, 150, 500, 250),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Feuilles de bananier", True, "pcs", 3, 2, 6, 100, 300, 150),
+]
+
+INGREDIENTS["sanga"] = [
+    ing("Maïs frais en épis", True, "kg", 2, 1, 4, 500, 2000, 1000),
+    ing("Feuilles de zom/épinards", True, "g", 1000, 500, 1500, 300, 900, 500),
+    ing("Jus de noix de palme", True, "g", 500, 300, 800, 400, 1200, 600),
+    ing("Sucre", False, "g", 100, 0, 200, 0, 200, 50),
+]
+
+INGREDIENTS["mintoumba-gateau-manioc"] = [
+    ing("Manioc fermenté", True, "kg", 2, 1, 4, 400, 1600, 800),
+    ing("Huile de palme rouge", True, "ml", 100, 50, 200, 100, 400, 200),
+    ing("Feuilles de bananier", True, "pcs", 4, 2, 8, 100, 400, 200),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["sauce-njansan-maquereau"] = [
+    ing("Njansan (akpi)", True, "g", 100, 50, 200, 300, 1200, 600),
+    ing("Maquereaux", True, "pcs", 3, 2, 5, 1000, 2500, 1500),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Huile de palme", True, "cl", 8, 4, 15, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["muandja-moto-titiris"] = [
+    ing("Titiris (petits poissons)", True, "g", 500, 300, 800, 1000, 3200, 1500),
+    ing("Oignons", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Tomates", True, "pcs", 3, 2, 5, 150, 500, 250),
+    ing("Piment", True, "pcs", 2, 1, 4, 50, 200, 100),
+    ing("Ail", False, "g", 20, 0, 50, 0, 150, 50),
+    ing("Huile de palme", True, "cl", 10, 5, 20, 150, 500, 250),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+INGREDIENTS["poisson-braise-bar-maquereau-sole"] = [
+    ing("Poisson entier", True, "pcs", 2, 1, 4, 1500, 6000, 3000),
+    ing("Oignon", True, "pcs", 1, 1, 3, 50, 300, 100),
+    ing("Tomate", False, "pcs", 1, 0, 3, 0, 300, 100),
+    ing("Persil", False, "g", 20, 0, 50, 0, 150, 50),
+    ing("Céleri", False, "g", 20, 0, 50, 0, 150, 50),
+    ing("Djansang", True, "g", 20, 10, 50, 150, 500, 250),
+    ing("Rondelles", False, "g", 10, 0, 30, 0, 300, 100),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Huile raffinée", True, "cl", 8, 4, 15, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Poivre", False, "g", 5, 0, 15, 0, 100, 30),
+]
+
+# RÉGION DU CENTRE (8 menus)
+INGREDIENTS["okock-okok-ikok-ekoke"] = [
+    ing("Feuilles d'Okok", True, "g", 400, 200, 800, 500, 2000, 1000),
+    ing("Jus de noix de palme", True, "ml", 500, 300, 800, 400, 1200, 600),
+    ing("Arachides pilées", True, "g", 200, 100, 400, 200, 800, 400),
+    ing("Écrevisses", False, "g", 100, 0, 200, 0, 1000, 400),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Sucre", False, "g", 20, 0, 50, 0, 100, 30),
+]
+
+INGREDIENTS["kpwem-kpem-puree-feuilles-manioc"] = [
+    ing("Feuilles de manioc pilées", True, "g", 800, 400, 1200, 400, 1200, 600),
+    ing("Jus de noix de palme", True, "ml", 500, 300, 800, 400, 1200, 600),
+    ing("Banane plantain", False, "pcs", 2, 0, 4, 0, 800, 300),
+    ing("Noix de palmiste", False, "g", 100, 0, 200, 0, 600, 200),
+]
+
+INGREDIENTS["mboam-kpem-papillote"] = [
+    ing("Feuilles de manioc pilées", True, "g", 800, 400, 1200, 400, 1200, 600),
+    ing("Jus de noix de palme", True, "ml", 500, 300, 800, 400, 1200, 600),
+    ing("Aubergines africaines", False, "pcs", 5, 0, 10, 0, 400, 200),
+    ing("Feuilles de bananier", True, "pcs", 4, 2, 8, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["ekomba-gateau-mais-arachides"] = [
+    ing("Maïs frais/farine", True, "kg", 2, 1, 4, 500, 2000, 1000),
+    ing("Arachides crues pilées", True, "g", 300, 150, 500, 300, 1000, 500),
+    ing("Huile de palme rouge", True, "ml", 100, 50, 200, 100, 400, 200),
+    ing("Feuilles de bananier", True, "pcs", 4, 2, 8, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["megande-pistache-oeufs-viande"] = [
+    ing("Graines de courge (pistache)", True, "g", 400, 200, 600, 400, 1200, 600),
+    ing("Œufs", True, "pcs", 4, 2, 8, 200, 800, 400),
+    ing("Viande de bœuf", True, "g", 300, 150, 600, 600, 3000, 1200),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+INGREDIENTS["njapchieu-sauce-morelle-noire"] = [
+    ing("Feuilles de morelle noire", True, "g", 500, 300, 800, 200, 600, 300),
+    ing("Viande de bœuf/poulet", True, "g", 500, 300, 800, 1000, 4000, 2000),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Huile de palme", True, "cl", 8, 4, 15, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["sauce-arachide-plantain-pile-ntouba"] = [
+    ing("Pâte d'arachide", True, "g", 300, 150, 500, 300, 1000, 500),
+    ing("Viande de bœuf/poisson fumé", True, "g", 400, 200, 600, 800, 3000, 1500),
+    ing("Plantain vert (pour pilon)", True, "pcs", 4, 2, 8, 400, 1600, 800),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Tomate", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Huile de palme", True, "cl", 8, 4, 15, 100, 400, 200),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Cubes Maggi", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+INGREDIENTS["bouillon-patte-boeuf"] = [
+    ing("Pattes de bœuf", True, "kg", 2, 1, 3, 2000, 6000, 3000),
+    ing("Oignons", True, "pcs", 3, 2, 5, 150, 500, 300),
+    ing("Tomates", True, "pcs", 3, 2, 5, 150, 500, 250),
+    ing("Ail", True, "g", 40, 20, 80, 50, 250, 120),
+    ing("Gingembre", True, "g", 40, 20, 80, 50, 250, 120),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Céleri/Persil/Poireau", True, "g", 100, 50, 200, 100, 400, 200),
+    ing("Poivre blanc", False, "g", 5, 0, 15, 0, 100, 30),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Huile", True, "cl", 5, 3, 10, 50, 200, 100),
+]
+
+# RÉGION DU SUD (5 menus)
+INGREDIENTS["sanga-variante-sud"] = [
+    ing("Maïs frais en épis", True, "kg", 2, 1, 4, 500, 2000, 1000),
+    ing("Feuilles de zom/épinards", True, "g", 1000, 500, 1500, 300, 900, 500),
+    ing("Jus de noix de palme", True, "g", 500, 300, 800, 400, 1200, 600),
+    ing("Sucre", True, "g", 150, 50, 300, 50, 300, 100),
+]
+
+INGREDIENTS["fiand-essouk-sauce-noix-palmiste"] = [
+    ing("Noix de palmiste", True, "kg", 1, 500, 2000, 1000, 4000, 2000),
+    ing("Viande de bœuf/poisson fumé", True, "g", 500, 300, 800, 1000, 4000, 2000),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+INGREDIENTS["ntoumba-plantain-pile-sauce-arachide"] = [
+    ing("Plantain vert", True, "pcs", 5, 3, 10, 500, 2000, 1000),
+    ing("Arachides grillées", True, "g", 300, 150, 500, 300, 1000, 500),
+    ing("Viande/poisson fumé", True, "g", 400, 200, 600, 800, 3000, 1500),
+    ing("Oignon", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Piment", False, "pcs", 1, 0, 3, 0, 150, 50),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+]
+
+INGREDIENTS["poulet-dg-directeur-general"] = [
+    ing("Poulet entier découpé", True, "kg", 1, 500, 2000, 2000, 8000, 3500),
+    ing("Plantains mûrs", True, "pcs", 3, 2, 6, 300, 1200, 600),
+    ing("Oignons", True, "pcs", 3, 2, 5, 150, 500, 300),
+    ing("Tomates fraîches", True, "pcs", 3, 2, 5, 150, 500, 250),
+    ing("Carottes", True, "pcs", 2, 1, 4, 100, 400, 200),
+    ing("Haricots verts", False, "g", 100, 0, 200, 0, 400, 150),
+    ing("Poivron rouge", True, "pcs", 1, 1, 3, 100, 300, 150),
+    ing("Ail", True, "g", 40, 20, 80, 50, 250, 120),
+    ing("Gingembre", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Céleri/Persil/Poireau", False, "g", 50, 0, 150, 0, 300, 100),
+    ing("Huile de friture", True, "cl", 15, 10, 30, 200, 600, 300),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Poivre", False, "g", 5, 0, 15, 0, 100, 30),
+]
+
+INGREDIENTS["ovianga-viande-brousse-plantain"] = [
+    ing("Viande de brousse (gibier)", True, "kg", 1, 500, 2000, 3000, 10000, 5000),
+    ing("Plantain (pour pilon)", True, "pcs", 4, 2, 8, 400, 1600, 800),
+    ing("Rondelles", True, "g", 15, 10, 40, 100, 400, 200),
+    ing("Djansang", True, "g", 20, 10, 50, 150, 500, 250),
+    ing("Ail", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Gingembre", True, "g", 30, 15, 60, 50, 200, 100),
+    ing("Piment", False, "pcs", 2, 0, 5, 0, 250, 100),
+    ing("Oignon", True, "pcs", 1, 1, 3, 50, 300, 100),
+    ing("Huile de palme", True, "cl", 10, 5, 20, 150, 500, 250),
+    ing("Sel", True, "g", 10, 5, 20, 0, 50, 10),
+    ing("Cubes d'assaisonnement", False, "pcs", 2, 0, 4, 0, 200, 100),
+]
+
+# Suite dans le prochain fichier...
+print("Partie 1/3 chargée...")

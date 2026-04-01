@@ -404,9 +404,21 @@ export function ProduitDetail() {
   }, [slug])
 
   function calcPrixCurseur(ing, qte) {
-    if (!ing.prix_max_fcfa || !ing.quantite_max) return ing.prix_defaut_fcfa || 0
-    const ratio = Math.max(0, Math.min(1, (qte - Number(ing.quantite_min||0)) / (Number(ing.quantite_max) - Number(ing.quantite_min||0))))
-    return Math.round((ing.prix_min_fcfa||0) + ratio * ((ing.prix_max_fcfa||0) - (ing.prix_min_fcfa||0)))
+    const qMin = Number(ing.quantite_min || 0)
+    const qMax = Number(ing.quantite_max || 100)
+    const pMin = Number(ing.prix_min_fcfa || 0)
+    const pMax = Number(ing.prix_max_fcfa || 0)
+    
+    // Si pas de variation de prix ou quantité invalide
+    if (qMax === qMin || pMax === pMin) return pMin
+    
+    // Calculer le ratio de la quantité actuelle par rapport à la plage
+    const ratio = Math.max(0, Math.min(1, (qte - qMin) / (qMax - qMin)))
+    
+    // Calculer le prix proportionnel
+    const prix = Math.round(pMin + ratio * (pMax - pMin))
+    
+    return prix
   }
 
   if (loading) return (
@@ -521,9 +533,10 @@ export function ProduitDetail() {
                 <div className="space-y-5">
                   {produit.ingredients.map(ing => {
                     const curQte  = config[ing.id]?.quantite ?? Number(ing.quantite_defaut)
-                    const curPrix = config[ing.id]?.prix ?? (ing.prix_defaut_fcfa || 0)
+                    const curPrix = config[ing.id]?.prix ?? calcPrixCurseur(ing, Number(ing.quantite_defaut))
                     const qMin = Number(ing.quantite_min || 0)
-                    const qMax = Number(ing.quantite_max || 99)
+                    const qMax = Number(ing.quantite_max || 100)
+                    const progressPercent = qMax > qMin ? ((curQte - qMin) / (qMax - qMin)) * 100 : 0
 
                     return (
                       <div key={ing.id} className="pb-4 border-b border-gray-50 last:border-0 last:pb-0">
@@ -554,18 +567,61 @@ export function ProduitDetail() {
                           </div>
                         ) : (
                           <div>
-                            <input type="range"
-                              min={qMin} max={qMax}
-                              step={ing.unite === 'g' ? 50 : ing.unite === 'cl' ? 1 : ing.unite === 'pcs' ? 1 : 50}
-                              value={curQte}
-                              onChange={e => updateCurseur(ing, Number(e.target.value))}
-                              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                              style={{background:`linear-gradient(to right, #0D2137 ${((curQte-qMin)/(qMax-qMin||1))*100}%, #e5e7eb ${((curQte-qMin)/(qMax-qMin||1))*100}%)`}}
-                            />
-                            <div className="flex justify-between text-xs text-gray-400 mt-1">
-                              <span>{qMin} {ing.unite !== 'unite' ? ing.unite : ''}</span>
-                              <span className="font-semibold text-[#0D2137]">{curQte} {ing.unite !== 'unite' ? ing.unite : ''}</span>
-                              <span>{qMax} {ing.unite !== 'unite' ? ing.unite : ''}</span>
+                            <div className="relative">
+                              <input 
+                                type="range"
+                                min={qMin} 
+                                max={qMax}
+                                step={ing.unite === 'g' ? 50 : ing.unite === 'kg' ? 0.5 : ing.unite === 'cl' || ing.unite === 'ml' ? 5 : ing.unite === 'pcs' ? 1 : 10}
+                                value={curQte}
+                                onChange={e => updateCurseur(ing, Number(e.target.value))}
+                                className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                                style={{
+                                  '--progress': `${progressPercent}%`,
+                                  background: `linear-gradient(to right, #0D2137 0%, #0D2137 var(--progress), #e5e7eb var(--progress), #e5e7eb 100%)`,
+                                  WebkitAppearance: 'none',
+                                  outline: 'none'
+                                }}
+                              />
+                              <style>{`
+                                input[type="range"]::-webkit-slider-thumb {
+                                  -webkit-appearance: none;
+                                  appearance: none;
+                                  width: 18px;
+                                  height: 18px;
+                                  border-radius: 50%;
+                                  background: #0D2137;
+                                  cursor: pointer;
+                                  border: 3px solid white;
+                                  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                  transition: all 0.15s ease;
+                                }
+                                input[type="range"]::-webkit-slider-thumb:hover {
+                                  transform: scale(1.15);
+                                  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+                                }
+                                input[type="range"]::-moz-range-thumb {
+                                  width: 18px;
+                                  height: 18px;
+                                  border-radius: 50%;
+                                  background: #0D2137;
+                                  cursor: pointer;
+                                  border: 3px solid white;
+                                  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                  transition: all 0.15s ease;
+                                }
+                                input[type="range"]::-moz-range-thumb:hover {
+                                  transform: scale(1.15);
+                                  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+                                }
+                              `}</style>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-400 mt-2">
+                              <span className="text-gray-400">{qMin} {ing.unite !== 'unite' ? ing.unite : ''}</span>
+                              <span className="font-bold text-[#0D2137] bg-amber-50 px-2 py-0.5 rounded">
+                                {curQte} {ing.unite !== 'unite' ? ing.unite : ''}
+                              </span>
+                              <span className="text-gray-400">{qMax} {ing.unite !== 'unite' ? ing.unite : ''}</span>
                             </div>
                           </div>
                         )}
