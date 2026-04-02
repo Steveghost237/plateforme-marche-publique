@@ -39,14 +39,14 @@ class ApiService {
     return headers;
   }
 
-  Future<Map<String, dynamic>> get(String endpoint, {bool auth = true}) async {
+  Future<dynamic> get(String endpoint, {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response =
         await http.get(url, headers: _getHeaders(includeAuth: auth));
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> data,
+  Future<dynamic> post(String endpoint, Map<String, dynamic> data,
       {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response = await http.post(
@@ -57,7 +57,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> put(String endpoint, Map<String, dynamic> data,
+  Future<dynamic> put(String endpoint, Map<String, dynamic> data,
       {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response = await http.put(
@@ -68,24 +68,39 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> delete(String endpoint,
-      {bool auth = true}) async {
+  Future<dynamic> delete(String endpoint, {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final response =
         await http.delete(url, headers: _getHeaders(includeAuth: auth));
     return _handleResponse(response);
   }
 
-  Map<String, dynamic> _handleResponse(http.Response response) {
+  dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return {};
-      return jsonDecode(response.body);
+      try {
+        final decoded = jsonDecode(response.body);
+        return decoded; // Retourne directement le décodage (peut être Map ou List)
+      } catch (e) {
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: 'Erreur de parsing: ${e.toString()}',
+        );
+      }
     } else {
+      String errorMessage = 'Erreur réseau';
+      try {
+        if (response.body.isNotEmpty) {
+          final errorData = jsonDecode(response.body);
+          errorMessage =
+              errorData['detail'] ?? errorData['message'] ?? 'Erreur inconnue';
+        }
+      } catch (_) {
+        errorMessage = 'Erreur ${response.statusCode}';
+      }
       throw ApiException(
         statusCode: response.statusCode,
-        message: response.body.isNotEmpty
-            ? jsonDecode(response.body)['detail'] ?? 'Erreur inconnue'
-            : 'Erreur réseau',
+        message: errorMessage,
       );
     }
   }

@@ -31,7 +31,7 @@ class Produit {
       nom: json['nom'],
       slug: json['slug'],
       description: json['description'],
-      prixFcfa: json['prix_fcfa'],
+      prixFcfa: json['prix_fcfa'] ?? 0,
       imageUrl: json['image_url'],
       unite: json['unite'] ?? 'unité',
       estActif: json['est_actif'] ?? true,
@@ -42,9 +42,9 @@ class Produit {
   }
 
   String get prixFormate => '${prixFcfa.toString().replaceAllMapped(
-    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-    (Match m) => '${m[1]} ',
-  )} F';
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]} ',
+      )} F';
 }
 
 class Section {

@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
+import 'orders_screen.dart';
+import 'addresses_screen.dart';
+import 'favorites_screen.dart';
+import 'loyalty_screen.dart';
+import 'notifications_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -99,32 +104,74 @@ class ProfileScreen extends StatelessWidget {
                 _buildMenuItem(
                   icon: Icons.shopping_bag,
                   title: 'Mes commandes',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                    );
+                  },
                 ),
                 _buildMenuItem(
                   icon: Icons.location_on,
                   title: 'Mes adresses',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const AddressesScreen()),
+                    );
+                  },
                 ),
                 _buildMenuItem(
                   icon: Icons.favorite,
                   title: 'Mes favoris',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const FavoritesScreen()),
+                    );
+                  },
                 ),
                 _buildMenuItem(
                   icon: Icons.star,
                   title: 'Points fidélité',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoyaltyScreen()),
+                    );
+                  },
                 ),
                 _buildMenuItem(
                   icon: Icons.notifications,
                   title: 'Notifications',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen()),
+                    );
+                  },
                 ),
                 _buildMenuItem(
                   icon: Icons.help,
                   title: 'Aide',
-                  onTap: () {},
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Aide'),
+                        content: const Text(
+                          'Pour toute assistance, contactez-nous :\n\n'
+                          'Email: support@comebuy.cm\n'
+                          'Téléphone: +237 6XX XXX XXX\n\n'
+                          'Horaires: Lun-Sam 8h-18h',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Fermer'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 const Divider(),
@@ -143,7 +190,8 @@ class ProfileScreen extends StatelessWidget {
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text('Déconnexion'),
-                        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+                        content: const Text(
+                            'Voulez-vous vraiment vous déconnecter ?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
@@ -164,7 +212,8 @@ class ProfileScreen extends StatelessWidget {
                       await authProvider.logout();
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const LoginScreen()),
                           (route) => false,
                         );
                       }

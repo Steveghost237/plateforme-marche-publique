@@ -16,7 +16,7 @@
 
     <application
 
-        android:label="Marché en Ligne"
+        android:label="ComeBuy"
 
         android:name="${applicationName}"
 

@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
-      
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
@@ -69,26 +69,29 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 48),
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
                     color: const Color(0xFFFBBF24),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(
-                    Icons.shopping_basket,
-                    size: 56,
-                    color: Color(0xFF0D2137),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      'assets/images/logo-comebuy.png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Marché en Ligne',
+                  'ComeBuy',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
+                    letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -108,7 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Téléphone',
                     labelStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.phone, color: Color(0xFFFBBF24)),
+                    prefixIcon:
+                        const Icon(Icons.phone, color: Color(0xFFFBBF24)),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.1),
                     border: OutlineInputBorder(
@@ -121,7 +125,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFFBBF24), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFFBBF24), width: 2),
                     ),
                   ),
                   validator: (value) {
@@ -139,10 +144,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Mot de passe',
                     labelStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.lock, color: Color(0xFFFBBF24)),
+                    prefixIcon:
+                        const Icon(Icons.lock, color: Color(0xFFFBBF24)),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: Colors.white70,
                       ),
                       onPressed: () {
@@ -161,7 +169,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFFBBF24), width: 2),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFFBBF24), width: 2),
                     ),
                   ),
                   validator: (value) {
@@ -182,12 +191,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D2137)),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF0D2137)),
                             ),
                           )
                         : const Text(
                             'Se connecter',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                   ),
                 ),

@@ -3,7 +3,7 @@ class ApiConfig {
   // Pour Android Emulator: 10.0.2.2
   // Pour iOS Simulator: localhost
   // Pour device physique: IP de votre machine
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  static const String baseUrl = 'http://192.168.1.179:8000/api';
   
   // Endpoints
   static const String auth = '/auth';

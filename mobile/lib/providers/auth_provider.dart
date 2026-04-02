@@ -49,7 +49,7 @@ class AuthProvider with ChangeNotifier {
       );
 
       await _api.saveToken(data['access_token']);
-      _user = User.fromJson(data['utilisateur']);
+      _user = User.fromJson(data['user']);
       _isLoading = false;
       notifyListeners();
     } catch (e) {
