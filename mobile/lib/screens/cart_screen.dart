@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../models/produit.dart';
 import '../providers/cart_provider.dart';
+import '../utils/image_utils.dart';
 import '../config/api_config.dart';
 import 'checkout_screen.dart';
 
@@ -64,11 +66,12 @@ class CartScreen extends StatelessWidget {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: item.produit.imageUrl != null
+                              child: item.produit.imageUrl != null &&
+                                      ImageUtils.isValidImageUrl(
+                                          item.produit.imageUrl)
                                   ? CachedNetworkImage(
-                                      imageUrl: item.produit.imageUrl!.startsWith('http')
-                                          ? item.produit.imageUrl!
-                                          : '${ApiConfig.baseUrl.replaceAll('/api', '')}${item.produit.imageUrl}',
+                                      imageUrl: ImageUtils.getImageUrl(
+                                          item.produit.imageUrl),
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,
@@ -80,11 +83,13 @@ class CartScreen extends StatelessWidget {
                                           child: CircularProgressIndicator(),
                                         ),
                                       ),
-                                      errorWidget: (context, url, error) => Container(
+                                      errorWidget: (context, url, error) =>
+                                          Container(
                                         width: 80,
                                         height: 80,
                                         color: Colors.grey[200],
-                                        child: const Icon(Icons.image_not_supported),
+                                        child: const Icon(
+                                            Icons.image_not_supported),
                                       ),
                                     )
                                   : Container(
@@ -120,7 +125,8 @@ class CartScreen extends StatelessWidget {
                                   Row(
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
+                                        icon: const Icon(
+                                            Icons.remove_circle_outline),
                                         onPressed: () {
                                           if (item.quantite > 1) {
                                             cart.updateQuantite(
@@ -136,7 +142,8 @@ class CartScreen extends StatelessWidget {
                                         constraints: const BoxConstraints(),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
                                         child: Text(
                                           '${item.quantite}',
                                           style: const TextStyle(
@@ -146,7 +153,8 @@ class CartScreen extends StatelessWidget {
                                         ),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
+                                        icon: const Icon(
+                                            Icons.add_circle_outline),
                                         onPressed: () {
                                           cart.updateQuantite(
                                             item.produit.id,
@@ -160,9 +168,10 @@ class CartScreen extends StatelessWidget {
                                       const Spacer(),
                                       Text(
                                         '${item.total.toString().replaceAllMapped(
-                                          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                          (Match m) => '${m[1]} ',
-                                        )} F',
+                                              RegExp(
+                                                  r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                              (Match m) => '${m[1]} ',
+                                            )} F',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
@@ -215,9 +224,9 @@ class CartScreen extends StatelessWidget {
                           ),
                           Text(
                             '${cart.sousTotal.toString().replaceAllMapped(
-                              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                              (Match m) => '${m[1]} ',
-                            )} F',
+                                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                  (Match m) => '${m[1]} ',
+                                )} F',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,

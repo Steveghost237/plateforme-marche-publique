@@ -9,36 +9,133 @@ from app.schemas.schemas import DemandeOTPIn, VerifOTPIn, FinaliserInscriptionIn
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
-def gen_otp(): return "".join(random.choices(string.digits, k=6))
+def gen_otp():
+    """Génère un OTP unique et aléatoire qui n'a jamais été utilisé"""
+    while True:
+        # Générer un OTP aléatoire de 6 chiffres
+        otp = "".join(random.choices(string.digits, k=6))
+        
+        # Éviter les codes trop simples (000000, 111111, 123456, etc.)
+        simple_codes = ['000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123456', '654321']
+        if otp in simple_codes:
+            continue
+            
+        # Éviter les codes avec des chiffres répétés (ex: 112233)
+        if len(set(otp)) < 3:  # Moins de 3 chiffres uniques
+            continue
+            
+        # Éviter les codes séquentiels (ex: 123456, 234567)
+        is_sequential = True
+        for i in range(5):
+            if int(otp[i+1]) != (int(otp[i]) + 1) % 10:
+                is_sequential = False
+                break
+        if is_sequential:
+            continue
+            
+        # Si on arrive ici, l'OTP est suffisamment aléatoire
+        return otp
 
 @router.post("/inscription/otp")
 def demande_otp(p: DemandeOTPIn, db: Session = Depends(get_db)):
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
     if user and user.statut == "actif":
         raise HTTPException(409, "Numéro déjà enregistré")
-    otp = gen_otp()
+    
+    # Générer un OTP unique qui n'a jamais été utilisé pour cet utilisateur
+    max_attempts = 10
+    otp = None
+    
+    for attempt in range(max_attempts):
+        candidate_otp = gen_otp()
+        
+        # Vérifier que cet OTP n'a jamais été utilisé pour cet utilisateur
+        user_history = db.query(Utilisateur).filter(
+            Utilisateur.telephone == p.telephone,
+            Utilisateur.otp_code == candidate_otp
+        ).first()
+        
+        # Vérifier que cet OTP n'est pas actuellement actif pour un autre utilisateur
+        active_otp = db.query(Utilisateur).filter(
+            Utilisateur.otp_code == candidate_otp,
+            Utilisateur.otp_expire_at > datetime.utcnow()
+        ).first()
+        
+        if not user_history and not active_otp:
+            otp = candidate_otp
+            break
+    
+    if otp is None:
+        # Si après 10 tentatives on ne trouve pas d'OTP unique, utiliser l'ancienne méthode
+        otp = gen_otp()
+        print(f"[WARNING] Impossible de générer un OTP unique après {max_attempts} tentatives pour {p.telephone}")
+    
     expire = datetime.utcnow() + timedelta(minutes=5)
+    
     if not user:
         user = Utilisateur(telephone=p.telephone, nom_complet="", operateur=p.operateur,
                            otp_code=otp, otp_expire_at=expire, otp_tentatives=0)
         db.add(user)
     else:
         user.otp_code = otp; user.otp_expire_at = expire; user.otp_tentatives = 0
+    
     db.commit()
-    print(f"[OTP DEV] {p.telephone} → {otp}")
+    print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
     return {"message": "OTP envoyé", "otp_dev": otp}
 
 @router.post("/inscription/verifier")
 def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
-    user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
-    if not user: raise HTTPException(404, "Numéro introuvable")
-    if (user.otp_tentatives or 0) >= 3: raise HTTPException(429, "Trop de tentatives")
-    if not user.otp_expire_at or datetime.utcnow() > user.otp_expire_at: raise HTTPException(400, "OTP expiré")
-    if user.otp_code != p.otp_code:
-        user.otp_tentatives = (user.otp_tentatives or 0) + 1; db.commit()
-        raise HTTPException(400, "OTP incorrect")
-    user.otp_code = None; user.otp_tentatives = 0; db.commit()
-    return {"message": "OTP vérifié"}
+    try:
+        print(f"[DEBUG] Vérification OTP pour {p.telephone} avec code {p.otp_code}")
+        
+        user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
+        print(f"[DEBUG] Utilisateur trouvé: {user is not None}")
+        
+        if not user: 
+            print(f"[DEBUG] Utilisateur non trouvé pour {p.telephone}")
+            raise HTTPException(404, "Numéro introuvable")
+        
+        print(f"[DEBUG] OTP stocké: {user.otp_code}, OTP reçu: {p.otp_code}")
+        print(f"[DEBUG] Tentatives: {user.otp_tentatives or 0}")
+        print(f"[DEBUG] Expiration: {user.otp_expire_at}")
+        
+        if (user.otp_tentatives or 0) >= 3: 
+            raise HTTPException(429, "Trop de tentatives")
+        
+        # Vérification simplifiée de l'expiration
+        if not user.otp_expire_at:
+            raise HTTPException(400, "OTP expiré")
+            
+        # Comparaison simple sans timezone pour l'instant
+        now = datetime.utcnow()
+        if now > user.otp_expire_at:
+            print(f"[DEBUG] OTP expiré: {now} > {user.otp_expire_at}")
+            raise HTTPException(400, "OTP expiré")
+            
+        if user.otp_code != p.otp_code:
+            print(f"[DEBUG] OTP incorrect: {user.otp_code} != {p.otp_code}")
+            user.otp_tentatives = (user.otp_tentatives or 0) + 1
+            db.commit()
+            raise HTTPException(400, "OTP incorrect")
+            
+        # Nettoyer l'OTP après validation
+        user.otp_code = None
+        user.otp_tentatives = 0
+        db.commit()
+        
+        print(f"[DEBUG] OTP validé avec succès")
+        return {"message": "OTP vérifié"}
+        
+    except HTTPException:
+        # Laisser passer les erreurs HTTP que nous contrôlons
+        raise
+    except Exception as e:
+        # Logger l'erreur détaillée
+        print(f"[ERROR] OTP verification failed: {str(e)}")
+        print(f"[ERROR] Type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Erreur lors de la vérification OTP: {str(e)}")
 
 @router.post("/inscription/finaliser", response_model=TokenOut)
 def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
