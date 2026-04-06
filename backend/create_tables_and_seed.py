@@ -3,6 +3,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
+from sqlalchemy import text
 from app.core.database import engine, Base, SessionLocal
 from app.core.security import hash_password
 from app.models.models import (
@@ -13,6 +14,15 @@ from app.models.models import (
 print("Creating all tables...")
 Base.metadata.create_all(bind=engine)
 print("Tables created successfully!")
+
+# Migrations: add missing columns
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE utilisateurs ADD COLUMN IF NOT EXISTS derniere_plateforme VARCHAR(20)"))
+        conn.commit()
+        print("Migration: colonne derniere_plateforme OK")
+    except Exception as e:
+        print(f"Migration info: {e}")
 
 db = SessionLocal()
 
