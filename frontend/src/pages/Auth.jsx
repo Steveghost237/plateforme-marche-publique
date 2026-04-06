@@ -16,7 +16,7 @@ export function Connexion() {
   const submit = async e => {
     e.preventDefault(); setLoading(true)
     try {
-      const { data } = await api.post('/auth/connexion', form)
+      const { data } = await api.post('/auth/connexion', { ...form, plateforme: 'web' })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success(`Bienvenue ${data.user.nom_complet?.split(' ')[0]} !`)
       navigate(data.user.role === 'admin' || data.user.role === 'super_admin' ? '/admin'

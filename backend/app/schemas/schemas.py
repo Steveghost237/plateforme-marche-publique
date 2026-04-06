@@ -21,6 +21,7 @@ class FinaliserInscriptionIn(BaseModel):
 class ConnexionIn(BaseModel):
     telephone: str
     mot_de_passe: str
+    plateforme: Optional[str] = "web"  # "web" ou "mobile"
 
 class RefreshIn(BaseModel):
     refresh_token: str

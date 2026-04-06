@@ -24,6 +24,7 @@ class Utilisateur(Base):
     statut             = Column(String(20), default="en_attente")
     fcm_token          = Column(Text)
     derniere_connexion = Column(DateTime(timezone=True))
+    derniere_plateforme = Column(String(20))  # "web" ou "mobile"
     created_at         = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at         = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at         = Column(DateTime(timezone=True))

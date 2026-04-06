@@ -505,6 +505,171 @@ def admin_stats_revenus(db: Session = Depends(get_db), _=Depends(get_current_adm
     """)).mappings().all()
     return [dict(r) for r in rows]
 
+@admin_router.get("/monitoring")
+def admin_monitoring(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    """Dashboard de monitoring : stats globales, utilisateurs par plateforme, activité récente"""
+    from datetime import timedelta
+    now = datetime.utcnow()
+    today = now.date()
+    seuil_actif = now - timedelta(hours=24)
+    seuil_en_ligne = now - timedelta(minutes=30)
+
+    # Utilisateurs totaux
+    total_users = db.query(Utilisateur).filter(Utilisateur.deleted_at.is_(None), Utilisateur.statut == "actif").count()
+    total_clients = db.query(Utilisateur).filter(Utilisateur.deleted_at.is_(None), Utilisateur.role == "client", Utilisateur.statut == "actif").count()
+    total_livreurs = db.query(Utilisateur).filter(Utilisateur.deleted_at.is_(None), Utilisateur.role == "livreur").count()
+    total_admins = db.query(Utilisateur).filter(Utilisateur.deleted_at.is_(None), Utilisateur.role.in_(["admin", "super_admin"])).count()
+
+    # Utilisateurs actifs dernières 24h
+    actifs_24h = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_actif
+    ).count()
+
+    # Utilisateurs "en ligne" (connexion < 30 min)
+    en_ligne = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_en_ligne
+    ).count()
+
+    # Par plateforme (en ligne < 30 min)
+    en_ligne_web = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_en_ligne,
+        Utilisateur.derniere_plateforme == "web"
+    ).count()
+    en_ligne_mobile = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_en_ligne,
+        Utilisateur.derniere_plateforme == "mobile"
+    ).count()
+
+    # Actifs 24h par plateforme
+    actifs_web_24h = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_actif,
+        Utilisateur.derniere_plateforme == "web"
+    ).count()
+    actifs_mobile_24h = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion >= seuil_actif,
+        Utilisateur.derniere_plateforme == "mobile"
+    ).count()
+
+    # Nouveaux inscrits aujourd'hui
+    inscrits_today = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        func.date(Utilisateur.created_at) == today
+    ).count()
+
+    # Nouveaux inscrits ce mois
+    first_of_month = today.replace(day=1)
+    inscrits_mois = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        func.date(Utilisateur.created_at) >= first_of_month
+    ).count()
+
+    # Commandes du jour
+    cmd_today = db.query(Commande).filter(func.date(Commande.created_at) == today).count()
+    ca_today = db.query(func.coalesce(func.sum(Commande.total_fcfa), 0)).filter(
+        Commande.statut.notin_(['annulee', 'brouillon']), func.date(Commande.created_at) == today).scalar() or 0
+    en_cours = db.query(Commande).filter(Commande.statut.in_(['en_livraison', 'en_cours_marche', 'assignee'])).count()
+    livrees_today = db.query(Commande).filter(Commande.statut == 'livree', func.date(Commande.livree_at) == today).count()
+
+    # Produits
+    total_produits = db.query(Produit).filter(Produit.deleted_at.is_(None), Produit.est_actif == True).count()
+    total_sections = db.query(Section).filter(Section.actif == True).count()
+
+    # Derniers utilisateurs connectés (10)
+    recents = db.query(Utilisateur).filter(
+        Utilisateur.deleted_at.is_(None),
+        Utilisateur.derniere_connexion.isnot(None)
+    ).order_by(Utilisateur.derniere_connexion.desc()).limit(15).all()
+
+    utilisateurs_recents = [{
+        "id": str(u.id),
+        "nom_complet": u.nom_complet,
+        "telephone": u.telephone,
+        "role": u.role,
+        "plateforme": u.derniere_plateforme or "inconnu",
+        "derniere_connexion": u.derniere_connexion.isoformat() if u.derniere_connexion else None,
+        "en_ligne": u.derniere_connexion >= seuil_en_ligne if u.derniere_connexion else False,
+    } for u in recents]
+
+    return {
+        "utilisateurs": {
+            "total": total_users,
+            "clients": total_clients,
+            "livreurs": total_livreurs,
+            "admins": total_admins,
+            "en_ligne": en_ligne,
+            "actifs_24h": actifs_24h,
+            "inscrits_aujourd_hui": inscrits_today,
+            "inscrits_mois": inscrits_mois,
+        },
+        "plateformes": {
+            "web": {"en_ligne": en_ligne_web, "actifs_24h": actifs_web_24h},
+            "mobile": {"en_ligne": en_ligne_mobile, "actifs_24h": actifs_mobile_24h},
+        },
+        "commandes": {
+            "aujourd_hui": cmd_today,
+            "ca_aujourd_hui": ca_today,
+            "en_cours": en_cours,
+            "livrees_aujourd_hui": livrees_today,
+        },
+        "catalogue": {
+            "total_produits": total_produits,
+            "total_sections": total_sections,
+        },
+        "utilisateurs_recents": utilisateurs_recents,
+    }
+
+@admin_router.get("/monitoring/utilisateurs")
+def admin_monitoring_users(
+    plateforme: Optional[str] = None,
+    role: Optional[str] = None,
+    en_ligne: Optional[bool] = None,
+    page: int = 1,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Liste détaillée des utilisateurs avec filtres plateforme/rôle/en ligne"""
+    from datetime import timedelta
+    seuil_en_ligne = datetime.utcnow() - timedelta(minutes=30)
+
+    q = db.query(Utilisateur).filter(Utilisateur.deleted_at.is_(None))
+    if plateforme:
+        q = q.filter(Utilisateur.derniere_plateforme == plateforme)
+    if role:
+        q = q.filter(Utilisateur.role == role)
+    if en_ligne is True:
+        q = q.filter(Utilisateur.derniere_connexion >= seuil_en_ligne)
+    elif en_ligne is False:
+        q = q.filter(or_(
+            Utilisateur.derniere_connexion.is_(None),
+            Utilisateur.derniere_connexion < seuil_en_ligne
+        ))
+
+    total = q.count()
+    users = q.order_by(Utilisateur.derniere_connexion.desc().nullslast()).offset((page-1)*20).limit(20).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "users": [{
+            "id": str(u.id),
+            "nom_complet": u.nom_complet,
+            "telephone": u.telephone,
+            "email": u.email,
+            "role": u.role,
+            "statut": u.statut,
+            "plateforme": u.derniere_plateforme or "inconnu",
+            "derniere_connexion": u.derniere_connexion.isoformat() if u.derniere_connexion else None,
+            "en_ligne": u.derniere_connexion >= seuil_en_ligne if u.derniere_connexion else False,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        } for u in users]
+    }
+
 @admin_router.get("/parametres")
 def get_params(db: Session = Depends(get_db), _=Depends(get_current_admin)):
     return db.query(Parametre).all()

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Users, Bike, Settings, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera } from 'lucide-react'
+import { LayoutDashboard, Package, Users, Bike, Settings, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity } from 'lucide-react'
 import api from '../utils/api'
 import { useAuth } from '../store'
 
@@ -10,6 +10,7 @@ const MENU = [
   { to:'/admin/livreurs',     icon:<Bike size={16}/>,            label:'Livreurs',      group:'principal' },
   { to:'/admin/clients',      icon:<Users size={16}/>,           label:'Clients',       group:'principal' },
   { to:'/admin/stats',        icon:<TrendingUp size={16}/>,      label:'Statistiques',  group:'principal' },
+  { to:'/admin/monitoring',   icon:<Activity size={16}/>,        label:'Monitoring',    group:'principal',  badge:'live' },
   { to:'/admin/suggestions',  icon:<Lightbulb size={16}/>,       label:'Suggestions',   group:'catalogue',  badge:'new' },
   { to:'/admin/prix',         icon:<DollarSign size={16}/>,      label:'Gestion Prix',  group:'catalogue' },
   { to:'/admin/images',       icon:<Camera size={16}/>,          label:'Photos Produits', group:'catalogue' },
@@ -50,7 +51,11 @@ export function AdminLayout({ children, title }) {
                     ${isActive ? 'bg-white/15 text-white font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
                   {m.icon}
                   <span className="flex-1">{m.label}</span>
-                  {m.badge && <span className="text-[9px] font-bold bg-amber-400 text-gray-900 px-1.5 py-0.5 rounded-full">{m.badge}</span>}
+                  {m.badge === 'live' ? (
+                    <span className="flex items-center gap-1 text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"/>live
+                    </span>
+                  ) : m.badge && <span className="text-[9px] font-bold bg-amber-400 text-gray-900 px-1.5 py-0.5 rounded-full">{m.badge}</span>}
                 </Link>
               </div>
             )

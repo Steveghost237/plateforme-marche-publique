@@ -158,7 +158,9 @@ def connexion(p: ConnexionIn, db: Session = Depends(get_db)):
     if not user or not verify_password(p.mot_de_passe, user.mot_de_passe_hash or ""):
         raise HTTPException(401, "Identifiants incorrects")
     if user.statut != "actif": raise HTTPException(403, f"Compte {user.statut}")
-    user.derniere_connexion = datetime.utcnow(); db.commit()
+    user.derniere_connexion = datetime.utcnow()
+    user.derniere_plateforme = p.plateforme or "web"
+    db.commit()
     return TokenOut(access_token=create_access_token({"sub": str(user.id)}),
                     refresh_token=create_refresh_token({"sub": str(user.id)}),
                     user=UtilisateurOut.model_validate(user))

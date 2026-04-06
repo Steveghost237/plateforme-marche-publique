@@ -44,7 +44,11 @@ class AuthProvider with ChangeNotifier {
     try {
       final data = await _api.post(
         '/auth/connexion',
-        {'telephone': telephone, 'mot_de_passe': password},
+        {
+          'telephone': telephone,
+          'mot_de_passe': password,
+          'plateforme': 'mobile'
+        },
         auth: false,
       );
 
