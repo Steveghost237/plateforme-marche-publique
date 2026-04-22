@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Search, ArrowLeft, ArrowRight, Plus, Minus, ShoppingCart, ChevronRight, Star, X, Lightbulb, Send, ThumbsUp } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api from '../utils/api'
+import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
 import SafeImg from '../components/common/SafeImg'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -357,7 +357,7 @@ export function Catalogue() {
 
 function ProduitCard({ produit: p, fallback }) {
   const { add } = usePanier()
-  const img = p.image_url || fallback
+  const img = getImageUrl(p.image_url) || fallback
 
   const handleAdd = (e) => {
     e.preventDefault()
@@ -468,7 +468,7 @@ export function ProduitDetail() {
 
   const sCode    = produit.section?.code || 'menus_ingredients'
   const meta     = SECTION_META[sCode] || SECTION_META.menus_ingredients
-  const img      = produit.image_url || meta.fallbacks[0]
+  const img      = getImageUrl(produit.image_url) || meta.fallbacks[0]
   const prixBase = produit.prix_base_fcfa || 0
   const prixIngs = Object.values(config).reduce((a, c) => a + (c.prix || 0), 0)
   const prixUnit = prixBase + prixIngs

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, ChevronRight, Star, Weight, RefreshCw, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api from '../utils/api'
+import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
 import SafeImg from '../components/common/SafeImg'
 
@@ -75,7 +75,7 @@ export function Panier() {
                 {items.map(l => (
                   <div key={l.produit.id} className="p-4 flex gap-3 items-start">
                     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100">
-                      <SafeImg src={l.produit.image_url} alt={l.produit.nom} className="w-full h-full object-cover"/>
+                      <SafeImg src={getImageUrl(l.produit.image_url)} alt={l.produit.nom} className="w-full h-full object-cover"/>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-[#0D2137] text-sm truncate">{l.produit.nom}</h3>

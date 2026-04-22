@@ -30,4 +30,12 @@ api.interceptors.response.use(r => r, async err => {
   return Promise.reject(err)
 })
 
+export const API_ORIGIN = API_BASE.replace('/api', '')
+
+export function getImageUrl(url) {
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
 export default api
