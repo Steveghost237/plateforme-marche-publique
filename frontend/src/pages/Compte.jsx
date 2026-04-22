@@ -20,9 +20,13 @@ export function Profil() {
   const [loading, setLoading] = useState(false)
   const [fidelite, setFidelite] = useState(null)
   const [editMode, setEditMode] = useState(false)
+  const [nbCommandes, setNbCommandes] = useState(0)
+  const [nbAdresses, setNbAdresses] = useState(0)
 
   useEffect(() => {
     api.get('/fidelite/compte').then(r => setFidelite(r.data)).catch(() => {})
+    api.get('/commandes/mes-commandes').then(r => setNbCommandes(r.data?.length || 0)).catch(() => {})
+    api.get('/adresses/').then(r => setNbAdresses(r.data?.length || 0)).catch(() => {})
   }, [])
 
   const save = async () => {
@@ -38,8 +42,8 @@ export function Profil() {
   const initials = user?.nom_complet?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || '?'
 
   const MENU_ITEMS = [
-    { to:'/commandes',     emoji:'📦', label:'Mes commandes',      sub:`${12} commandes passées` },
-    { to:'/adresses',      emoji:'📍', label:'Mes adresses',       sub:'2 adresses enregistrées' },
+    { to:'/commandes',     emoji:'📦', label:'Mes commandes',      sub:`${nbCommandes} commande${nbCommandes > 1 ? 's' : ''} passée${nbCommandes > 1 ? 's' : ''}` },
+    { to:'/adresses',      emoji:'📍', label:'Mes adresses',       sub:`${nbAdresses} adresse${nbAdresses > 1 ? 's' : ''} enregistrée${nbAdresses > 1 ? 's' : ''}` },
     { to:'/fidelite',      emoji:'⭐', label:'Programme fidélité', sub: fidelite ? `${fidelite.points_actuels?.toLocaleString()} pts · Niveau ${niv?.label}` : 'Chargement...' },
     { to:'/notifications', emoji:'🔔', label:'Notifications',      sub:'Gérer mes notifications' },
     { to:'/aide',          emoji:'❓', label:'Aide & Support',     sub:'FAQ, nous contacter' },
@@ -384,6 +388,140 @@ export function Fidelite() {
         </div>
 
         <div className="pb-4"/>
+      </div>
+    </div>
+  )
+}
+
+// ── MES ADRESSES ──────────────────────────────────────────────
+export function MesAdresses() {
+  const [adresses, setAdresses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ libelle: 'Domicile', quartier: '', ville: 'Yaoundé' })
+  const { isAuth } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isAuth) { navigate('/connexion'); return }
+    api.get('/adresses/').then(r => setAdresses(r.data)).catch(() => {}).finally(() => setLoading(false))
+  }, [isAuth])
+
+  const ajouter = async () => {
+    if (!form.quartier.trim()) { toast.error('Veuillez renseigner le quartier'); return }
+    try {
+      const { data } = await api.post('/adresses/', { ...form, est_par_defaut: adresses.length === 0 })
+      setAdresses(a => [...a, data])
+      setForm({ libelle: 'Domicile', quartier: '', ville: 'Yaoundé' })
+      setShowForm(false)
+      toast.success('Adresse ajoutée')
+    } catch { toast.error('Erreur lors de l\'ajout') }
+  }
+
+  const supprimer = async (id) => {
+    try {
+      await api.delete(`/adresses/${id}`)
+      setAdresses(a => a.filter(x => x.id !== id))
+      toast.success('Adresse supprimée')
+    } catch { toast.error('Erreur') }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F5EFE6]">
+      <div className="bg-[#0D2137] px-6 py-5">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <h1 className="font-serif text-white font-bold text-xl">📍 Mes Adresses</h1>
+          <button onClick={() => setShowForm(!showForm)} className="text-amber-400 text-xs font-bold">+ Ajouter</button>
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-4 py-5 space-y-3">
+        {showForm && (
+          <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+            <h2 className="font-bold text-[#0D2137] text-sm">Nouvelle adresse</h2>
+            <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+              placeholder="Libellé (ex: Maison, Bureau)" value={form.libelle} onChange={e => setForm({...form, libelle: e.target.value})}/>
+            <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+              placeholder="Quartier" value={form.quartier} onChange={e => setForm({...form, quartier: e.target.value})}/>
+            <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+              placeholder="Ville" value={form.ville} onChange={e => setForm({...form, ville: e.target.value})}/>
+            <div className="flex gap-2">
+              <button onClick={ajouter} className="flex-1 bg-[#0D2137] text-white font-bold py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all">Ajouter</button>
+              <button onClick={() => setShowForm(false)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-2.5 rounded-xl text-sm">Annuler</button>
+            </div>
+          </div>
+        )}
+        {loading ? (
+          <div className="space-y-3">{[...Array(2)].map((_,i) => <div key={i} className="bg-white rounded-2xl h-16 animate-pulse"/>)}</div>
+        ) : adresses.length === 0 && !showForm ? (
+          <div className="text-center py-20">
+            <MapPin size={40} className="mx-auto text-gray-200 mb-4"/>
+            <p className="text-gray-400 font-medium mb-4">Aucune adresse enregistrée</p>
+            <button onClick={() => setShowForm(true)} className="bg-[#0D2137] text-white font-bold px-6 py-3 rounded-xl text-sm">Ajouter une adresse</button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {adresses.map(a => (
+              <div key={a.id} className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                  {a.est_par_defaut ? <Star size={18} className="text-amber-500"/> : <MapPin size={18} className="text-gray-400"/>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-[#0D2137] text-sm">{a.libelle || a.quartier}</p>
+                  <p className="text-xs text-gray-400">{a.quartier}, {a.ville}</p>
+                </div>
+                <button onClick={() => supprimer(a.id)} className="text-red-400 hover:text-red-600 text-xs transition-colors p-1">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── AIDE ──────────────────────────────────────────────────────
+export function Aide() {
+  const FAQ = [
+    { q: 'Comment passer une commande ?', a: 'Parcourez le catalogue, ajoutez des produits au panier, puis finalisez votre commande en choisissant un créneau de livraison et un mode de paiement.' },
+    { q: 'Quels sont les frais de livraison ?', a: 'Les frais de livraison sont de 500 FCFA. La livraison est offerte pour toute commande supérieure ou égale à 5 000 FCFA.' },
+    { q: 'Comment fonctionne le programme fidélité ?', a: 'Vous gagnez 1 point par tranche de 500 FCFA dépensés. Accumulez des points pour monter de niveau et débloquer des récompenses.' },
+    { q: 'Comment annuler une commande ?', a: 'Vous pouvez annuler une commande tant qu\'elle n\'a pas encore été assignée à un livreur, depuis la page Mes Commandes.' },
+    { q: 'Quels modes de paiement acceptez-vous ?', a: 'MTN Mobile Money, Orange Money, et paiement en espèces à la livraison.' },
+    { q: 'Dans quelles villes livrez-vous ?', a: 'Nous livrons actuellement à Yaoundé et Douala.' },
+  ]
+  const [open, setOpen] = useState(null)
+
+  return (
+    <div className="min-h-screen bg-[#F5EFE6]">
+      <div className="bg-[#0D2137] px-6 py-5">
+        <div className="max-w-lg mx-auto">
+          <h1 className="font-serif text-white font-bold text-xl">❓ Aide & Support</h1>
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-4 py-5 space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <h2 className="font-bold text-[#0D2137] text-sm mb-3">Questions fréquentes</h2>
+          <div className="space-y-1 divide-y divide-gray-50">
+            {FAQ.map((f, i) => (
+              <div key={i}>
+                <button onClick={() => setOpen(open === i ? null : i)}
+                  className="w-full text-left py-3 flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-[#0D2137]">{f.q}</span>
+                  <ChevronRight size={14} className={`text-gray-300 transition-transform shrink-0 ${open === i ? 'rotate-90' : ''}`}/>
+                </button>
+                {open === i && <p className="text-xs text-gray-500 pb-3 leading-relaxed">{f.a}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+          <HelpCircle size={32} className="mx-auto text-amber-400 mb-2"/>
+          <p className="font-bold text-[#0D2137] text-sm mb-1">Besoin d'aide supplémentaire ?</p>
+          <p className="text-xs text-gray-400 mb-3">Notre équipe est disponible 7j/7 de 8h à 20h</p>
+          <a href="tel:+237600000000" className="inline-flex items-center gap-2 bg-[#0D2137] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all">
+            📞 Nous appeler
+          </a>
+        </div>
       </div>
     </div>
   )

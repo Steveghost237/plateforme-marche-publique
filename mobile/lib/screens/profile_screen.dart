@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'orders_screen.dart';
@@ -171,6 +172,23 @@ class ProfileScreen extends StatelessWidget {
                         ],
                       ),
                     );
+                  },
+                ),
+                _buildMenuItem(
+                  icon: Icons.chat,
+                  title: 'Contacter sur WhatsApp',
+                  onTap: () async {
+                    final url = Uri.parse(
+                        'https://wa.me/237600000000?text=${Uri.encodeComponent("Bonjour Marché·CM ! J\'ai une question.")}');
+                    try {
+                      await launchUrl(url,
+                          mode: LaunchMode.externalApplication);
+                    } catch (_) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Impossible d\'ouvrir WhatsApp')),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 16),

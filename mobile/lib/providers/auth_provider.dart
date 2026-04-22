@@ -53,6 +53,9 @@ class AuthProvider with ChangeNotifier {
       );
 
       await _api.saveToken(data['access_token']);
+      if (data['refresh_token'] != null) {
+        await _api.saveRefreshToken(data['refresh_token']);
+      }
       _user = User.fromJson(data['user']);
       _isLoading = false;
       notifyListeners();
@@ -129,22 +132,7 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
       _error = e.toString();
       notifyListeners();
-
-      // En cas d'erreur 500, essayer de finaliser directement (contournement)
-      if (e.toString().contains('500') || e.toString().contains('serveur')) {
-        try {
-          await finalizeRegistration(
-            telephone: telephone,
-            nomComplet: '', // Sera rempli plus tard
-            password: '', // Sera rempli plus tard
-          );
-        } catch (finalizeError) {
-          // Si même la finalisation échoue, relancer l'erreur originale
-          rethrow;
-        }
-      } else {
-        rethrow;
-      }
+      rethrow;
     }
   }
 
@@ -153,6 +141,7 @@ class AuthProvider with ChangeNotifier {
     required String nomComplet,
     required String password,
     String? email,
+    String role = 'client',
   }) async {
     _isLoading = true;
     _error = null;
@@ -165,14 +154,21 @@ class AuthProvider with ChangeNotifier {
           'telephone': telephone,
           'nom_complet': nomComplet,
           'mot_de_passe': password,
+          'role': role,
           if (email != null) 'email': email,
         },
         auth: false,
       );
 
-      // Sauvegarder le token reçu
+      // Sauvegarder le token et les données utilisateur
       if (response['access_token'] != null) {
         await _api.saveToken(response['access_token']);
+      }
+      if (response['refresh_token'] != null) {
+        await _api.saveRefreshToken(response['refresh_token']);
+      }
+      if (response['user'] != null) {
+        _user = User.fromJson(response['user']);
       }
 
       _isLoading = false;

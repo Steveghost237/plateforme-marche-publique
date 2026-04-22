@@ -4,6 +4,9 @@ import { Search, ArrowLeft, ArrowRight, Plus, Minus, ShoppingCart, ChevronRight,
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { usePanier, useAuth } from '../store'
+import SafeImg from '../components/common/SafeImg'
+import Breadcrumb from '../components/common/Breadcrumb'
+import SEO from '../components/common/SEO'
 
 const SECTION_META = {
   menus_ingredients: { label:'Menus & Ingrédients', emoji:'🥘', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=1200&q=80&fit=crop', color:'#0D2137',  fallbacks:['https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1598103442097-8b74394b95c7?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80&fit=crop'] },
@@ -13,11 +16,7 @@ const SECTION_META = {
   epices:            { label:'Épices & Condiments', emoji:'🌶️', img:'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=1200&q=80&fit=crop', color:'#8a1a1a',  fallbacks:['https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1532336414038-cf19250c5757?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1509358271058-acd22cc93898?w=400&q=80&fit=crop'] },
 }
 
-function SafeImg({ src, alt, className }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <div className={`${className} bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center`}><span className="text-4xl opacity-40">🍽️</span></div>
-  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} loading="lazy" />
-}
+// SafeImg importé depuis components/common/SafeImg
 
 // ── SIDEBAR SECTION NAV ───────────────────────────────────────
 function SidebarNav({ current }) {
@@ -182,17 +181,24 @@ export function Catalogue() {
   const navigate = useNavigate()
   const [produits, setProduits]   = useState([])
   const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState(false)
   const [q, setQ]                 = useState('')
   const [filtre, setFiltre]       = useState('tous')
+  const [prixMax, setPrixMax]     = useState('')
   const [suggestOpen, setSuggestOpen] = useState(false)
   const meta = SECTION_META[section] || SECTION_META.menus_ingredients
 
-  useEffect(() => {
-    setLoading(true); setQ(''); setFiltre('tous')
+  const loadProduits = () => {
+    setLoading(true); setError(false)
     api.get(`/catalogue/produits?section=${section}&limit=60`)
       .then(r => setProduits(r.data))
-      .catch(() => setProduits([]))
+      .catch(() => { setProduits([]); setError(true) })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    setQ(''); setFiltre('tous'); setPrixMax('')
+    loadProduits()
   }, [section])
 
   const filtered = produits.filter(p => {
@@ -200,11 +206,14 @@ export function Catalogue() {
     if (filtre === 'populaire'  && !p.est_populaire) return false
     if (filtre === 'nouveau'    && !p.est_nouveau)   return false
     if (filtre === 'disponible' && !p.stock_dispo)   return false
+    if (prixMax && p.prix_base_fcfa > Number(prixMax)) return false
     return true
   })
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
+      <SEO title={`${meta.label} — Catalogue`} description={`Découvrez nos ${meta.label.toLowerCase()} frais du marché camerounais. Livraison à domicile Yaoundé & Douala.`}/>
+      <Breadcrumb items={[{ label:'Catalogue', to:'/catalogue/menus_ingredients' }, { label: meta.label }]}/>
       {/* Hero Banner */}
       <div className="relative h-48 overflow-hidden">
         <SafeImg src={meta.img} alt={meta.label} className="w-full h-full object-cover" />
@@ -251,10 +260,16 @@ export function Catalogue() {
             <div className="flex gap-1.5 flex-wrap">
               {[['tous','Tous'],['populaire','⭐ Populaires'],['nouveau','✨ Nouveaux'],['disponible','✅ Dispo']].map(([v,l]) => (
                 <button key={v} onClick={() => setFiltre(v)}
-                  className={`text-xs font-semibold px-3 py-2 rounded-lg transition-colors ${filtre===v ? 'bg-[#0D2137] text-white' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
+                  className={`text-xs font-semibold px-3 py-2.5 min-h-[44px] rounded-lg transition-colors ${filtre===v ? 'bg-[#0D2137] text-white' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
                   {l}
                 </button>
               ))}
+            </div>
+            <div className="relative w-32">
+              <input type="number" inputMode="numeric" placeholder="Prix max"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-[#0D2137] min-h-[44px]"
+                value={prixMax} onChange={e => setPrixMax(e.target.value)} min={0} step={500}/>
+              {prixMax && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">FCFA</span>}
             </div>
           </div>
 
@@ -270,8 +285,27 @@ export function Catalogue() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...Array(8)].map((_,i) => <div key={i} className="bg-white rounded-2xl h-68 animate-pulse"/>)}
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+              {[...Array(8)].map((_,i) => (
+                <div key={i} className="bg-white rounded-2xl animate-pulse">
+                  <div className="h-40 bg-gray-200 rounded-t-2xl"/>
+                  <div className="p-3.5 space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-1/3"/>
+                    <div className="h-4 bg-gray-200 rounded w-2/3"/>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-24 bg-white rounded-2xl">
+              <div className="text-5xl mb-4">📡</div>
+              <p className="text-gray-600 font-semibold mb-2">Impossible de charger les produits</p>
+              <p className="text-gray-400 text-sm mb-6">Vérifiez votre connexion internet et réessayez</p>
+              <button onClick={loadProduits}
+                className="bg-[#0D2137] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all">
+                🔄 Réessayer
+              </button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-24 bg-white rounded-2xl">
@@ -291,7 +325,7 @@ export function Catalogue() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {filtered.map((p, i) => (
                   <ProduitCard key={p.id} produit={p} fallback={meta.fallbacks[i % meta.fallbacks.length]} />
                 ))}
@@ -338,8 +372,12 @@ function ProduitCard({ produit: p, fallback }) {
       <div className="relative h-40 overflow-hidden bg-gray-100">
         <SafeImg src={img} alt={p.nom} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
         {!p.stock_dispo && (
-          <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
-            <span className="bg-white text-gray-700 text-xs font-bold px-3 py-1 rounded-full">Indisponible</span>
+          <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-2">
+            <span className="bg-white text-gray-700 text-xs font-bold px-3 py-1 rounded-full">Rupture de stock</span>
+            <button onClick={e => { e.preventDefault(); toast('Vous serez notifié dès le retour en stock !', { icon:'🔔' }) }}
+              className="bg-amber-400 text-gray-900 text-[10px] font-bold px-3 py-1 rounded-full hover:bg-amber-300 transition-colors min-h-[32px]">
+              🔔 Me prévenir
+            </button>
           </div>
         )}
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
@@ -368,8 +406,8 @@ function ProduitCard({ produit: p, fallback }) {
             </span>
           ) : (
             <button onClick={handleAdd} disabled={!p.stock_dispo}
-              className="w-8 h-8 bg-[#0D2137] hover:bg-amber-400 hover:text-gray-900 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 shadow-sm">
-              <Plus size={14}/>
+              className="w-10 h-10 sm:w-8 sm:h-8 bg-[#0D2137] hover:bg-amber-400 hover:text-gray-900 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 shadow-sm">
+              <Plus size={16}/>
             </button>
           )}
         </div>
@@ -456,9 +494,15 @@ export function ProduitDetail() {
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
+      <SEO title={produit.nom} description={produit.description || `${produit.nom} — ${(prixBase).toLocaleString()} FCFA. Livraison à domicile Yaoundé & Douala.`}/>
+      <Breadcrumb items={[
+        { label:'Catalogue', to:`/catalogue/${sCode}` },
+        { label: meta.label, to:`/catalogue/${sCode}` },
+        { label: produit.nom },
+      ]}/>
       <div className="max-w-6xl mx-auto px-4 py-6">
         <button onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-gray-500 hover:text-[#0D2137] text-sm mb-6 transition-colors group">
+          className="flex items-center gap-2 text-gray-500 hover:text-[#0D2137] text-sm mb-6 transition-colors group min-h-[44px]">
           <ArrowLeft size={15} className="group-hover:-translate-x-0.5 transition-transform"/>
           Retour au catalogue
         </button>

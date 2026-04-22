@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/produit.dart';
 import '../providers/cart_provider.dart';
 import '../utils/image_utils.dart';
-import '../config/api_config.dart';
 import 'checkout_screen.dart';
 
 class CartScreen extends StatelessWidget {

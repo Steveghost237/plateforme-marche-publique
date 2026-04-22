@@ -1,7 +1,11 @@
-import random, string
+import os, random, string
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user
 from app.models.models import Utilisateur, FideliteCompte
@@ -37,7 +41,8 @@ def gen_otp():
         return otp
 
 @router.post("/inscription/otp")
-def demande_otp(p: DemandeOTPIn, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)):
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
     if user and user.statut == "actif":
         raise HTTPException(409, "Numéro déjà enregistré")
@@ -80,8 +85,12 @@ def demande_otp(p: DemandeOTPIn, db: Session = Depends(get_db)):
         user.otp_code = otp; user.otp_expire_at = expire; user.otp_tentatives = 0
     
     db.commit()
+    debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
-    return {"message": "OTP envoyé", "otp_dev": otp}
+    resp = {"message": "OTP envoyé"}
+    if debug:
+        resp["otp_dev"] = otp
+    return resp
 
 @router.post("/inscription/verifier")
 def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
@@ -139,21 +148,31 @@ def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
 
 @router.post("/inscription/finaliser", response_model=TokenOut)
 def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
+    from app.models.models import Livreur
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
     if not user: raise HTTPException(404, "Numéro introuvable")
     if user.statut == "actif": raise HTTPException(409, "Déjà actif")
     user.nom_complet = p.nom_complet
     user.mot_de_passe_hash = hash_password(p.mot_de_passe)
     user.email = p.email; user.statut = "actif"
+    # Assigner le rôle choisi (client ou livreur uniquement, pas admin)
+    role = p.role if p.role in ("client", "livreur") else "client"
+    user.role = role
     if not db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first():
         db.add(FideliteCompte(utilisateur_id=user.id))
+    # Si livreur, créer le profil livreur associé
+    if role == "livreur":
+        existing_livreur = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
+        if not existing_livreur:
+            db.add(Livreur(utilisateur_id=user.id, statut="disponible", niveau="debutant"))
     db.commit(); db.refresh(user)
     return TokenOut(access_token=create_access_token({"sub": str(user.id)}),
                     refresh_token=create_refresh_token({"sub": str(user.id)}),
                     user=UtilisateurOut.model_validate(user))
 
 @router.post("/connexion", response_model=TokenOut)
-def connexion(p: ConnexionIn, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def connexion(request: Request, p: ConnexionIn, db: Session = Depends(get_db)):
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone, Utilisateur.deleted_at.is_(None)).first()
     if not user or not verify_password(p.mot_de_passe, user.mot_de_passe_hash or ""):
         raise HTTPException(401, "Identifiants incorrects")
@@ -174,6 +193,59 @@ def refresh(p: RefreshIn, db: Session = Depends(get_db)):
     return TokenOut(access_token=create_access_token({"sub": str(user.id)}),
                     refresh_token=create_refresh_token({"sub": str(user.id)}),
                     user=UtilisateurOut.model_validate(user))
+
+@router.post("/mot-de-passe-oublie/otp")
+@limiter.limit("5/minute")
+def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)):
+    body = body or {}
+    telephone = body.get("telephone")
+    if not telephone: raise HTTPException(400, "Numéro requis")
+    user = db.query(Utilisateur).filter(Utilisateur.telephone == telephone, Utilisateur.statut == "actif", Utilisateur.deleted_at.is_(None)).first()
+    if not user: raise HTTPException(404, "Aucun compte actif trouvé avec ce numéro")
+    otp = gen_otp()
+    user.otp_code = otp
+    user.otp_expire_at = datetime.utcnow() + timedelta(minutes=5)
+    user.otp_tentatives = 0
+    db.commit()
+    debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
+    print(f"[RESET OTP] {telephone} → {otp}")
+    resp = {"message": "Code de réinitialisation envoyé"}
+    if debug: resp["otp_dev"] = otp
+    return resp
+
+@router.post("/mot-de-passe-oublie/verifier")
+def reset_verify(body: dict = None, db: Session = Depends(get_db)):
+    body = body or {}
+    telephone = body.get("telephone")
+    otp_code = body.get("otp_code")
+    if not telephone or not otp_code: raise HTTPException(400, "Numéro et code requis")
+    user = db.query(Utilisateur).filter(Utilisateur.telephone == telephone).first()
+    if not user: raise HTTPException(404, "Numéro introuvable")
+    if (user.otp_tentatives or 0) >= 3: raise HTTPException(429, "Trop de tentatives")
+    if not user.otp_expire_at or datetime.utcnow() > user.otp_expire_at:
+        raise HTTPException(400, "Code expiré")
+    if user.otp_code != otp_code:
+        user.otp_tentatives = (user.otp_tentatives or 0) + 1
+        db.commit()
+        raise HTTPException(400, "Code incorrect")
+    user.otp_code = None
+    user.otp_tentatives = 0
+    db.commit()
+    return {"message": "Code vérifié", "reset_token": create_access_token({"sub": str(user.id), "type": "reset"}, expires_minutes=10)}
+
+@router.post("/mot-de-passe-oublie/reset")
+def reset_password(body: dict = None, db: Session = Depends(get_db)):
+    body = body or {}
+    token = body.get("reset_token")
+    new_password = body.get("nouveau_mot_de_passe")
+    if not token or not new_password: raise HTTPException(400, "Token et nouveau mot de passe requis")
+    if len(new_password) < 6: raise HTTPException(400, "Mot de passe trop court (min. 6 caractères)")
+    data = decode_token(token)
+    user = db.query(Utilisateur).filter(Utilisateur.id == data.get("sub")).first()
+    if not user: raise HTTPException(404, "Utilisateur introuvable")
+    user.mot_de_passe_hash = hash_password(new_password)
+    db.commit()
+    return {"message": "Mot de passe réinitialisé avec succès"}
 
 @router.get("/me", response_model=UtilisateurOut)
 def me(user=Depends(get_current_user)): return user

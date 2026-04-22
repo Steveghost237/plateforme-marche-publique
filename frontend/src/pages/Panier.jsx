@@ -4,15 +4,10 @@ import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCar
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { usePanier, useAuth } from '../store'
+import SafeImg from '../components/common/SafeImg'
 
 const SECTION_ICONS = {
   menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞', epices: '🌶️'
-}
-
-function SafeImg({ src, alt, className }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <div className={`${className} bg-amber-50 flex items-center justify-center text-2xl`}>🍽️</div>
-  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
 }
 
 // ── PANIER ────────────────────────────────────────────────────
@@ -401,6 +396,14 @@ export function Checkout() {
           {step === 1 && (
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <h2 className="font-bold text-[#0D2137] text-base mb-4 flex items-center gap-2"><MapPin size={16} className="text-amber-500"/> Adresse de livraison</h2>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4 text-xs">
+                <p className="font-bold text-blue-700 mb-1">🛵 Zones de livraison couvertes</p>
+                <div className="flex flex-wrap gap-2 text-blue-600">
+                  <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Yaoundé — tous quartiers</span>
+                  <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Douala — tous quartiers</span>
+                </div>
+                <p className="text-blue-500 mt-1.5">Frais à partir de 500 F · Gratuit dès 5 000 F de commande</p>
+              </div>
               {adresses.length > 0 ? (
                 <div className="space-y-2 mb-4">
                   {adresses.map(a => (

@@ -1,7 +1,7 @@
 // src/utils/api.js
 import axios from 'axios'
 
-let _base = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+let _base = import.meta.env.VITE_API_URL || 'https://comebuy-api.onrender.com/api'
 if (!_base.endsWith('/api')) _base = _base.replace(/\/+$/, '') + '/api'
 const API_BASE = _base
 const api = axios.create({ baseURL: API_BASE, headers: { 'Content-Type': 'application/json' } })
@@ -24,7 +24,7 @@ api.interceptors.response.use(r => r, async err => {
         localStorage.setItem('refresh_token', data.refresh_token)
         orig.headers.Authorization = `Bearer ${data.access_token}`
         return api(orig)
-      } catch { localStorage.clear(); window.location.href = '/connexion' }
+      } catch { localStorage.removeItem('auth'); window.location.href = '/connexion' }
     }
   }
   return Promise.reject(err)

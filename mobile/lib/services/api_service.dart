@@ -15,6 +15,7 @@ class ApiService {
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
+    _refreshToken = prefs.getString('refresh_token');
   }
 
   Future<void> saveToken(String token) async {
@@ -41,38 +42,78 @@ class ApiService {
 
   Future<dynamic> get(String endpoint, {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response =
-        await http.get(url, headers: _getHeaders(includeAuth: auth));
-    return _handleResponse(response);
+    return _requestWithRetry(
+      () => http.get(url, headers: _getHeaders(includeAuth: auth)),
+      auth: auth,
+    );
   }
 
   Future<dynamic> post(String endpoint, Map<String, dynamic> data,
       {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.post(
-      url,
-      headers: _getHeaders(includeAuth: auth),
-      body: jsonEncode(data),
+    return _requestWithRetry(
+      () => http.post(url,
+          headers: _getHeaders(includeAuth: auth), body: jsonEncode(data)),
+      auth: auth,
     );
-    return _handleResponse(response);
   }
 
   Future<dynamic> put(String endpoint, Map<String, dynamic> data,
       {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.put(
-      url,
-      headers: _getHeaders(includeAuth: auth),
-      body: jsonEncode(data),
+    return _requestWithRetry(
+      () => http.put(url,
+          headers: _getHeaders(includeAuth: auth), body: jsonEncode(data)),
+      auth: auth,
     );
-    return _handleResponse(response);
   }
 
   Future<dynamic> delete(String endpoint, {bool auth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response =
-        await http.delete(url, headers: _getHeaders(includeAuth: auth));
-    return _handleResponse(response);
+    return _requestWithRetry(
+      () => http.delete(url, headers: _getHeaders(includeAuth: auth)),
+      auth: auth,
+    );
+  }
+
+  String? _refreshToken;
+
+  Future<void> saveRefreshToken(String token) async {
+    _refreshToken = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('refresh_token', token);
+  }
+
+  Future<void> loadRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _refreshToken = prefs.getString('refresh_token');
+  }
+
+  bool _isRefreshing = false;
+
+  Future<bool> _tryRefreshToken() async {
+    if (_isRefreshing || _refreshToken == null) return false;
+    _isRefreshing = true;
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/auth/refresh');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        await saveToken(data['access_token']);
+        if (data['refresh_token'] != null) {
+          await saveRefreshToken(data['refresh_token']);
+        }
+        return true;
+      }
+    } catch (_) {
+    } finally {
+      _isRefreshing = false;
+    }
+    return false;
   }
 
   dynamic _handleResponse(http.Response response) {
@@ -80,7 +121,7 @@ class ApiService {
       if (response.body.isEmpty) return {};
       try {
         final decoded = jsonDecode(response.body);
-        return decoded; // Retourne directement le décodage (peut être Map ou List)
+        return decoded;
       } catch (e) {
         throw ApiException(
           statusCode: response.statusCode,
@@ -103,6 +144,19 @@ class ApiService {
         message: errorMessage,
       );
     }
+  }
+
+  Future<dynamic> _requestWithRetry(Future<http.Response> Function() request,
+      {bool auth = true}) async {
+    final response = await request();
+    if (response.statusCode == 401 && auth) {
+      final refreshed = await _tryRefreshToken();
+      if (refreshed) {
+        final retryResponse = await request();
+        return _handleResponse(retryResponse);
+      }
+    }
+    return _handleResponse(response);
   }
 }
 

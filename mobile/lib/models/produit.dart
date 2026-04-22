@@ -156,7 +156,7 @@ class Ingredient {
     );
   }
 
-  String get quantiteFormatee => '${quantiteDefaut} $unite';
+  String get quantiteFormatee => '$quantiteDefaut $unite';
   String get prixFormate => '${prixDefautFcfa.toString().replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (Match m) => '${m[1]} ',

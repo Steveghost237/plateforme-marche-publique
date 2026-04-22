@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, Clock } from 'lucide-react'
 
-export default function Footer() {
+export default function Footer({ className = '' }) {
   return (
-    <footer className="bg-[#071220] text-white/40">
+    <footer className={`bg-[#071220] text-white/40 ${className}`}>
       <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 gap-8">
 
         {/* Brand */}
@@ -80,6 +80,34 @@ export default function Footer() {
               <span className="ml-auto">{h}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Trust signals */}
+      <div className="border-t border-white/8 py-6">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-2xl">🛵</span>
+              <p className="text-white/70 text-xs font-semibold">Livraison rapide</p>
+              <p className="text-white/30 text-[10px]">En moins d'1 heure</p>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-2xl">🔒</span>
+              <p className="text-white/70 text-xs font-semibold">Paiement sécurisé</p>
+              <p className="text-white/30 text-[10px]">Mobile Money & Espèces</p>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-2xl">🌿</span>
+              <p className="text-white/70 text-xs font-semibold">Produits frais</p>
+              <p className="text-white/30 text-[10px]">Du marché local chaque matin</p>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-2xl">💬</span>
+              <p className="text-white/70 text-xs font-semibold">Support WhatsApp</p>
+              <a href="https://wa.me/237600000000" className="text-amber-400 text-[10px] hover:underline">+237 6XX XXX XXX</a>
+            </div>
+          </div>
         </div>
       </div>
 

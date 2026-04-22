@@ -17,6 +17,7 @@ class FinaliserInscriptionIn(BaseModel):
     nom_complet: str
     mot_de_passe: str
     email: Optional[str] = None
+    role: Optional[str] = "client"
 
 class ConnexionIn(BaseModel):
     telephone: str

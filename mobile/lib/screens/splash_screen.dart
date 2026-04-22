@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'livreur_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,14 +22,18 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.init();
-    
+
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (!mounted) return;
-    
+
     if (authProvider.isAuthenticated) {
+      final user = authProvider.user;
+      final isLivreur = user != null && user.role == 'livreur';
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+            builder: (_) =>
+                isLivreur ? const LivreurScreen() : const HomeScreen()),
       );
     } else {
       Navigator.of(context).pushReplacement(

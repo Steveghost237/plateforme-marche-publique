@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'home_screen.dart';
+import 'livreur_screen.dart';
 
 class RegisterScreenOtp extends StatefulWidget {
   const RegisterScreenOtp({super.key});
@@ -19,6 +21,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
 
   int _currentStep = 0;
   bool _isLoading = false;
+  String _selectedRole = 'client';
 
   @override
   void dispose() {
@@ -182,6 +185,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
         telephone: _telephoneController.text.trim(),
         nomComplet: _nomController.text.trim(),
         password: _passwordController.text,
+        role: _selectedRole,
       );
 
       setState(() => _isLoading = false);
@@ -193,7 +197,17 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        if (_selectedRole == 'livreur') {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LivreurScreen()),
+            (route) => false,
+          );
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -217,7 +231,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
         } else if (errorString.contains('500')) {
           errorMessage = 'Erreur serveur. Veuillez réessayer plus tard.';
         } else {
-          errorMessage = 'Erreur: ${errorString}';
+          errorMessage = 'Erreur: $errorString';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -258,10 +272,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
-                        const Color(0xFFFBBF24),
-                        const Color(0xFFF59E0B),
+                        Color(0xFFFBBF24),
+                        Color(0xFFF59E0B),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -305,10 +319,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                             height: 6,
                             decoration: BoxDecoration(
                               gradient: _currentStep >= 0
-                                  ? LinearGradient(
+                                  ? const LinearGradient(
                                       colors: [
-                                        const Color(0xFFFBBF24),
-                                        const Color(0xFFF59E0B),
+                                        Color(0xFFFBBF24),
+                                        Color(0xFFF59E0B),
                                       ],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
@@ -327,10 +341,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                             height: 6,
                             decoration: BoxDecoration(
                               gradient: _currentStep >= 1
-                                  ? LinearGradient(
+                                  ? const LinearGradient(
                                       colors: [
-                                        const Color(0xFFFBBF24),
-                                        const Color(0xFFF59E0B),
+                                        Color(0xFFFBBF24),
+                                        Color(0xFFF59E0B),
                                       ],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
@@ -521,6 +535,127 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 ),
                 const SizedBox(height: 20),
 
+                // Choix du rôle
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Je suis…',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _selectedRole = 'client'),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  gradient: _selectedRole == 'client'
+                                      ? const LinearGradient(colors: [
+                                          Color(0xFFFBBF24),
+                                          Color(0xFFF59E0B)
+                                        ])
+                                      : null,
+                                  color: _selectedRole == 'client'
+                                      ? null
+                                      : Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: _selectedRole == 'client'
+                                          ? const Color(0xFFFBBF24)
+                                          : Colors.white.withOpacity(0.2),
+                                      width: 2),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('🛒', style: TextStyle(fontSize: 28)),
+                                    const SizedBox(height: 4),
+                                    Text('Client',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: _selectedRole == 'client'
+                                                ? const Color(0xFF0D2137)
+                                                : Colors.white)),
+                                    Text('Commander',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: _selectedRole == 'client'
+                                                ? const Color(0xFF0D2137)
+                                                    .withOpacity(0.6)
+                                                : Colors.white54)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _selectedRole = 'livreur'),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  gradient: _selectedRole == 'livreur'
+                                      ? const LinearGradient(colors: [
+                                          Color(0xFFFBBF24),
+                                          Color(0xFFF59E0B)
+                                        ])
+                                      : null,
+                                  color: _selectedRole == 'livreur'
+                                      ? null
+                                      : Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: _selectedRole == 'livreur'
+                                          ? const Color(0xFFFBBF24)
+                                          : Colors.white.withOpacity(0.2),
+                                      width: 2),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('🛵', style: TextStyle(fontSize: 28)),
+                                    const SizedBox(height: 4),
+                                    Text('Livreur',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: _selectedRole == 'livreur'
+                                                ? const Color(0xFF0D2137)
+                                                : Colors.white)),
+                                    Text('Livrer',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: _selectedRole == 'livreur'
+                                                ? const Color(0xFF0D2137)
+                                                    .withOpacity(0.6)
+                                                : Colors.white54)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 // Champ mot de passe avec fond clair
                 Container(
                   decoration: BoxDecoration(
@@ -659,10 +794,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 Container(
                   height: 60,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
-                        const Color(0xFFFBBF24),
-                        const Color(0xFFF59E0B),
+                        Color(0xFFFBBF24),
+                        Color(0xFFF59E0B),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,

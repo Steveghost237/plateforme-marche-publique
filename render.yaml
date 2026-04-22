@@ -7,7 +7,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python create_tables_and_seed.py && python seed_produits.py && python update_boissons_images.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python create_tables_and_seed.py && python seed_produits.py && python update_boissons_images.py && python update_menus_images.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -27,6 +27,20 @@ services:
         value: '["*"]'
       - key: DEBUG
         value: false
+      # ── NotchPay Mobile Money (MTN MoMo / Orange Money) ──
+      # Obtenir sur https://business.notchpay.co → Settings → API Keys
+      - key: NOTCHPAY_PUBLIC_KEY
+        sync: false
+      - key: NOTCHPAY_SANDBOX
+        value: false
+      # ── Infobip SMS (confirmation commandes) ──
+      # Obtenir sur https://portal.infobip.com → API Keys
+      - key: INFOBIP_API_KEY
+        sync: false
+      - key: INFOBIP_BASE_URL
+        sync: false
+      - key: SMS_SENDER
+        value: MarcheCM
 
 databases:
   # Base de données PostgreSQL

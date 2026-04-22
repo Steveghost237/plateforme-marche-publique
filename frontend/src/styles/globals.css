@@ -88,5 +88,19 @@ input[type=range] {
   border-radius: 12px !important;
 }
 
+/* Safe area for iPhone notch / home indicator */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Hide scrollbar for mobile horizontal scroll */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Selection */
 ::selection { background: #E8920A22; color: #0D2137; }

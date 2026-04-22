@@ -13,8 +13,11 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final ApiService _api = ApiService();
   bool _isLoading = false;
+  bool _adressesLoading = true;
   String _selectedCreneau = 'matin_8h_12h';
   String _modePaiement = 'mtn_momo';
+  String? _selectedAdresseId;
+  List<Map<String, dynamic>> _adresses = [];
 
   final List<Map<String, String>> _creneaux = [
     {'value': 'matin_8h_12h', 'label': 'Matin (8h - 12h)'},
@@ -28,14 +31,109 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     {'value': 'especes', 'label': 'Espèces à la livraison'},
   ];
 
-  Future<void> _passerCommande() async {
-    final cart = Provider.of<CartProvider>(context, listen: false);
+  @override
+  void initState() {
+    super.initState();
+    _loadAdresses();
+  }
 
+  Future<void> _loadAdresses() async {
+    try {
+      final data = await _api.get('/adresses/');
+      final list =
+          (data as List).map((a) => Map<String, dynamic>.from(a)).toList();
+      setState(() {
+        _adresses = list;
+        _adressesLoading = false;
+        if (list.isNotEmpty) {
+          final defaut = list.firstWhere((a) => a['est_par_defaut'] == true,
+              orElse: () => list.first);
+          _selectedAdresseId = defaut['id'];
+        }
+      });
+    } catch (e) {
+      setState(() => _adressesLoading = false);
+    }
+  }
+
+  Future<void> _ajouterAdresse() async {
+    final quartierCtrl = TextEditingController();
+    final villeCtrl = TextEditingController(text: 'Yaoundé');
+    final libelleCtrl = TextEditingController(text: 'Domicile');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nouvelle adresse'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: libelleCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Libellé', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(
+                controller: quartierCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Quartier', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(
+                controller: villeCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Ville', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () async {
+              if (quartierCtrl.text.isEmpty) return;
+              try {
+                await _api.post('/adresses/', {
+                  'libelle': libelleCtrl.text,
+                  'quartier': quartierCtrl.text,
+                  'ville': villeCtrl.text,
+                  'est_par_defaut': _adresses.isEmpty,
+                });
+                Navigator.of(ctx).pop(true);
+              } catch (e) {
+                Navigator.of(ctx).pop(false);
+              }
+            },
+            child: const Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+    if (result == true) await _loadAdresses();
+  }
+
+  String _formatPrix(int montant) {
+    return montant.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]} ',
+        );
+  }
+
+  Future<void> _passerCommande() async {
+    if (_selectedAdresseId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Veuillez sélectionner une adresse de livraison'),
+            backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    final cart = Provider.of<CartProvider>(context, listen: false);
     setState(() => _isLoading = true);
 
     try {
       final commandeData = {
-        'adresse_id': null, // À implémenter avec sélection d'adresse
+        'adresse_id': _selectedAdresseId,
         'creneau': _selectedCreneau,
         'date_livraison': DateTime.now()
             .add(const Duration(days: 1))
@@ -49,29 +147,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       };
 
       final response = await _api.post('/commandes/', commandeData);
-
-      // Payer la commande
       await _api.post('/commandes/${response['id']}/payer', {});
-
       cart.clear();
 
       if (!mounted) return;
-
       Navigator.of(context).popUntil((route) => route.isFirst);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Commande passée avec succès !'),
-          backgroundColor: Colors.green,
-        ),
+            content: Text('Commande passée avec succès !'),
+            backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -81,77 +170,103 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
+    final fraisLiv = cart.sousTotal >= 5000 ? 0 : 500;
+    final total = cart.sousTotal + fraisLiv;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Finaliser la commande'),
-      ),
+      appBar: AppBar(title: const Text('Finaliser la commande')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Créneau de livraison',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            // ── ADRESSE DE LIVRAISON ──
+            const Text('Adresse de livraison',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            ..._creneaux.map((creneau) => RadioListTile<String>(
-                  title: Text(creneau['label']!),
-                  value: creneau['value']!,
+            if (_adressesLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_adresses.isEmpty)
+              Card(
+                child: ListTile(
+                  leading:
+                      const Icon(Icons.add_location, color: Color(0xFFFBBF24)),
+                  title: const Text('Aucune adresse'),
+                  subtitle: const Text('Ajoutez une adresse pour continuer'),
+                  trailing: const Icon(Icons.add),
+                  onTap: _ajouterAdresse,
+                ),
+              )
+            else
+              ..._adresses.map((a) => RadioListTile<String>(
+                    title: Text(a['libelle'] ?? a['quartier'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle:
+                        Text('${a['quartier'] ?? ''}, ${a['ville'] ?? ''}'),
+                    value: a['id'],
+                    groupValue: _selectedAdresseId,
+                    onChanged: (v) => setState(() => _selectedAdresseId = v),
+                    activeColor: const Color(0xFFFBBF24),
+                    secondary: Icon(
+                      a['est_par_defaut'] == true
+                          ? Icons.star
+                          : Icons.location_on,
+                      color: const Color(0xFFFBBF24),
+                      size: 20,
+                    ),
+                  )),
+            if (_adresses.isNotEmpty)
+              TextButton.icon(
+                onPressed: _ajouterAdresse,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Ajouter une adresse'),
+              ),
+
+            const SizedBox(height: 24),
+            // ── CRÉNEAU ──
+            const Text('Créneau de livraison',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            ..._creneaux.map((c) => RadioListTile<String>(
+                  title: Text(c['label']!),
+                  value: c['value']!,
                   groupValue: _selectedCreneau,
-                  onChanged: (value) {
-                    setState(() => _selectedCreneau = value!);
-                  },
+                  onChanged: (v) => setState(() => _selectedCreneau = v!),
                   activeColor: const Color(0xFFFBBF24),
                 )),
+
             const SizedBox(height: 24),
-            const Text(
-              'Mode de paiement',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            // ── PAIEMENT ──
+            const Text('Mode de paiement',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            ..._paiements.map((paiement) => RadioListTile<String>(
-                  title: Text(paiement['label']!),
-                  value: paiement['value']!,
+            ..._paiements.map((p) => RadioListTile<String>(
+                  title: Text(p['label']!),
+                  value: p['value']!,
                   groupValue: _modePaiement,
-                  onChanged: (value) {
-                    setState(() => _modePaiement = value!);
-                  },
+                  onChanged: (v) => setState(() => _modePaiement = v!),
                   activeColor: const Color(0xFFFBBF24),
                 )),
+
             const SizedBox(height: 24),
+            // ── RÉCAPITULATIF ──
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Récapitulatif',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    const Text('Récapitulatif',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const Divider(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Sous-total'),
-                        Text(
-                          '${cart.sousTotal.toString().replaceAllMapped(
-                                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                (Match m) => '${m[1]} ',
-                              )} F',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                        Text('${_formatPrix(cart.sousTotal)} F',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -160,11 +275,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       children: [
                         const Text('Frais de livraison'),
                         Text(
-                          cart.sousTotal >= 5000 ? 'Offert' : '500 F',
+                          fraisLiv == 0
+                              ? 'Offert'
+                              : '${_formatPrix(fraisLiv)} F',
                           style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: cart.sousTotal >= 5000 ? Colors.green : null,
-                          ),
+                              fontWeight: FontWeight.bold,
+                              color: fraisLiv == 0 ? Colors.green : null),
                         ),
                       ],
                     ),
@@ -172,23 +288,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Total',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text('Total',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                         Text(
-                          '${(cart.sousTotal + (cart.sousTotal >= 5000 ? 0 : 500)).toString().replaceAllMapped(
-                                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                (Match m) => '${m[1]} ',
-                              )} F',
+                          '${_formatPrix(total)} F',
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFBBF24),
-                          ),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFFBBF24)),
                         ),
                       ],
                     ),
@@ -207,18 +315,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF0D2137)),
-                        ),
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF0D2137))),
                       )
-                    : const Text(
-                        'Confirmer la commande',
+                    : const Text('Confirmer la commande',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                            fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

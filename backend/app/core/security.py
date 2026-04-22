@@ -14,8 +14,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/connexion", auto_error=
 def hash_password(p: str) -> str: return pwd_context.hash(p)
 def verify_password(plain: str, hashed: str) -> bool: return pwd_context.verify(plain, hashed)
 
-def create_access_token(data: dict) -> str:
-    d = {**data, "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "type": "access"}
+def create_access_token(data: dict, expires_minutes: int = None) -> str:
+    mins = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    d = {**data, "exp": datetime.utcnow() + timedelta(minutes=mins)}
+    if "type" not in d: d["type"] = "access"
     return jwt.encode(d, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_refresh_token(data: dict) -> str:

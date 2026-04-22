@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowLeft, ChevronRight, Star, Truck, Shield, Clock, MapPin, Phone, CheckCircle } from 'lucide-react'
 import api from '../utils/api'
+import SafeImg from '../components/common/SafeImg'
 
 // ── Images Unsplash libres ────────────────────────────────────
 const HERO_SLIDES = [
@@ -79,12 +80,7 @@ function useInView(threshold = 0.15) {
   return [ref, visible]
 }
 
-// ── Composant image avec fallback gracieux ────────────────────
-function SafeImg({ src, alt, className }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <div className={`${className} bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center`}><span className="text-white/20 text-sm text-center px-4">{alt}</span></div>
-  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} loading="lazy" decoding="async" />
-}
+// SafeImg importé depuis components/common/SafeImg
 
 // ── Stars ─────────────────────────────────────────────────────
 function Stars({ n = 5 }) {

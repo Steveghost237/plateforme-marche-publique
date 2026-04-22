@@ -2,14 +2,45 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0"/>
   <title>Marché·CM — Livraison à domicile Cameroun</title>
+  <meta name="description" content="Marché·CM : votre marché camerounais en ligne. Menus traditionnels, fruits, légumes, boissons livrés à domicile à Yaoundé et Douala. Paiement Mobile Money."/>
+  <meta name="keywords" content="marché cameroun, livraison yaoundé, livraison douala, courses en ligne, mobile money, orange money, mtn momo"/>
+  <meta name="theme-color" content="#0D2137"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta property="og:title" content="Marché·CM — Livraison à domicile Cameroun"/>
+  <meta property="og:description" content="Courses du marché livrées chez vous en moins d'une heure. Yaoundé & Douala."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:locale" content="fr_CM"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" type="image/png" href="/logo-comebuy.png"/>
+  <link rel="apple-touch-icon" href="/logo-comebuy.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    #app-loader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#F5EFE6;transition:opacity .3s}
+    #app-loader.hide{opacity:0;pointer-events:none}
+    #app-loader .spinner{width:40px;height:40px;border:3px solid #0D213720;border-top-color:#0D2137;border-radius:50%;animation:spin .8s linear infinite}
+    #app-loader p{margin-top:16px;font-family:'Jost',sans-serif;color:#0D2137;font-size:14px;font-weight:500}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
 </head>
 <body>
+  <div id="app-loader" aria-label="Chargement">
+    <div class="spinner"></div>
+    <p>Chargement de Marché·CM…</p>
+  </div>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded',function(){
+      var c=0,t=setInterval(function(){if(document.getElementById('root').children.length>0||c++>50){
+        var l=document.getElementById('app-loader');if(l)l.classList.add('hide');
+        setTimeout(function(){if(l&&l.parentNode)l.parentNode.removeChild(l)},400);clearInterval(t)
+      }},100)
+    })
+  </script>
 </body>
 </html>

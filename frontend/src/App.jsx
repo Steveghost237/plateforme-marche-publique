@@ -5,9 +5,10 @@ import Navbar from './components/common/Navbar'
 import Footer from './components/common/Footer'
 import Accueil from './pages/Accueil'
 import { Connexion, Inscription } from './pages/Auth'
+import MotDePasseOublie from './pages/MotDePasseOublie'
 import { Catalogue, ProduitDetail, Recherche } from './pages/Catalogue'
 import { Panier, Checkout } from './pages/Panier'
-import { Profil, MesCommandes, Fidelite, Notifications } from './pages/Compte'
+import { Profil, MesCommandes, MesAdresses, Aide, Fidelite, Notifications } from './pages/Compte'
 import SuiviCommande from './pages/SuiviCommande'
 import Sondage from './pages/Sondage'
 import { AdminDashboard } from './pages/Admin'
@@ -22,6 +23,8 @@ import AdminImages from './pages/AdminImages'
 import AdminMonitoring from './pages/AdminMonitoring'
 import { LiveurDashboard } from './pages/Livreur'
 import { useAuth } from './store'
+import WhatsAppButton from './components/common/WhatsAppButton'
+import BottomNav from './components/common/BottomNav'
 
 function Spinner() {
   return (
@@ -42,8 +45,10 @@ function ProtectedRoute({ children, roles }) {
 function PublicLayout({ children }) {
   return <>
     <Navbar/>
-    <main>{children}</main>
-    <Footer/>
+    <main className="pb-14 sm:pb-0">{children}</main>
+    <Footer className="hidden sm:block"/>
+    <BottomNav/>
+    <WhatsAppButton/>
   </>
 }
 
@@ -59,6 +64,7 @@ export default function App() {
         <Route path="/" element={<PublicLayout><Accueil/></PublicLayout>}/>
         <Route path="/connexion"  element={<Connexion/>}/>
         <Route path="/inscription" element={<Inscription/>}/>
+        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie/>}/>
         <Route path="/recherche"  element={<PublicLayout><Recherche/></PublicLayout>}/>
         <Route path="/catalogue/:section" element={<PublicLayout><Catalogue/></PublicLayout>}/>
         <Route path="/produit/:slug" element={<PublicLayout><ProduitDetail/></PublicLayout>}/>
@@ -70,6 +76,8 @@ export default function App() {
         <Route path="/profil"     element={<ProtectedRoute><PublicLayout><Profil/></PublicLayout></ProtectedRoute>}/>
         <Route path="/fidelite"   element={<ProtectedRoute><PublicLayout><Fidelite/></PublicLayout></ProtectedRoute>}/>
         <Route path="/notifications" element={<ProtectedRoute><PublicLayout><Notifications/></PublicLayout></ProtectedRoute>}/>
+        <Route path="/adresses" element={<ProtectedRoute><PublicLayout><MesAdresses/></PublicLayout></ProtectedRoute>}/>
+        <Route path="/aide" element={<PublicLayout><Aide/></PublicLayout>}/>
         <Route path="/suivi/:id"  element={<ProtectedRoute><SuiviCommande/></ProtectedRoute>}/>
         <Route path="/sondage/:id" element={<ProtectedRoute><Sondage/></ProtectedRoute>}/>
 

@@ -82,14 +82,14 @@ class CartProvider with ChangeNotifier {
   }
 
   List<Map<String, dynamic>> toCommandeData() {
-    return _items.values
-        .map((item) => {
-              'produit_id': item.produit.id,
-              'section_id': item.produit.sectionCode,
-              'quantite': item.quantite,
-              'prix_unitaire': item.produit.prixFcfa,
-              'ingredients': [],
-            })
-        .toList();
+    return _items.values.map((item) {
+      return {
+        'produit_id': item.produit.id,
+        'section_id': item.produit.sectionCode,
+        'quantite': item.quantite,
+        'prix_unitaire': item.produit.prixFcfa,
+        'ingredients': item.ingredientsPersonnalises ?? [],
+      };
+    }).toList();
   }
 }

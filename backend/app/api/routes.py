@@ -57,13 +57,20 @@ def create_produit(p: ProduitCreateIn, db: Session = Depends(get_db), _=Depends(
     if db.query(Produit).filter(Produit.slug == p.slug).first(): raise HTTPException(409, "Slug déjà pris")
     prod = Produit(**p.model_dump()); db.add(prod); db.commit(); db.refresh(prod); return prod
 
+PRODUIT_EDITABLE_FIELDS = {
+    "nom", "slug", "description", "prix_base_fcfa", "prix_max_fcfa",
+    "image_url", "est_menu", "est_actif", "est_populaire", "est_nouveau",
+    "stock_dispo", "ordre", "section_id",
+}
+
 @cat_router.put("/produits/{produit_id}")
 def update_produit(produit_id: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     body = body or {}
     prod = db.query(Produit).filter(Produit.id == produit_id).first()
     if not prod: raise HTTPException(404)
     for k, v in body.items():
-        if hasattr(prod, k): setattr(prod, k, v)
+        if k in PRODUIT_EDITABLE_FIELDS:
+            setattr(prod, k, v)
     db.commit(); return {"ok": True}
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads", "produits")
@@ -121,6 +128,70 @@ def creer_adresse(p: AdresseIn, db: Session = Depends(get_db), user=Depends(get_
 def delete_adresse(adr_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
     a = db.query(Adresse).filter(Adresse.id == adr_id, Adresse.utilisateur_id == user.id).first()
     if a: db.delete(a); db.commit()
+    return {"ok": True}
+
+# ══════════════════════════════════════════════
+# FAVORIS
+# ══════════════════════════════════════════════
+fav_router = APIRouter(prefix="/favoris", tags=["Favoris"])
+
+@fav_router.get("/")
+def mes_favoris(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    listes = db.query(ListeFavorite).filter(ListeFavorite.utilisateur_id == user.id).all()
+    result = []
+    for l in listes:
+        lignes = db.query(ListeFavoriteLigne).filter(ListeFavoriteLigne.liste_id == l.id).all()
+        produits = []
+        for lg in lignes:
+            p = db.query(Produit).filter(Produit.id == lg.produit_id).first()
+            if p:
+                produits.append({
+                    "ligne_id": str(lg.id), "produit_id": str(p.id),
+                    "nom": p.nom, "slug": p.slug, "image_url": p.image_url,
+                    "prix_base_fcfa": p.prix_base_fcfa, "quantite": lg.quantite,
+                })
+        result.append({
+            "id": str(l.id), "nom": l.nom,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "produits": produits,
+        })
+    return result
+
+@fav_router.post("/")
+def creer_liste_favorite(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    body = body or {}
+    liste = ListeFavorite(utilisateur_id=user.id, nom=body.get("nom", "Ma liste"))
+    db.add(liste); db.commit(); db.refresh(liste)
+    return {"id": str(liste.id), "nom": liste.nom}
+
+@fav_router.post("/{liste_id}/produits")
+def ajouter_favori(liste_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    body = body or {}
+    liste = db.query(ListeFavorite).filter(ListeFavorite.id == liste_id, ListeFavorite.utilisateur_id == user.id).first()
+    if not liste: raise HTTPException(404, "Liste introuvable")
+    produit_id = body.get("produit_id")
+    if not produit_id: raise HTTPException(400, "produit_id requis")
+    existing = db.query(ListeFavoriteLigne).filter(
+        ListeFavoriteLigne.liste_id == liste_id, ListeFavoriteLigne.produit_id == produit_id).first()
+    if existing: return {"ok": True, "message": "Déjà dans la liste"}
+    lg = ListeFavoriteLigne(liste_id=liste_id, produit_id=produit_id, quantite=body.get("quantite", 1))
+    db.add(lg); db.commit()
+    return {"ok": True}
+
+@fav_router.delete("/{liste_id}/produits/{produit_id}")
+def retirer_favori(liste_id: UUID, produit_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    liste = db.query(ListeFavorite).filter(ListeFavorite.id == liste_id, ListeFavorite.utilisateur_id == user.id).first()
+    if not liste: raise HTTPException(404, "Liste introuvable")
+    lg = db.query(ListeFavoriteLigne).filter(
+        ListeFavoriteLigne.liste_id == liste_id, ListeFavoriteLigne.produit_id == produit_id).first()
+    if lg: db.delete(lg); db.commit()
+    return {"ok": True}
+
+@fav_router.delete("/{liste_id}")
+def supprimer_liste_favorite(liste_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    liste = db.query(ListeFavorite).filter(ListeFavorite.id == liste_id, ListeFavorite.utilisateur_id == user.id).first()
+    if not liste: raise HTTPException(404)
+    db.delete(liste); db.commit()
     return {"ok": True}
 
 # ══════════════════════════════════════════════
@@ -226,6 +297,31 @@ def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
         } for l in (cmd.lignes or [])],
     }
 
+@cmd_router.post("/{cmd_id}/initier-paiement")
+async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Initie un paiement Mobile Money via NotchPay (MTN MoMo / Orange Money)"""
+    body = body or {}
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    if cmd.statut not in ("en_attente_paiement", "brouillon"): raise HTTPException(400, "Commande déjà payée ou annulée")
+    from app.services.payment_service import initier_paiement
+    telephone = body.get("telephone_paiement") or user.telephone
+    result = await initier_paiement(
+        montant_fcfa=cmd.total_fcfa,
+        telephone=telephone,
+        email=user.email,
+        reference=cmd.numero,
+        description=f"Commande {cmd.numero} — Marché·CM",
+        callback_url=body.get("callback_url", ""),
+    )
+    if result.get("success"):
+        pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+        if pmt:
+            pmt.reference_externe = result.get("transaction_ref")
+            pmt.telephone_paiement = telephone
+        db.commit()
+    return result
+
 @cmd_router.post("/{cmd_id}/payer")
 def confirmer_paiement(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
     cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
@@ -237,6 +333,14 @@ def confirmer_paiement(cmd_id: UUID, db: Session = Depends(get_db), user=Depends
                         titre="Commande confirmée !", corps=f"Commande {cmd.numero} confirmée.",
                         donnees_json={"commande_id": str(cmd_id)}))
     db.commit()
+    # Envoi SMS de confirmation (async, ne bloque pas la réponse)
+    try:
+        import asyncio
+        from app.services.sms_service import envoyer_sms, sms_confirmation_commande
+        msg = sms_confirmation_commande(cmd.numero, cmd.total_fcfa, cmd.creneau or "")
+        asyncio.get_event_loop().create_task(envoyer_sms(user.telephone, msg))
+    except Exception as e:
+        print(f"[SMS SEND ERROR] {e}")
     return {"message": "Paiement confirmé", "numero": cmd.numero}
 
 @cmd_router.post("/{cmd_id}/annuler")

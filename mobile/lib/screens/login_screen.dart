@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/validators.dart';
+import '../services/api_service.dart';
 import 'home_screen.dart';
+import 'livreur_screen.dart';
 import 'register_screen_otp.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,6 +28,128 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _showForgotPasswordDialog() {
+    final telCtrl = TextEditingController();
+    final otpCtrl = TextEditingController();
+    final newPwdCtrl = TextEditingController();
+    final api = ApiService();
+    int step = 1;
+    String? resetToken;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(step == 1
+              ? 'Mot de passe oublié'
+              : step == 2
+                  ? 'Code de vérification'
+                  : 'Nouveau mot de passe'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (step == 1) ...[
+                const Text(
+                    'Entrez votre numéro de téléphone pour recevoir un code.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: telCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                        labelText: 'Téléphone',
+                        hintText: '+237 6XX XXX XXX',
+                        border: OutlineInputBorder())),
+              ],
+              if (step == 2) ...[
+                Text('Code envoyé au ${telCtrl.text}',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: otpCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                        labelText: 'Code à 6 chiffres',
+                        border: OutlineInputBorder())),
+              ],
+              if (step == 3) ...[
+                const Text('Choisissez un nouveau mot de passe sécurisé.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: newPwdCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Nouveau mot de passe',
+                        border: OutlineInputBorder())),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  if (step == 1) {
+                    if (!Validators.isValidCameroonPhone(telCtrl.text)) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Numéro invalide'),
+                          backgroundColor: Colors.red));
+                      return;
+                    }
+                    await api.post(
+                        '/auth/mot-de-passe-oublie/otp',
+                        {
+                          'telephone':
+                              Validators.normalizeCameroonPhone(telCtrl.text)
+                        },
+                        auth: false);
+                    setDialogState(() => step = 2);
+                  } else if (step == 2) {
+                    final data = await api.post(
+                        '/auth/mot-de-passe-oublie/verifier',
+                        {
+                          'telephone':
+                              Validators.normalizeCameroonPhone(telCtrl.text),
+                          'otp_code': otpCtrl.text
+                        },
+                        auth: false);
+                    resetToken = data['reset_token'];
+                    setDialogState(() => step = 3);
+                  } else {
+                    await api.post(
+                        '/auth/mot-de-passe-oublie/reset',
+                        {
+                          'reset_token': resetToken,
+                          'nouveau_mot_de_passe': newPwdCtrl.text
+                        },
+                        auth: false);
+                    Navigator.of(ctx).pop();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text(
+                              'Mot de passe réinitialisé ! Connectez-vous.'),
+                          backgroundColor: Colors.green));
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('$e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              child: Text(step == 3 ? 'Réinitialiser' : 'Suivant'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -39,8 +164,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      final user = authProvider.user;
+      final isLivreur = user != null && user.role == 'livreur';
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) =>
+                isLivreur ? const LivreurScreen() : const HomeScreen()),
+        (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
@@ -76,10 +206,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
-                          const Color(0xFFFBBF24),
-                          const Color(0xFFF59E0B),
+                          Color(0xFFFBBF24),
+                          Color(0xFFF59E0B),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -186,6 +316,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Veuillez entrer votre numéro';
                       }
+                      if (!Validators.isValidCameroonPhone(value)) {
+                        return 'Numéro camerounais invalide (ex: +237 6XX XXX XXX)';
+                      }
                       return null;
                     },
                   ),
@@ -268,16 +401,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 12),
+
+                // Mot de passe oublié
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () => _showForgotPasswordDialog(),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Mot de passe oublié ?',
+                        style: TextStyle(
+                          color: Color(0xFFFBBF24),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Bouton de connexion moderne
                 Container(
                   height: 60,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
-                        const Color(0xFFFBBF24),
-                        const Color(0xFFF59E0B),
+                        Color(0xFFFBBF24),
+                        Color(0xFFF59E0B),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,

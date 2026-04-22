@@ -48,5 +48,6 @@ export const usePanier = create(persist((set, get) => ({
 
   get count() { return get().lignes.reduce((a, l) => a + l.quantite, 0) },
   get sousTotal() { return get().lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0) },
-  get total() { return get().lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0) + 500 },
+  get fraisLivraison() { const st = get().lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0); return st >= 5000 ? 0 : 500 },
+  get total() { const st = get().lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0); return st + (st >= 5000 ? 0 : 500) },
 }), { name: 'panier' }))

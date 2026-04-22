@@ -17,7 +17,7 @@ class MenuCustomizationScreen extends StatefulWidget {
 
 class _MenuCustomizationScreenState extends State<MenuCustomizationScreen> {
   final ApiService _api = ApiService();
-  Map<String, IngredientConfig> _config = {};
+  final Map<String, IngredientConfig> _config = {};
   bool _isLoading = true;
   Produit? _produitDetail;
 
@@ -343,7 +343,7 @@ class _MenuCustomizationScreenState extends State<MenuCustomizationScreen> {
                               if (config == null) return const SizedBox.shrink();
                               
                               return _buildIngredientCard(ingredient, config);
-                            }).toList()
+                            })
                           else
                             const Center(
                               child: Text('Aucun ingrédient personnalisable'),

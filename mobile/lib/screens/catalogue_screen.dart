@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/produit.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
-import '../config/api_config.dart';
 import '../utils/image_utils.dart';
 import 'menu_customization_screen.dart';
 
@@ -20,6 +19,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   List<Section> _sections = [];
   List<Produit> _produits = [];
   bool _isLoading = true;
+  bool _hasError = false;
   String? _selectedSection;
   String _searchQuery = '';
 
@@ -30,7 +30,10 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
       final sectionsData = await _api.get('/catalogue/sections', auth: false);
       final produitsData = await _api.get(
@@ -46,12 +49,10 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
@@ -196,27 +197,57 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.75,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.wifi_off,
+                                size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            const Text('Impossible de charger les produits',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey)),
+                            const SizedBox(height: 8),
+                            const Text('Vérifiez votre connexion internet',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey)),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: _loadData,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Réessayer'),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D2137),
+                                  foregroundColor: Colors.white),
+                            ),
+                          ],
                         ),
-                        itemCount: _filteredProduits.length,
-                        itemBuilder: (context, index) {
-                          return _buildProduitCard(_filteredProduits[index]);
-                        },
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.75,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: _filteredProduits.length,
+                            itemBuilder: (context, index) {
+                              return _buildProduitCard(
+                                  _filteredProduits[index]);
+                            },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
           ),
         ],
       ),
@@ -416,10 +447,10 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                                 color: const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Composer',
                                     style: TextStyle(
                                       color: Color(0xFF1B6CA8),
@@ -427,9 +458,9 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const SizedBox(width: 2),
+                                  SizedBox(width: 2),
                                   Icon(Icons.chevron_right,
-                                      size: 14, color: const Color(0xFF1B6CA8)),
+                                      size: 14, color: Color(0xFF1B6CA8)),
                                 ],
                               ),
                             ),
@@ -574,23 +605,23 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                 spacing: 8,
                 children: [
                   if (produit.estMenu)
-                    Chip(
-                      label: const Text('MENU',
+                    const Chip(
+                      label: Text('MENU',
                           style: TextStyle(color: Colors.white, fontSize: 12)),
                       backgroundColor: Colors.red,
                     ),
                   if (produit.estNouveau)
-                    Chip(
-                      label: const Text('NOUVEAU',
+                    const Chip(
+                      label: Text('NOUVEAU',
                           style: TextStyle(color: Colors.white, fontSize: 12)),
                       backgroundColor: Colors.green,
                     ),
                   if (produit.estPopulaire)
-                    Chip(
-                      label: const Text('POPULAIRE',
+                    const Chip(
+                      label: Text('POPULAIRE',
                           style: TextStyle(
                               color: Color(0xFF0D2137), fontSize: 12)),
-                      backgroundColor: const Color(0xFFFBBF24),
+                      backgroundColor: Color(0xFFFBBF24),
                     ),
                 ],
               ),

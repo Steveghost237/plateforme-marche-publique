@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Phone, Lock, Eye, EyeOff, ArrowRight, Check } from 'lucide-react'
+import { Phone, Lock, Eye, EyeOff, ArrowRight, Check, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
+import { isValidCameroonPhone, normalizeCameroonPhone, getPasswordStrength } from '../utils/format'
 
 // ── CONNEXION ─────────────────────────────────────────────────
 export function Connexion() {
@@ -14,9 +15,13 @@ export function Connexion() {
   const navigate = useNavigate()
 
   const submit = async e => {
-    e.preventDefault(); setLoading(true)
+    e.preventDefault()
+    if (!isValidCameroonPhone(form.telephone)) {
+      toast.error('Numéro camerounais invalide (ex: +237 6XX XXX XXX)'); return
+    }
+    setLoading(true)
     try {
-      const { data } = await api.post('/auth/connexion', { ...form, plateforme: 'web' })
+      const { data } = await api.post('/auth/connexion', { ...form, telephone: normalizeCameroonPhone(form.telephone), plateforme: 'web' })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success(`Bienvenue ${data.user.nom_complet?.split(' ')[0]} !`)
       navigate(data.user.role === 'admin' || data.user.role === 'super_admin' ? '/admin'
@@ -33,12 +38,15 @@ export function Connexion() {
           <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Téléphone</label>
           <div className="relative">
             <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
-            <input className="input pl-10" placeholder="+237 6XX XXX XXX" required
+            <input className="input pl-10" placeholder="+237 6XX XXX XXX" required type="tel" inputMode="numeric" autoComplete="tel"
               value={form.telephone} onChange={e => setForm({...form, telephone: e.target.value})}/>
           </div>
         </div>
         <div>
-          <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Mot de passe</label>
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="text-xs font-semibold text-navy/70">Mot de passe</label>
+            <Link to="/mot-de-passe-oublie" className="text-[10px] text-blue-500 hover:underline font-semibold">Mot de passe oublié ?</Link>
+          </div>
           <div className="relative">
             <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
             <input className="input pl-10 pr-10" type={show ? 'text' : 'password'} placeholder="••••••••" required
@@ -65,7 +73,7 @@ export function Inscription() {
   const [tel, setTel] = useState('')
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
-  const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'' })
+  const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const { setAuth } = useAuth()
@@ -96,7 +104,7 @@ export function Inscription() {
       const { data } = await api.post('/auth/inscription/finaliser', { telephone: tel, ...form })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success('Compte créé ! Bienvenue 🎉')
-      navigate('/')
+      navigate(data.user.role === 'livreur' ? '/livreur' : '/')
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
     finally { setLoading(false) }
   }
@@ -127,7 +135,7 @@ export function Inscription() {
           <div>
             <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Numéro de téléphone</label>
             <div className="relative"><Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
-              <input className="input pl-10" placeholder="+237 6XX XXX XXX" required value={tel} onChange={e => setTel(e.target.value)}/>
+              <input className="input pl-10" placeholder="+237 6XX XXX XXX" required type="tel" inputMode="numeric" autoComplete="tel" value={tel} onChange={e => setTel(e.target.value)}/>
             </div>
           </div>
           <div>
@@ -172,6 +180,25 @@ export function Inscription() {
               value={form.nom_complet} onChange={e => setForm({...form, nom_complet: e.target.value})}/>
           </div>
           <div>
+            <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Je suis…</label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { val:'client',  emoji:'🛒', label:'Client',  sub:'Je veux commander' },
+                { val:'livreur', emoji:'🛵', label:'Livreur', sub:'Je veux livrer' },
+              ].map(r => (
+                <button key={r.val} type="button" onClick={() => setForm({...form, role: r.val})}
+                  className={`py-4 px-3 rounded-xl border-2 text-center transition-all
+                    ${form.role === r.val
+                      ? 'border-navy bg-navy text-white shadow-md'
+                      : 'border-gray-200 text-gray-600 hover:border-navy/30 bg-white'}`}>
+                  <div className="text-2xl mb-1">{r.emoji}</div>
+                  <div className="font-bold text-sm">{r.label}</div>
+                  <div className={`text-[10px] mt-0.5 ${form.role === r.val ? 'text-white/60' : 'text-gray-400'}`}>{r.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Mot de passe</label>
             <div className="relative">
               <input className="input pr-10" type={show ? 'text' : 'password'} placeholder="Minimum 8 caractères" required minLength={6}
@@ -180,6 +207,17 @@ export function Inscription() {
                 {show ? <EyeOff size={16}/> : <Eye size={16}/>}
               </button>
             </div>
+            {form.mot_de_passe && (() => {
+              const s = getPasswordStrength(form.mot_de_passe)
+              return (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1">
+                    {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.score ? s.color : 'bg-gray-200'}`}/>)}
+                  </div>
+                  <p className={`text-[10px] font-semibold ${s.text}`}>{s.label} — min. 8 car., 1 majuscule, 1 chiffre, 1 spécial</p>
+                </div>
+              )
+            })()}
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Créer mon compte 🎉</>}
