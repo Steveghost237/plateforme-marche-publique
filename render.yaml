@@ -7,7 +7,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python create_tables_and_seed.py && python seed_produits.py && python update_boissons_images.py && python update_menus_images.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python create_tables_and_seed.py && python seed_produits.py && python update_boissons_images.py && python update_menus_images_v2.py && python update_fruits_epices_images.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

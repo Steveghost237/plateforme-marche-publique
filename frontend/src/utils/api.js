@@ -35,7 +35,10 @@ export const API_ORIGIN = API_BASE.replace('/api', '')
 export function getImageUrl(url) {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) return url
-  return `${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`
+  // Encoder chaque segment du path (gère espaces et accents)
+  const path = url.startsWith('/') ? url : '/' + url
+  const encoded = path.split('/').map(s => s ? encodeURIComponent(s) : s).join('/')
+  return `${API_ORIGIN}${encoded}`
 }
 
 export default api
