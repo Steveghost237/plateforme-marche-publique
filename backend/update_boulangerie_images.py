@@ -3,7 +3,8 @@ Script pour associer les images locales de boulangerie aux produits.
 Scanne récursivement backend/static/images/boulangerie/ et associe chaque image
 au produit dont le slug correspond au nom du fichier (sans extension).
 """
-import sys, os
+import sys, os, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.core.database import engine, Base, SessionLocal
@@ -12,7 +13,7 @@ from app.models.models import Produit
 Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 
-BASE_IMG = os.path.join(os.path.dirname(__file__), "static", "images", "boulangerie")
+BASE_IMG = os.path.join(os.path.dirname(__file__), "static", "images", "Boulangerie")
 
 if not os.path.isdir(BASE_IMG):
     print(f"[BOULANGERIE] Dossier introuvable: {BASE_IMG}")
