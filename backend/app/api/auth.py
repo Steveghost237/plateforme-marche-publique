@@ -1,4 +1,4 @@
-import os, random, string
+import os, random, string, asyncio
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -10,6 +10,36 @@ from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user
 from app.models.models import Utilisateur, FideliteCompte
 from app.schemas.schemas import DemandeOTPIn, VerifOTPIn, FinaliserInscriptionIn, ConnexionIn, RefreshIn, TokenOut, UtilisateurOut, UtilisateurUpdateIn
+from app.services.sms_service import envoyer_sms
+
+
+def _send_otp_sms_sync(telephone: str, otp: str, contexte: str = "inscription"):
+    """Envoie un SMS OTP de façon synchrone (compatible avec routes FastAPI sync).
+    Le numéro doit être au format E.164 (+237XXXXXXXXX).
+    """
+    # Normaliser le numéro: ajouter +237 si absent
+    tel = telephone.strip().replace(" ", "")
+    if tel.startswith("00"):
+        tel = "+" + tel[2:]
+    elif not tel.startswith("+"):
+        tel = "+237" + tel.lstrip("0")
+
+    if contexte == "reset":
+        msg = f"Marché·CM - Code de réinitialisation: {otp}\nValide 5 minutes. Ne le partagez pas."
+    else:
+        msg = f"Marché·CM - Code de vérification: {otp}\nValide 5 minutes. Bienvenue !"
+
+    try:
+        # Appeler la coroutine asynchrone dans un nouvel event loop
+        result = asyncio.run(envoyer_sms(tel, msg))
+        if result.get("success"):
+            print(f"[SMS OTP ✓] {tel} - simulation={result.get('simulation', False)}")
+        else:
+            print(f"[SMS OTP ✗] {tel} - erreur: {result.get('error')}")
+        return result
+    except Exception as e:
+        print(f"[SMS OTP EXCEPTION] {e}")
+        return {"success": False, "error": str(e)}
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
@@ -87,9 +117,14 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     db.commit()
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
+
+    # ENVOI EFFECTIF DU SMS
+    sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
+
     resp = {"message": "OTP envoyé"}
     if debug:
         resp["otp_dev"] = otp
+        resp["sms_status"] = sms_result
     return resp
 
 @router.post("/inscription/verifier")
@@ -209,8 +244,14 @@ def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)
     db.commit()
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[RESET OTP] {telephone} → {otp}")
+
+    # ENVOI EFFECTIF DU SMS
+    sms_result = _send_otp_sms_sync(telephone, otp, contexte="reset")
+
     resp = {"message": "Code de réinitialisation envoyé"}
-    if debug: resp["otp_dev"] = otp
+    if debug:
+        resp["otp_dev"] = otp
+        resp["sms_status"] = sms_result
     return resp
 
 @router.post("/mot-de-passe-oublie/verifier")

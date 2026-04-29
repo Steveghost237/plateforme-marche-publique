@@ -163,17 +163,23 @@ class CartScreen extends StatelessWidget {
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(),
                                       ),
-                                      const Spacer(),
-                                      Text(
-                                        '${item.total.toString().replaceAllMapped(
-                                              RegExp(
-                                                  r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                              (Match m) => '${m[1]} ',
-                                            )} F',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Color(0xFFFBBF24),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            '${item.total.toString().replaceAllMapped(
+                                                  RegExp(
+                                                      r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                                  (Match m) => '${m[1]} ',
+                                                )} F',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Color(0xFFFBBF24),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],

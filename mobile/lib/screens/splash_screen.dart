@@ -51,16 +51,23 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 120,
-              height: 120,
+              width: 140,
+              height: 140,
               decoration: BoxDecoration(
-                color: const Color(0xFFFBBF24),
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.shopping_basket,
-                size: 64,
-                color: Color(0xFF0D2137),
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/logo-comebuy.png',
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 24),

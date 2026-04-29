@@ -85,7 +85,7 @@ class CartProvider with ChangeNotifier {
     return _items.values.map((item) {
       return {
         'produit_id': item.produit.id,
-        'section_id': item.produit.sectionCode,
+        'section_id': item.produit.sectionId ?? item.produit.sectionCode,
         'quantite': item.quantite,
         'prix_unitaire': item.produit.prixFcfa,
         'ingredients': item.ingredientsPersonnalises ?? [],

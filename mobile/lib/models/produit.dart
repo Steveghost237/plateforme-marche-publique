@@ -14,6 +14,7 @@ class Produit {
   final bool estNouveau;
   final bool stockDispo;
   final String sectionCode;
+  final String? sectionId;
   final String? sectionNom;
   final List<Ingredient>? ingredients;
 
@@ -33,6 +34,7 @@ class Produit {
     this.estNouveau = false,
     this.stockDispo = true,
     required this.sectionCode,
+    this.sectionId,
     this.sectionNom,
     this.ingredients,
   });
@@ -40,12 +42,15 @@ class Produit {
   factory Produit.fromJson(Map<String, dynamic> json) {
     // Gérer la section si elle est imbriquée
     String sectionCode = '';
+    String? sectionId;
     String? sectionNom;
     if (json['section'] != null) {
       sectionCode = json['section']['code'] ?? '';
+      sectionId = json['section']['id']?.toString();
       sectionNom = json['section']['nom'];
     } else {
       sectionCode = json['section_code'] ?? '';
+      sectionId = json['section_id']?.toString();
       sectionNom = json['section_nom'];
     }
 
@@ -65,6 +70,7 @@ class Produit {
       estNouveau: json['est_nouveau'] ?? false,
       stockDispo: json['stock_dispo'] ?? true,
       sectionCode: sectionCode,
+      sectionId: sectionId,
       sectionNom: sectionNom,
       ingredients: json['ingredients'] != null
           ? (json['ingredients'] as List)

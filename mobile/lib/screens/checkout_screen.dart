@@ -18,6 +18,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _modePaiement = 'mtn_momo';
   String? _selectedAdresseId;
   List<Map<String, dynamic>> _adresses = [];
+  final TextEditingController _telPaiementCtrl = TextEditingController();
 
   final List<Map<String, String>> _creneaux = [
     {'value': 'matin_8h_12h', 'label': 'Matin (8h - 12h)'},
@@ -118,6 +119,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
   }
 
+  bool get _besoinTelephone =>
+      _modePaiement == 'mtn_momo' || _modePaiement == 'orange_money';
+
   Future<void> _passerCommande() async {
     if (_selectedAdresseId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -126,6 +130,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             backgroundColor: Colors.orange),
       );
       return;
+    }
+
+    // Validation du numéro de téléphone pour MTN / Orange
+    String? telPaiement;
+    if (_besoinTelephone) {
+      final tel = _telPaiementCtrl.text.trim().replaceAll(' ', '');
+      if (tel.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Veuillez saisir le numéro à débiter (Mobile Money)'),
+              backgroundColor: Colors.orange),
+        );
+        return;
+      }
+      // Doit être 9 chiffres camerounais (ex: 67XXXXXXX, 65XXXXXXX, 69XXXXXXX)
+      final reg = RegExp(r'^(?:\+?237)?(6\d{8})$');
+      final match = reg.firstMatch(tel);
+      if (match == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Numéro invalide. Format: 6XXXXXXXX (9 chiffres)'),
+              backgroundColor: Colors.orange),
+        );
+        return;
+      }
+      telPaiement = '237${match.group(1)}';
     }
 
     final cart = Provider.of<CartProvider>(context, listen: false);
@@ -140,14 +171,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             .toIso8601String()
             .split('T')[0],
         'mode_paiement': _modePaiement,
-        'telephone_paiement': null,
+        'telephone_paiement': telPaiement,
         'lignes': cart.toCommandeData(),
         'note_client': null,
         'poids_estime_kg': 0.0,
       };
 
       final response = await _api.post('/commandes/', commandeData);
-      await _api.post('/commandes/${response['id']}/payer', {});
+      final cmdId = response['id'];
+
+      if (_besoinTelephone) {
+        // Mobile Money: initier paiement via NotchPay (MTN MoMo / Orange Money)
+        final paymentResult = await _api.post(
+          '/commandes/$cmdId/initier-paiement',
+          {'telephone_paiement': telPaiement},
+        );
+        if (paymentResult['success'] == true) {
+          // Marquer comme payé après initiation réussie
+          await _api.post('/commandes/$cmdId/payer', {});
+        } else {
+          throw Exception(
+              paymentResult['error'] ?? 'Échec de l\'initiation du paiement');
+        }
+      } else {
+        // Espèces à la livraison
+        await _api.post('/commandes/$cmdId/payer', {});
+      }
       cart.clear();
 
       if (!mounted) return;
@@ -165,6 +214,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _telPaiementCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -247,6 +302,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   onChanged: (v) => setState(() => _modePaiement = v!),
                   activeColor: const Color(0xFFFBBF24),
                 )),
+
+            // Champ téléphone visible uniquement si MTN ou Orange Money
+            if (_besoinTelephone) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _telPaiementCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Numéro Mobile Money à débiter',
+                  hintText: '6XXXXXXXX',
+                  prefixIcon: Icon(
+                    _modePaiement == 'mtn_momo'
+                        ? Icons.phone_android
+                        : Icons.phone_iphone,
+                    color: _modePaiement == 'mtn_momo'
+                        ? Colors.amber
+                        : Colors.orange,
+                  ),
+                  prefixText: '+237 ',
+                  border: const OutlineInputBorder(),
+                  helperText:
+                      'Une notification de paiement sera envoyée sur ce numéro',
+                ),
+              ),
+            ],
 
             const SizedBox(height: 24),
             // ── RÉCAPITULATIF ──
