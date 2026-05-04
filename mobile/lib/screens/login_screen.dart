@@ -174,10 +174,37 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString();
+      final isTimeout = msg.contains('serveur') ||
+          msg.contains('Connexion') ||
+          msg.contains('timeout') ||
+          msg.contains('SocketException');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isTimeout
+                    ? 'Serveur en cours de démarrage...'
+                    : 'Erreur de connexion',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isTimeout
+                    ? 'Le serveur se réveille après inactivité. Réessayez dans quelques secondes.'
+                    : msg,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          backgroundColor: isTimeout ? const Color(0xFF1B4A8A) : Colors.red,
+          duration: Duration(seconds: isTimeout ? 6 : 4),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } finally {
@@ -254,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Connectez-vous pour commander\nvos plats préférés',
+                  'Connectez-vous pour composer\nvos repas sur mesure',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,

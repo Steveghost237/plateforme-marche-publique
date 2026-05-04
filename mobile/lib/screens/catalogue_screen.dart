@@ -68,7 +68,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Marché en Ligne'),
+        title: const Text('Composez votre repas'),
         actions: [
           Consumer<CartProvider>(
             builder: (context, cart, child) {
@@ -230,21 +230,30 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                         onRefresh: _loadData,
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(16),
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.75,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                            ),
-                            itemCount: _filteredProduits.length,
-                            itemBuilder: (context, index) {
-                              return _buildProduitCard(
-                                  _filteredProduits[index]);
-                            },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── BANNIÈRE COMPOSITION DYNAMIQUE ──
+                              const _CompositionBanner(),
+                              const SizedBox(height: 16),
+                              // ── GRILLE PRODUITS ──
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 0.75,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                                itemCount: _filteredProduits.length,
+                                itemBuilder: (context, index) {
+                                  return _buildProduitCard(
+                                      _filteredProduits[index]);
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -744,6 +753,143 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── BANNIÈRE DYNAMIQUE COMPOSITION ─────────────────────────────
+class _CompositionBanner extends StatefulWidget {
+  const _CompositionBanner();
+
+  @override
+  State<_CompositionBanner> createState() => _CompositionBannerState();
+}
+
+class _CompositionBannerState extends State<_CompositionBanner> {
+  int _tipIndex = 0;
+
+  static final _tips = [
+    {
+      'icon': '🍽️',
+      'title': 'Composez votre menu sur mesure',
+      'sub':
+          'Choisissez vos ingrédients, ajustez les quantités et créez le plat qui vous ressemble.',
+      'color': Color(0xFF0D2137),
+    },
+    {
+      'icon': '🥘',
+      'title': 'Ici, rien n\'est tout fait !',
+      'sub':
+          'Chaque commande est préparée avec les ingrédients frais que VOUS choisissez au marché.',
+      'color': Color(0xFF166534),
+    },
+    {
+      'icon': '🛒',
+      'title': 'Du marché à votre cuisine',
+      'sub':
+          'Nos livreurs achètent vos ingrédients frais au marché local et vous les livrent en 30 min.',
+      'color': Color(0xFF7A3E10),
+    },
+    {
+      'icon': '✨',
+      'title': 'Personnalisez chaque détail',
+      'sub':
+          'Plus de piment ? Moins de sel ? Ajustez chaque ingrédient avec les curseurs.',
+      'color': Color(0xFF8A1A1A),
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startRotation();
+  }
+
+  void _startRotation() {
+    Future.delayed(const Duration(seconds: 6), () {
+      if (mounted) {
+        setState(() => _tipIndex = (_tipIndex + 1) % _tips.length);
+        _startRotation();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tip = _tips[_tipIndex];
+    final color = tip['color'] as Color;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      child: Container(
+        key: ValueKey(_tipIndex),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, color.withOpacity(0.85)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Text(
+              tip['icon'] as String,
+              style: const TextStyle(fontSize: 32),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tip['title'] as String,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    tip['sub'] as String,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Dots indicator
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(_tips.length, (i) {
+                return Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i == _tipIndex
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.3),
+                  ),
+                );
+              }),
+            ),
+          ],
         ),
       ),
     );

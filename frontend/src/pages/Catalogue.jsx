@@ -9,7 +9,7 @@ import Breadcrumb from '../components/common/Breadcrumb'
 import SEO from '../components/common/SEO'
 
 const SECTION_META = {
-  menus_ingredients: { label:'Menus & Ingrédients', emoji:'🥘', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=1200&q=80&fit=crop', color:'#0D2137',  fallbacks:['https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1598103442097-8b74394b95c7?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80&fit=crop'] },
+  menus_ingredients: { label:'Composez vos Menus', emoji:'🥘', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=1200&q=80&fit=crop', color:'#0D2137',  fallbacks:['https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1598103442097-8b74394b95c7?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80&fit=crop'] },
   fruits:            { label:'Fruits & Légumes',    emoji:'🍊', img:'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=1200&q=80&fit=crop', color:'#166534',  fallbacks:['https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1528825871115-3581a5387919?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1563746924237-f81d91fec822?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=400&q=80&fit=crop'] },
   boissons:          { label:'Boissons',            emoji:'🥤', img:'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=1200&q=80&fit=crop', color:'#1B4A8A',  fallbacks:['https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80&fit=crop'] },
   boulangerie:       { label:'Boulangerie',         emoji:'🍞', img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&q=80&fit=crop', color:'#7a3e10',  fallbacks:['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=400&q=80&fit=crop'] },
@@ -325,6 +325,23 @@ export function Catalogue() {
             </div>
           ) : (
             <>
+              {/* Bannière composition dynamique */}
+              {section === 'menus_ingredients' && (
+                <div className="mb-5 bg-gradient-to-r from-[#0D2137] to-[#1B4A7A] rounded-2xl p-5 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">🍽️</span>
+                      <h3 className="font-bold text-base">Ici, rien n'est tout fait !</h3>
+                    </div>
+                    <p className="text-white/70 text-sm leading-relaxed max-w-2xl">
+                      Chaque menu est <strong className="text-amber-400">composé par vous</strong> : choisissez vos ingrédients,
+                      ajustez les quantités avec les curseurs, et notre livreur achète tout frais au marché local.
+                      Cliquez sur <span className="bg-blue-500/30 text-blue-200 font-bold px-1.5 py-0.5 rounded text-xs">Composer →</span> pour personnaliser.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {filtered.map((p, i) => (
                   <ProduitCard key={p.id} produit={p} fallback={meta.fallbacks[i % meta.fallbacks.length]} />

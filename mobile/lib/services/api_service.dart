@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -148,15 +150,55 @@ class ApiService {
 
   Future<dynamic> _requestWithRetry(Future<http.Response> Function() request,
       {bool auth = true}) async {
-    final response = await request();
-    if (response.statusCode == 401 && auth) {
-      final refreshed = await _tryRefreshToken();
-      if (refreshed) {
-        final retryResponse = await request();
-        return _handleResponse(retryResponse);
+    const maxRetries = 3;
+    const baseTimeout = Duration(seconds: 15);
+
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final timeout = Duration(
+          seconds: baseTimeout.inSeconds * (attempt + 1),
+        );
+        final response = await request().timeout(timeout);
+
+        if (response.statusCode == 401 && auth) {
+          final refreshed = await _tryRefreshToken();
+          if (refreshed) {
+            final retryResponse = await request().timeout(timeout);
+            return _handleResponse(retryResponse);
+          }
+        }
+        return _handleResponse(response);
+      } on TimeoutException {
+        if (attempt == maxRetries - 1) {
+          throw ApiException(
+            statusCode: 0,
+            message: 'Le serveur met du temps à répondre. '
+                'Veuillez patienter quelques secondes puis réessayer.',
+          );
+        }
+        // Wait before retrying (server is waking up)
+        await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+      } on SocketException catch (e) {
+        if (attempt == maxRetries - 1) {
+          throw ApiException(
+            statusCode: 0,
+            message: 'Connexion impossible au serveur. '
+                'Vérifiez votre connexion internet et réessayez.',
+          );
+        }
+        await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+      } on http.ClientException {
+        if (attempt == maxRetries - 1) {
+          throw ApiException(
+            statusCode: 0,
+            message: 'Le serveur est en cours de démarrage. '
+                'Veuillez réessayer dans quelques secondes.',
+          );
+        }
+        await Future.delayed(Duration(seconds: 3 * (attempt + 1)));
       }
     }
-    return _handleResponse(response);
+    throw ApiException(statusCode: 0, message: 'Erreur réseau inattendue');
   }
 }
 

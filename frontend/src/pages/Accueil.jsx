@@ -8,16 +8,16 @@ import SafeImg from '../components/common/SafeImg'
 const HERO_SLIDES = [
   {
     img: 'https://images.unsplash.com/photo-1595475207225-428b62bda831?w=1600&q=85&fit=crop',
-    tag: 'Menus Traditionnels',
-    title: 'Les saveurs du\nCameroun livrées\nchez vous',
-    sub: 'Ndolé, ERU, Poulet DG, Mbongo Tchobi — composés à votre goût, achetés au marché local.',
+    tag: 'Composez votre repas',
+    title: 'Vos ingrédients\nfrais, choisis\npar vous',
+    sub: 'Ndolé, ERU, Poulet DG, Mbongo Tchobi — choisissez chaque ingrédient, ajustez les quantités, et composez le plat qui vous ressemble.',
     href: '/catalogue/menus_ingredients',
   },
   {
     img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=85&fit=crop',
     tag: 'Fruits & Légumes Frais',
     title: 'Directement\ndu marché\nà votre table',
-    sub: "Ananas, mangues, plantains, tomates — la fraîcheur du marché local livrée en 30 minutes.",
+    sub: 'Ananas, mangues, plantains, tomates — sélectionnez vos fruits et légumes, nos livreurs les achètent frais au marché pour vous.',
     href: '/catalogue/fruits',
   },
   {
@@ -44,7 +44,7 @@ const HERO_SLIDES = [
 ]
 
 const SECTIONS_DATA = [
-  { code:'menus_ingredients', label:'Menus & Ingrédients', desc:'Plats traditionnels personnalisables', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=600&q=80&fit=crop' },
+  { code:'menus_ingredients', label:'Menus & Ingrédients', desc:'Composez vos plats ingrédient par ingrédient', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=600&q=80&fit=crop' },
   { code:'fruits',            label:'Fruits & Légumes',    desc:'Produits frais cueillis chaque matin',   img:'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&q=80&fit=crop' },
   { code:'boissons',          label:'Boissons',            desc:'Jus naturels, eaux et boissons locales', img:'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=600&q=80&fit=crop' },
   { code:'boulangerie',       label:'Boulangerie',         desc:'Pains frais et viennoiseries artisanales',img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&q=80&fit=crop' },
@@ -274,9 +274,9 @@ export default function Accueil() {
           </div>
           <div className="grid lg:grid-cols-3 gap-8">
             {[
-              { n:'01', title:'Composez votre commande', desc:'Parcourez nos 5 sections et personnalisez vos menus ingrédient par ingrédient, selon vos préférences.', img:'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&q=80&fit=crop' },
+              { n:'01', title:'Choisissez vos ingrédients', desc:'Parcourez nos 5 sections, sélectionnez chaque ingrédient et ajustez les quantités avec les curseurs. Rien n\'est tout fait, tout est composé par vous.', img:'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&q=80&fit=crop' },
               { n:'02', title:'Payez en toute sécurité',  desc:'MTN Mobile Money, Orange Money, ou espèces à la livraison. Paiement 100% sécurisé et confirmé par SMS.',  img:'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=500&q=80&fit=crop' },
-              { n:'03', title:'Votre livreur s\'en occupe',desc:'Il se rend au marché local, sélectionne vos produits avec soin et vous les livre en 30 à 60 minutes.', img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&fit=crop' },
+              { n:'03', title:'Votre livreur achète au marché',desc:'Il se rend au marché local, achète exactement les ingrédients que vous avez choisis et vous les livre frais en 30 à 60 min.', img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&fit=crop' },
             ].map((step, i) => (
               <div key={step.n}
                 className={`group transition-all duration-700 ${hiwVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
@@ -396,12 +396,12 @@ export default function Accueil() {
               Le marché local,<br/>à votre porte
             </h2>
             <p className="text-gray-600 leading-relaxed mb-4 text-sm sm:text-base">
-              Nous croyons que chaque famille camerounaise mérite un accès facile aux produits frais
-              du marché local, sans perdre du temps dans les embouteillages ou les files d'attente.
+              Ici, on ne vend pas de la nourriture toute faite. Vous composez votre repas en choisissant
+              chaque ingrédient frais, et notre livreur se rend au marché local pour tout acheter pour vous.
             </p>
             <p className="text-gray-600 leading-relaxed mb-7 text-sm sm:text-base">
-              Nos livreurs partenaires, formés et engagés, se rendent personnellement au marché
-              pour sélectionner vos produits avec le même soin que vous le feriez vous-même.
+              Nos livreurs partenaires, formés et engagés, achètent exactement les produits que vous avez
+              sélectionnés — avec le même soin que vous le feriez vous-même au marché.
             </p>
 
             <div className="grid grid-cols-2 gap-3 mb-8">
