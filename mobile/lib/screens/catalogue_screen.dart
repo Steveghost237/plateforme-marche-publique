@@ -828,14 +828,14 @@ class _CompositionBannerState extends State<_CompositionBanner> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [color, color.withOpacity(0.85)],
+            colors: [color, color.withValues(alpha: 0.85)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.25),
+              color: color.withValues(alpha: 0.25),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -864,7 +864,7 @@ class _CompositionBannerState extends State<_CompositionBanner> {
                   Text(
                     tip['sub'] as String,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 11,
                       height: 1.3,
                     ),
@@ -884,7 +884,7 @@ class _CompositionBannerState extends State<_CompositionBanner> {
                     shape: BoxShape.circle,
                     color: i == _tipIndex
                         ? Colors.white
-                        : Colors.white.withOpacity(0.3),
+                        : Colors.white.withValues(alpha: 0.3),
                   ),
                 );
               }),
