@@ -1,16 +1,9 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Search, Bell, Menu, X, ChevronDown, LogOut, User, Package, Star, Shield, Bike } from 'lucide-react'
+import { ShoppingCart, Search, Bell, Menu, X, ChevronDown, LogOut, User, Package, Star, Shield, Bike, Globe } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth, usePanier } from '../../store'
+import { useLang, useT } from '../../store/langStore'
 import api from '../../utils/api'
-
-const NAV_LINKS = [
-  { label:'Menus',       href:'/catalogue/menus_ingredients' },
-  { label:'Fruits',      href:'/catalogue/fruits' },
-  { label:'Boissons',    href:'/catalogue/boissons' },
-  { label:'Boulangerie', href:'/catalogue/boulangerie' },
-  { label:'Épices',      href:'/catalogue/epices' },
-]
 
 export default function Navbar() {
   const { user, isAuth, logout } = useAuth()
@@ -36,13 +29,22 @@ export default function Navbar() {
     api.get('/notifications/?non_lues=true').then(r => setNotifN(r.data.length)).catch(() => {})
   }, [isAuth, pathname])
 
+  const { lang, toggle: toggleLang } = useLang()
+  const t = useT()
+  const NAV_LINKS = [
+    { label: t('sec_menus'),       href:'/catalogue/menus_ingredients' },
+    { label: t('sec_fruits'),      href:'/catalogue/fruits' },
+    { label: t('sec_boissons'),    href:'/catalogue/boissons' },
+    { label: t('sec_boulangerie'), href:'/catalogue/boulangerie' },
+    { label: t('sec_epices'),      href:'/catalogue/epices' },
+  ]
   const handleLogout = () => { logout(); navigate('/') }
 
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#071220] shadow-2xl' : 'bg-[#0D2137]'}`}>
       {/* Bandeau promo */}
       <div className="bg-amber-500 text-gray-900 text-center text-xs py-1.5 font-semibold tracking-wide">
-        Livraison à domicile — Yaoundé &amp; Douala · Frais de livraison à partir de 500 FCFA seulement
+        {t('nav_promo_banner')}
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
@@ -65,6 +67,14 @@ export default function Navbar() {
 
         {/* Actions droite */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Language toggle */}
+          <button onClick={toggleLang}
+            className="flex items-center gap-1 px-2 py-1.5 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 text-xs font-bold border border-white/15"
+            title={t('lang_switch_tooltip')}>
+            <Globe size={14}/>
+            {lang === 'fr' ? 'EN' : 'FR'}
+          </button>
+
           <Link to="/recherche"
             className="p-2 text-white/55 hover:text-white transition-colors rounded-lg hover:bg-white/10">
             <Search size={18}/>
@@ -117,9 +127,9 @@ export default function Navbar() {
                   </div>
 
                   {[
-                    { to:'/profil',    Icon:User,    label:'Mon profil' },
-                    { to:'/commandes', Icon:Package, label:'Mes commandes' },
-                    { to:'/fidelite',  Icon:Star,    label:'Programme Fidélité' },
+                    { to:'/profil',    Icon:User,    label:t('nav_profil') },
+                    { to:'/commandes', Icon:Package, label:t('nav_commandes') },
+                    { to:'/fidelite',  Icon:Star,    label:t('nav_fidelite') },
                   ].map(({ to, Icon, label }) => (
                     <Link key={to} to={to} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#0D2137] hover:bg-[#F5EFE6] transition-colors">
                       <Icon size={14} className="text-gray-400"/>{label}
@@ -128,17 +138,17 @@ export default function Navbar() {
 
                   {(user?.role==='admin'||user?.role==='super_admin') && (
                     <Link to="/admin" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-amber-700 font-semibold hover:bg-amber-50 transition-colors">
-                      <Shield size={14}/> Administration
+                      <Shield size={14}/> {t('nav_admin')}
                     </Link>
                   )}
                   {user?.role==='livreur' && (
                     <Link to="/livreur" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-700 font-semibold hover:bg-blue-50 transition-colors">
-                      <Bike size={14}/> Espace Livreur
+                      <Bike size={14}/> {t('nav_livreur')}
                     </Link>
                   )}
                   <div className="border-t border-gray-100 mt-1 pt-1">
                     <button onClick={handleLogout} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors w-full">
-                      <LogOut size={14}/> Déconnexion
+                      <LogOut size={14}/> {t('nav_deconnexion')}
                     </button>
                   </div>
                 </div>
@@ -147,7 +157,7 @@ export default function Navbar() {
           ) : (
             <Link to="/connexion"
               className="bg-amber-500 hover:bg-amber-400 text-gray-900 text-xs font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
-              Connexion
+              {t('nav_connexion')}
             </Link>
           )}
 
@@ -168,7 +178,7 @@ export default function Navbar() {
           ))}
           {!isAuth && (
             <Link to="/inscription" className="block mt-4 text-center bg-amber-500 text-gray-900 font-bold py-3 rounded-xl text-sm">
-              Créer un compte gratuit
+              {t('nav_create_account')}
             </Link>
           )}
         </div>

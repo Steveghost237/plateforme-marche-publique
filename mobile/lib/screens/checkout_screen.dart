@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
+import 'payment_waiting_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -27,9 +28,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   ];
 
   final List<Map<String, String>> _paiements = [
-    {'value': 'mtn_momo', 'label': 'MTN Mobile Money'},
-    {'value': 'orange_money', 'label': 'Orange Money'},
-    {'value': 'especes', 'label': 'Espèces à la livraison'},
+    {'value': 'mtn_momo', 'label': 'MTN Mobile Money', 'icon': '🟡'},
+    {'value': 'orange_money', 'label': 'Orange Money', 'icon': '🟠'},
+    {'value': 'stripe', 'label': 'Carte bancaire (Visa/MC)', 'icon': '💳'},
+    {'value': 'paypal', 'label': 'PayPal', 'icon': '🅿️'},
+    {'value': 'especes', 'label': 'Espèces à la livraison', 'icon': '💵'},
   ];
 
   @override
@@ -180,32 +183,91 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final response = await _api.post('/commandes/', commandeData);
       final cmdId = response['id'];
 
+      final numero = response['numero']?.toString() ?? '';
+
       if (_besoinTelephone) {
-        // Mobile Money: initier paiement via NotchPay (MTN MoMo / Orange Money)
+        // Mobile Money : déclenche un USSD push (MTN MoMo / Orange Money)
         final paymentResult = await _api.post(
           '/commandes/$cmdId/initier-paiement',
           {'telephone_paiement': telPaiement},
         );
-        if (paymentResult['success'] == true) {
-          // Marquer comme payé après initiation réussie
+        if (paymentResult['simulation'] == true) {
+          // Pas de clé NotchPay → confirmation directe (dev)
           await _api.post('/commandes/$cmdId/payer', {});
-        } else {
-          throw Exception(
-              paymentResult['error'] ?? 'Échec de l\'initiation du paiement');
+          cart.clear();
+          if (!mounted) return;
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Commande passée avec succès !'),
+                backgroundColor: Colors.green),
+          );
+          return;
         }
+        if (paymentResult['success'] == true) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(
+            builder: (_) => PaymentWaitingScreen(
+              cmdId: cmdId.toString(),
+              numero: numero,
+              mode: 'momo',
+              operator: paymentResult['operator']?.toString(),
+              telephone: telPaiement,
+            ),
+          ));
+          return;
+        }
+        throw Exception(
+            paymentResult['error'] ?? 'Échec de l\'initiation du paiement');
+      } else if (_modePaiement == 'stripe') {
+        final stripeResult = await _api.post(
+          '/commandes/$cmdId/initier-paiement-stripe',
+          {'success_url': '', 'cancel_url': ''},
+        );
+        if (stripeResult['success'] == true &&
+            stripeResult['checkout_url'] != null) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(
+            builder: (_) => PaymentWaitingScreen(
+              cmdId: cmdId.toString(),
+              numero: numero,
+              mode: 'stripe',
+              checkoutUrl: stripeResult['checkout_url']?.toString(),
+            ),
+          ));
+          return;
+        }
+        throw Exception(stripeResult['error'] ?? 'Échec du paiement Stripe');
+      } else if (_modePaiement == 'paypal') {
+        final ppResult = await _api.post(
+          '/commandes/$cmdId/initier-paiement-paypal',
+          {'return_url': '', 'cancel_url': ''},
+        );
+        if (ppResult['success'] == true && ppResult['checkout_url'] != null) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(
+            builder: (_) => PaymentWaitingScreen(
+              cmdId: cmdId.toString(),
+              numero: numero,
+              mode: 'paypal',
+              checkoutUrl: ppResult['checkout_url']?.toString(),
+            ),
+          ));
+          return;
+        }
+        throw Exception(ppResult['error'] ?? 'Échec du paiement PayPal');
       } else {
-        // Espèces à la livraison
+        // Espèces à la livraison : confirmation immédiate
         await _api.post('/commandes/$cmdId/payer', {});
+        cart.clear();
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Commande passée avec succès !'),
+              backgroundColor: Colors.green),
+        );
       }
-      cart.clear();
-
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Commande passée avec succès !'),
-            backgroundColor: Colors.green),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -324,6 +386,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   border: const OutlineInputBorder(),
                   helperText:
                       'Une notification de paiement sera envoyée sur ce numéro',
+                ),
+              ),
+            ],
+
+            // Info Stripe
+            if (_modePaiement == 'stripe') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: const Row(
+                  children: [
+                    Text('💳', style: TextStyle(fontSize: 20)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Vous serez redirigé vers Stripe pour saisir vos informations de carte (Visa, Mastercard).',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Info PayPal
+            if (_modePaiement == 'paypal') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.indigo.shade100),
+                ),
+                child: const Row(
+                  children: [
+                    Text('🅿️', style: TextStyle(fontSize: 20)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Vous serez redirigé vers PayPal pour finaliser le paiement avec votre compte ou carte internationale.',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF3730A3)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

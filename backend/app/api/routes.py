@@ -306,13 +306,22 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
     if cmd.statut not in ("en_attente_paiement", "brouillon"): raise HTTPException(400, "Commande déjà payée ou annulée")
     from app.services.payment_service import initier_paiement
     telephone = body.get("telephone_paiement") or user.telephone
+    # Déterminer l'opérateur depuis le mode de paiement (champ sur Paiement)
+    pmt_row = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+    op_hint = None
+    mp = (pmt_row.mode if pmt_row else "").lower() if pmt_row else ""
+    if "mtn" in mp:
+        op_hint = "mtn"
+    elif "orange" in mp:
+        op_hint = "orange"
     result = await initier_paiement(
         montant_fcfa=cmd.total_fcfa,
         telephone=telephone,
         email=user.email,
         reference=cmd.numero,
-        description=f"Commande {cmd.numero} — Marché·CM",
+        description=f"Commande {cmd.numero} — ComeBuy",
         callback_url=body.get("callback_url", ""),
+        operator=op_hint,
     )
     if result.get("success"):
         pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
@@ -321,6 +330,120 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
             pmt.telephone_paiement = telephone
         db.commit()
     return result
+
+
+@cmd_router.get("/{cmd_id}/statut-paiement-momo")
+async def statut_paiement_momo(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Poll le statut d'un paiement MoMo (NotchPay) et marque la commande payée si confirmé."""
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+    if not pmt or not pmt.reference_externe:
+        raise HTTPException(400, "Aucun paiement MoMo initié")
+    from app.services.payment_service import verifier_paiement
+    result = await verifier_paiement(pmt.reference_externe)
+    status = (result.get("status") or "").lower()
+    # NotchPay statuts : pending, processing, complete, failed, canceled
+    if result.get("success") and (status in ("complete", "completed", "success", "successful") or result.get("simulation")):
+        if cmd.statut != "payee":
+            pmt.statut = "confirme"; pmt.confirme_at = datetime.utcnow()
+            cmd.statut = "payee"; cmd.payee_at = datetime.utcnow()
+            db.add(Notification(destinataire_id=user.id, type="commande_confirmee",
+                                titre="Paiement Mobile Money confirmé !", corps=f"Commande {cmd.numero} payée.",
+                                donnees_json={"commande_id": str(cmd_id)}))
+            db.commit()
+        return {"success": True, "status": "complete", "numero": cmd.numero}
+    if status in ("failed", "canceled", "cancelled", "rejected"):
+        return {"success": False, "status": status, "error": "Paiement échoué ou annulé"}
+    return {"success": True, "status": status or "pending", "message": "En attente de confirmation"}
+
+@cmd_router.post("/{cmd_id}/initier-paiement-stripe")
+async def initier_paiement_stripe_route(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Initie un paiement Stripe (Visa/Mastercard)"""
+    body = body or {}
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    if cmd.statut not in ("en_attente_paiement", "brouillon"): raise HTTPException(400, "Commande déjà payée ou annulée")
+    from app.services.payment_service import initier_paiement_stripe
+    result = await initier_paiement_stripe(
+        montant_fcfa=cmd.total_fcfa,
+        email=user.email,
+        reference=cmd.numero,
+        description=f"Commande {cmd.numero} — ComeBuy",
+        success_url=body.get("success_url", ""),
+        cancel_url=body.get("cancel_url", ""),
+    )
+    if result.get("success"):
+        pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+        if pmt:
+            pmt.reference_externe = result.get("session_id") or result.get("reference")
+        db.commit()
+    return result
+
+@cmd_router.post("/{cmd_id}/initier-paiement-paypal")
+async def initier_paiement_paypal_route(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Initie un paiement PayPal"""
+    body = body or {}
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    if cmd.statut not in ("en_attente_paiement", "brouillon"): raise HTTPException(400, "Commande déjà payée ou annulée")
+    from app.services.payment_service import initier_paiement_paypal
+    result = await initier_paiement_paypal(
+        montant_fcfa=cmd.total_fcfa,
+        email=user.email,
+        reference=cmd.numero,
+        description=f"Commande {cmd.numero} — ComeBuy",
+        return_url=body.get("return_url", ""),
+        cancel_url=body.get("cancel_url", ""),
+    )
+    if result.get("success"):
+        pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+        if pmt:
+            pmt.reference_externe = result.get("order_id") or result.get("reference")
+        db.commit()
+    return result
+
+@cmd_router.post("/{cmd_id}/verifier-paiement-stripe")
+async def verifier_paiement_stripe_route(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Vérifie la session Stripe et marque la commande comme payée si OK."""
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+    if not pmt or not pmt.reference_externe:
+        raise HTTPException(400, "Aucun paiement Stripe initié")
+    from app.services.payment_service import verifier_paiement_stripe
+    result = await verifier_paiement_stripe(pmt.reference_externe)
+    if result.get("success") and (result.get("status") == "paid" or result.get("simulation")):
+        pmt.statut = "confirme"; pmt.confirme_at = datetime.utcnow()
+        cmd.statut = "payee"; cmd.payee_at = datetime.utcnow()
+        db.add(Notification(destinataire_id=user.id, type="commande_confirmee",
+                            titre="Paiement Stripe confirmé !", corps=f"Commande {cmd.numero} payée par carte.",
+                            donnees_json={"commande_id": str(cmd_id)}))
+        db.commit()
+        return {"success": True, "numero": cmd.numero, "statut": "payee"}
+    return {"success": False, "error": result.get("error") or "Paiement non confirmé", "status": result.get("status")}
+
+
+@cmd_router.post("/{cmd_id}/verifier-paiement-paypal")
+async def verifier_paiement_paypal_route(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Capture la commande PayPal et marque la commande comme payée si OK."""
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
+    if not cmd: raise HTTPException(404)
+    pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
+    if not pmt or not pmt.reference_externe:
+        raise HTTPException(400, "Aucun paiement PayPal initié")
+    from app.services.payment_service import capturer_paiement_paypal
+    result = await capturer_paiement_paypal(pmt.reference_externe)
+    if result.get("success") and (result.get("status") == "COMPLETED" or result.get("simulation")):
+        pmt.statut = "confirme"; pmt.confirme_at = datetime.utcnow()
+        cmd.statut = "payee"; cmd.payee_at = datetime.utcnow()
+        db.add(Notification(destinataire_id=user.id, type="commande_confirmee",
+                            titre="Paiement PayPal confirmé !", corps=f"Commande {cmd.numero} payée via PayPal.",
+                            donnees_json={"commande_id": str(cmd_id)}))
+        db.commit()
+        return {"success": True, "numero": cmd.numero, "statut": "payee"}
+    return {"success": False, "error": result.get("error") or "Paiement non capturé", "status": result.get("status")}
+
 
 @cmd_router.post("/{cmd_id}/payer")
 def confirmer_paiement(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):

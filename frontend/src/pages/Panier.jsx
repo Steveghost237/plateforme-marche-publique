@@ -4,6 +4,7 @@ import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCar
 import toast from 'react-hot-toast'
 import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
+import { useT } from '../store/langStore'
 import SafeImg from '../components/common/SafeImg'
 
 const SECTION_ICONS = {
@@ -12,6 +13,7 @@ const SECTION_ICONS = {
 
 // ── PANIER ────────────────────────────────────────────────────
 export function Panier() {
+  const t = useT()
   const { lignes, setQty, remove } = usePanier(s => ({
     lignes: s.lignes, setQty: s.setQty, remove: s.remove
   }))
@@ -34,11 +36,11 @@ export function Panier() {
       <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm">
         <ShoppingCart size={40} className="text-gray-200"/>
       </div>
-      <h2 className="font-serif text-[#0D2137] text-2xl font-bold">Panier vide</h2>
-      <p className="text-gray-400 text-sm text-center">Aucun article pour l'instant.<br/>Explorez notre catalogue de produits camerounais !</p>
+      <h2 className="font-serif text-[#0D2137] text-2xl font-bold">{t('cart_empty')}</h2>
+      <p className="text-gray-400 text-sm text-center">{t('cart_empty_cta')}</p>
       <Link to="/catalogue/menus_ingredients"
         className="bg-[#0D2137] text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-amber-400 hover:text-gray-900 transition-all">
-        <ShoppingCart size={16}/> Explorer le catalogue
+        <ShoppingCart size={16}/> {t('cart_empty_cta')}
       </Link>
     </div>
   )
@@ -49,12 +51,12 @@ export function Panier() {
       <div className="bg-[#0D2137] px-6 py-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-serif text-white font-bold text-2xl">🛒 Mon Panier</h1>
+            <h1 className="font-serif text-white font-bold text-2xl">🛒 {t('cart_title')}</h1>
             <p className="text-white/50 text-xs mt-0.5">{lignes.length} article{lignes.length>1?'s':''} · {Object.keys(grouped).length} section{Object.keys(grouped).length>1?'s':''}</p>
           </div>
           <Link to="/catalogue/menus_ingredients"
             className="text-white/60 hover:text-white text-xs flex items-center gap-1 transition-colors">
-            + Continuer mes achats
+            + {t('cart_continue_shopping')}
           </Link>
         </div>
       </div>
@@ -174,6 +176,7 @@ export function Panier() {
 
 // ── CHECKOUT ─────────────────────────────────────────────────
 export function Checkout() {
+  const t = useT()
   const { lignes, clear } = usePanier(s => ({ lignes: s.lignes, clear: s.clear }))
   const sousTotal = lignes.reduce((a,l)=>a+l.prixUnit*l.quantite,0)
   const { isAuth, user } = useAuth()
@@ -246,8 +249,49 @@ export function Checkout() {
         }))
       }
       const { data: cmd } = await api.post('/commandes/', payload)
-      // Confirmer paiement (simulation)
-      await api.post(`/commandes/${cmd.id}/payer`)
+
+      // Initier le paiement selon le mode choisi
+      if (sel.mode === 'stripe') {
+        const { data: stripeRes } = await api.post(`/commandes/${cmd.id}/initier-paiement-stripe`, {
+          success_url: `${window.location.origin}/commande/succes?cmd=${cmd.id}&mode=stripe`,
+          cancel_url: `${window.location.origin}/panier`,
+        })
+        if (stripeRes.checkout_url) {
+          // Sauvegarder pour la page succès
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'stripe'}))
+          window.location.href = stripeRes.checkout_url
+          return
+        }
+        throw new Error(stripeRes.error || 'Échec initiation Stripe')
+      } else if (sel.mode === 'paypal') {
+        const { data: ppRes } = await api.post(`/commandes/${cmd.id}/initier-paiement-paypal`, {
+          return_url: `${window.location.origin}/commande/succes?cmd=${cmd.id}&mode=paypal`,
+          cancel_url: `${window.location.origin}/panier`,
+        })
+        if (ppRes.checkout_url) {
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'paypal'}))
+          window.location.href = ppRes.checkout_url
+          return
+        }
+        throw new Error(ppRes.error || 'Échec initiation PayPal')
+      } else if (sel.mode === 'mtn_mobile_money' || sel.mode === 'orange_money') {
+        const { data: momoRes } = await api.post(`/commandes/${cmd.id}/initier-paiement`, {
+          telephone_paiement: sel.tel || user?.telephone,
+        })
+        if (momoRes.simulation) {
+          await api.post(`/commandes/${cmd.id}/payer`)
+        } else if (momoRes.success) {
+          // Flux natif : le USSD push a été envoyé → redirige vers page d'attente avec polling
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'momo'}))
+          navigate(`/commande/succes?cmd=${cmd.id}&mode=momo&operator=${momoRes.operator || ''}&tel=${encodeURIComponent(sel.tel || user?.telephone)}`)
+          return
+        } else {
+          throw new Error(momoRes.error || 'Échec initiation Mobile Money')
+        }
+      } else {
+        // Espèces à la livraison
+        await api.post(`/commandes/${cmd.id}/payer`)
+      }
       setCmdNumero(cmd.numero)
       setLignesSnap(lignes)
       clear()
@@ -263,9 +307,11 @@ export function Checkout() {
     { val:'soir_17h_19h',  label:'Soir',   time:'17h – 19h',emoji:'🌆' },
   ]
   const MODES = [
-    { val:'mtn_mobile_money', label:'MTN Mobile Money', emoji:'🟡' },
-    { val:'orange_money',     label:'Orange Money',     emoji:'🟠' },
-    { val:'especes',          label:'Espèces à la livraison', emoji:'💵' },
+    { val:'mtn_mobile_money', label:t('payment_mtn'), emoji:'🟡' },
+    { val:'orange_money',     label:t('payment_orange'), emoji:'🟠' },
+    { val:'stripe',           label:t('payment_stripe'), emoji:'💳' },
+    { val:'paypal',           label:t('payment_paypal'), emoji:'🅿️' },
+    { val:'especes',          label:t('payment_cash'), emoji:'💵' },
   ]
 
   if (step === 4) return (
@@ -503,7 +549,7 @@ export function Checkout() {
           {/* ÉTAPE 3 : PAIEMENT */}
           {step === 3 && (
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="font-bold text-[#0D2137] text-base mb-4 flex items-center gap-2"><CreditCard size={16} className="text-amber-500"/> Mode de paiement</h2>
+              <h2 className="font-bold text-[#0D2137] text-base mb-4 flex items-center gap-2"><CreditCard size={16} className="text-amber-500"/> {t('checkout_payment')}</h2>
               <div className="space-y-3 mb-5">
                 {MODES.map(m => (
                   <button key={m.val} onClick={() => setSel(s => ({...s, mode: m.val}))}
@@ -512,27 +558,37 @@ export function Checkout() {
                     <span className="text-2xl">{m.emoji}</span>
                     <div className="flex-1">
                       <p className="font-bold text-[#0D2137] text-sm">{m.label}</p>
-                      <p className="text-xs text-gray-400">{m.val === 'especes' ? 'Payez à la réception' : 'Paiement instantané'}</p>
+                      <p className="text-xs text-gray-400">{m.val === 'especes' ? t('payment_pay_on_delivery') : t('payment_instant')}</p>
                     </div>
                     {sel.mode === m.val && <Check size={16} className="text-[#0D2137] shrink-0"/>}
                   </button>
                 ))}
               </div>
-              {sel.mode !== 'especes' && (
+              {(sel.mode === 'mtn_mobile_money' || sel.mode === 'orange_money') && (
                 <div className="mb-5">
-                  <label className="text-xs font-bold text-gray-500 mb-1.5 block">Numéro Mobile Money</label>
+                  <label className="text-xs font-bold text-gray-500 mb-1.5 block">{t('payment_phone_label')}</label>
                   <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
-                    placeholder="6XX XXX XXX" value={sel.tel} onChange={e => setSel(s => ({...s, tel: e.target.value}))}/>
+                    placeholder={t('payment_phone_placeholder')} value={sel.tel} onChange={e => setSel(s => ({...s, tel: e.target.value}))}/>
+                </div>
+              )}
+              {sel.mode === 'stripe' && (
+                <div className="mb-5 bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                  💳 {t('payment_stripe_info')}
+                </div>
+              )}
+              {sel.mode === 'paypal' && (
+                <div className="mb-5 bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700">
+                  🅿️ {t('payment_paypal_info')}
                 </div>
               )}
               <div className="bg-green-50 rounded-xl p-3 mb-4 text-xs text-green-700">
-                🔒 Paiement 100% sécurisé · Données chiffrées
+                🔒 {t('payment_secure')}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm">← Retour</button>
+                <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm">← {t('checkout_back')}</button>
                 <button onClick={passer} disabled={loading}
                   className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>✅ Confirmer & Payer</>}
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>✅ {t('checkout_confirm')}</>}
                 </button>
               </div>
             </div>

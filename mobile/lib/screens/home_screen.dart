@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/lang_provider.dart';
 import 'catalogue_screen.dart';
 import 'cart_screen.dart';
 import 'orders_screen.dart';
@@ -42,22 +43,22 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFFFBBF24),
         unselectedItemColor: Colors.grey,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Catalogue',
+            icon: const Icon(Icons.store),
+            label: context.watch<LangProvider>().t('catalogue'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Panier',
+            icon: const Icon(Icons.shopping_cart),
+            label: context.watch<LangProvider>().t('cart'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long),
-            label: 'Commandes',
+            icon: const Icon(Icons.receipt_long),
+            label: context.watch<LangProvider>().t('orders'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profil',
+            icon: const Icon(Icons.person),
+            label: context.watch<LangProvider>().t('profile'),
           ),
         ],
       ),

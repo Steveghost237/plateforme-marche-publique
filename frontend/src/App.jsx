@@ -10,6 +10,7 @@ import { Catalogue, ProduitDetail, Recherche } from './pages/Catalogue'
 import { Panier, Checkout } from './pages/Panier'
 import { Profil, MesCommandes, MesAdresses, Aide, Fidelite, Notifications } from './pages/Compte'
 import SuiviCommande from './pages/SuiviCommande'
+import CommandeSucces from './pages/CommandeSucces'
 import Sondage from './pages/Sondage'
 import { AdminDashboard } from './pages/Admin'
 import AdminCommandes from './pages/AdminCommandes'
@@ -69,6 +70,8 @@ export default function App() {
         <Route path="/catalogue/:section" element={<PublicLayout><Catalogue/></PublicLayout>}/>
         <Route path="/produit/:slug" element={<PublicLayout><ProduitDetail/></PublicLayout>}/>
         <Route path="/panier"     element={<PublicLayout><Panier/></PublicLayout>}/>
+        <Route path="/commande/succes" element={<PublicLayout><CommandeSucces/></PublicLayout>}/>
+        <Route path="/commande/succes/" element={<PublicLayout><CommandeSucces/></PublicLayout>}/>
 
         {/* PROTÉGÉES */}
         <Route path="/commande"   element={<ProtectedRoute><Checkout/></ProtectedRoute>}/>

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/produit.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
+import '../providers/lang_provider.dart';
 import '../utils/image_utils.dart';
 import 'menu_customization_screen.dart';
 
@@ -68,8 +69,29 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Composez votre repas'),
+        title: Consumer<LangProvider>(
+          builder: (context, lp, _) => Text(lp.t('compose_meal')),
+        ),
         actions: [
+          // ── Language toggle FR / EN ──
+          Consumer<LangProvider>(
+            builder: (context, lp, _) => TextButton.icon(
+              onPressed: () => lp.toggle(),
+              icon: const Icon(Icons.language, color: Colors.white, size: 18),
+              label: Text(
+                lp.isFr ? 'EN' : 'FR',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+              ),
+            ),
+          ),
           Consumer<CartProvider>(
             builder: (context, cart, child) {
               return Stack(

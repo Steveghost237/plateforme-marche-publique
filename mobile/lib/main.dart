@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
+import 'providers/lang_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() {
@@ -17,6 +18,7 @@ class MarcheApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => LangProvider()),
       ],
       child: MaterialApp(
         title: 'Marché en Ligne',

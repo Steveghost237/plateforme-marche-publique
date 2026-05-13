@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowLeft, ChevronRight, Star, Truck, Shield, Clock, MapPin, Phone, CheckCircle } from 'lucide-react'
 import api from '../utils/api'
+import { useT } from '../store/langStore'
 import SafeImg from '../components/common/SafeImg'
 
 // ── Images Unsplash libres ────────────────────────────────────
@@ -89,6 +90,7 @@ function Stars({ n = 5 }) {
 
 // ══════════════════════════════════════════════════════════════
 export default function Accueil() {
+  const t = useT()
   const [slide, setSlide]       = useState(0)
   const [sliding, setSliding]   = useState(false)
   const [products, setProducts] = useState(FALLBACK_PRODUCTS)
@@ -270,13 +272,13 @@ export default function Accueil() {
         <div className="max-w-7xl mx-auto px-6">
           <div className={`text-center mb-16 transition-all duration-700 ${hiwVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <span className="text-amber-600 text-xs font-bold tracking-[.3em] uppercase block mb-2">Simple & Rapide</span>
-            <h2 className="font-serif text-[#0D2137] font-bold mb-3" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>Comment ça marche ?</h2>
+            <h2 className="font-serif text-[#0D2137] font-bold mb-3" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>{t('how_title')}</h2>
           </div>
           <div className="grid lg:grid-cols-3 gap-8">
             {[
-              { n:'01', title:'Choisissez vos ingrédients', desc:'Parcourez nos 5 sections, sélectionnez chaque ingrédient et ajustez les quantités avec les curseurs. Rien n\'est tout fait, tout est composé par vous.', img:'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&q=80&fit=crop' },
-              { n:'02', title:'Payez en toute sécurité',  desc:'MTN Mobile Money, Orange Money, ou espèces à la livraison. Paiement 100% sécurisé et confirmé par SMS.',  img:'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=500&q=80&fit=crop' },
-              { n:'03', title:'Votre livreur achète au marché',desc:'Il se rend au marché local, achète exactement les ingrédients que vous avez choisis et vous les livre frais en 30 à 60 min.', img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&fit=crop' },
+              { n:'01', title:t('how_step1'), desc:t('how_step1_desc'), img:'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&q=80&fit=crop' },
+              { n:'02', title:t('how_step2'), desc:t('how_step2_desc'), img:'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=500&q=80&fit=crop' },
+              { n:'03', title:t('how_step3'), desc:t('how_step3_desc'), img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&fit=crop' },
             ].map((step, i) => (
               <div key={step.n}
                 className={`group transition-all duration-700 ${hiwVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}

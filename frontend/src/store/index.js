@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import api from '../utils/api'
 
+export { useLang } from './langStore'
+
 // ── AUTH ──────────────────────────────────────────────────────
 export const useAuth = create(persist((set, get) => ({
   user: null,

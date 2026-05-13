@@ -4,10 +4,12 @@ import { Phone, Lock, Eye, EyeOff, ArrowRight, Check, KeyRound } from 'lucide-re
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
+import { useT } from '../store/langStore'
 import { isValidCameroonPhone, normalizeCameroonPhone, getPasswordStrength } from '../utils/format'
 
 // ── CONNEXION ─────────────────────────────────────────────────
 export function Connexion() {
+  const t = useT()
   const [form, setForm] = useState({ telephone: '', mot_de_passe: '' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -32,10 +34,10 @@ export function Connexion() {
   }
 
   return (
-    <AuthLayout title="Bon retour !" subtitle="Connectez-vous à votre compte">
+    <AuthLayout title={t('login_title')} subtitle={t('login_sub')}>
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Téléphone</label>
+          <label className="text-xs font-semibold text-navy/70 mb-1.5 block">{t('login_phone')}</label>
           <div className="relative">
             <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
             <input className="input pl-10" placeholder="+237 6XX XXX XXX" required type="tel" inputMode="numeric" autoComplete="tel"
@@ -44,8 +46,8 @@ export function Connexion() {
         </div>
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <label className="text-xs font-semibold text-navy/70">Mot de passe</label>
-            <Link to="/mot-de-passe-oublie" className="text-[10px] text-blue-500 hover:underline font-semibold">Mot de passe oublié ?</Link>
+            <label className="text-xs font-semibold text-navy/70">{t('login_password')}</label>
+            <Link to="/mot-de-passe-oublie" className="text-[10px] text-blue-500 hover:underline font-semibold">{t('login_forgot')}</Link>
           </div>
           <div className="relative">
             <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
@@ -57,11 +59,11 @@ export function Connexion() {
           </div>
         </div>
         <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
-          {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Se connecter <ArrowRight size={16}/></>}
+          {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>{t('login_submit')} <ArrowRight size={16}/></>}
         </button>
       </form>
       <p className="text-center text-sm text-gray-500 mt-4">
-        Pas de compte ? <Link to="/inscription" className="text-blue font-semibold hover:underline">S'inscrire</Link>
+        {t('login_no_account')} <Link to="/inscription" className="text-blue font-semibold hover:underline">{t('login_create')}</Link>
       </p>
     </AuthLayout>
   )
