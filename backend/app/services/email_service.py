@@ -104,9 +104,14 @@ def _html_otp(otp: str, nom: str, contexte: str = "inscription") -> str:
 
 
 def _html_welcome(nom: str, telephone: str, role: str) -> str:
-    nom_safe = _s(nom) or "Nouvel utilisateur"
+    nom_safe   = _s(nom) or "Nouvel utilisateur"
     role_label = {"client": "Client", "livreur": "Livreur Partenaire"}.get(role, role.capitalize())
     role_emoji = "🛒" if role == "client" else "🛵"
+    if role == "client":
+        role_msg = '<p style="font-size:13px;color:#374151">🛒 Parcourez notre catalogue et passez votre première commande dès maintenant !</p>'
+    else:
+        role_msg = "<p style=\"font-size:13px;color:#374151\">🛵 Bienvenue dans l'équipe ! Connectez-vous sur l'app pour recevoir vos premières missions de livraison.</p>"
+    tel_safe = _s(telephone)
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">{_BASE_STYLE}</head>
 <body><div class="wrap">
   {_header("Bienvenue dans la famille ComeBuy !")}
@@ -117,12 +122,12 @@ def _html_welcome(nom: str, telephone: str, role: str) -> str:
     </p>
     <div style="background:#F9FAFB;border-radius:10px;padding:16px;margin:16px 0">
       <div class="info-row"><span class="info-label">Nom complet</span><span class="info-val">{nom_safe}</span></div>
-      <div class="info-row"><span class="info-label">Téléphone</span><span class="info-val">{_s(telephone)}</span></div>
+      <div class="info-row"><span class="info-label">Téléphone</span><span class="info-val">{tel_safe}</span></div>
       <div class="info-row" style="border:none"><span class="info-label">Rôle</span>
         <span class="badge">{role_emoji} {role_label}</span>
       </div>
     </div>
-    {'<p style="font-size:13px;color:#374151">🛒 Parcourez notre catalogue et passez votre première commande dès maintenant !</p>' if role == 'client' else '<p style="font-size:13px;color:#374151">🛵 Bienvenue dans l\'équipe ! Connectez-vous sur l\'app pour recevoir vos premières missions de livraison.</p>'}
+    {role_msg}
     <a href="https://comebuy-frontend.vercel.app" class="btn">Accéder à ComeBuy →</a>
   </div>
   {_footer()}
