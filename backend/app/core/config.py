@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     COMEBUY_ADMIN_EMAIL: str = "comebuy237@gmail.com"
     GMAIL_USER: str = "comebuy237@gmail.com"
     GMAIL_APP_PASSWORD: str = ""
+    RESEND_API_KEY: str = ""
 
     class Config:
         env_file = ".env"

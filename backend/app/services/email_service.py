@@ -21,6 +21,8 @@ MAILER_URL      = os.environ.get("CODINGMAILER_URL", "https://codingmailer.onren
 ADMIN_EMAIL     = os.environ.get("COMEBUY_ADMIN_EMAIL", "comebuy237@gmail.com")
 GMAIL_USER      = os.environ.get("GMAIL_USER", "comebuy237@gmail.com")
 GMAIL_PASSWORD  = os.environ.get("GMAIL_APP_PASSWORD", "")
+RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "")
+RESEND_URL      = "https://api.resend.com/emails"
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
@@ -199,8 +201,37 @@ def _html_invoice(nom: str, numero: str, lignes: list, sous_total: int,
 
 
 # ── Envoi HTTP (synchrone) ────────────────────────────────────
+def _send_email_resend(to: str, subject: str, html_body: str) -> dict:
+    """Envoi via Resend API (HTTP, fonctionne sur Render free tier)."""
+    if not RESEND_API_KEY:
+        return {"success": False, "error": "RESEND_API_KEY non configuré"}
+    try:
+        with httpx.Client(timeout=15) as client:
+            resp = client.post(
+                RESEND_URL,
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": "ComeBuy <onboarding@resend.dev>",
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body,
+                },
+            )
+        if resp.status_code in (200, 201):
+            print(f"[RESEND ✓] → {to} | {subject}")
+            return {"success": True}
+        print(f"[RESEND ✗] {resp.status_code} → {resp.text[:300]}")
+        return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+    except Exception as e:
+        print(f"[RESEND ERROR] → {e}")
+        return {"success": False, "error": str(e)}
+
+
 def _send_email_smtp(to: str, subject: str, html_body: str) -> dict:
-    """Envoi direct via Gmail SMTP (méthode principale)."""
+    """Envoi direct via Gmail SMTP (fallback - bloqué sur Render free tier)."""
     if not GMAIL_PASSWORD:
         return {"success": False, "error": "GMAIL_APP_PASSWORD non configuré"}
     try:
@@ -247,19 +278,25 @@ def _send_email_codingmailer(to: str, subject: str, html_body: str) -> dict:
 
 
 def _send_email(to: str, subject: str, html_body: str) -> dict:
-    """Envoie un email : Gmail SMTP en priorité, CodingMailer en fallback."""
+    """Envoie un email : Resend API en priorité, puis SMTP, puis CodingMailer."""
     if not is_valid_email(to):
         print(f"[EMAIL] Adresse invalide ignorée : {to!r}")
         return {"success": False, "error": "Adresse email invalide"}
 
     subject_clean = _s(subject, 150)
 
-    # 1) Essai Gmail SMTP
+    # 1) Resend API (HTTP — fonctionne sur Render free tier)
+    result = _send_email_resend(to, subject_clean, html_body)
+    if result["success"]:
+        return result
+
+    # 2) Gmail SMTP (fallback — bloqué sur Render free tier)
+    print(f"[EMAIL] Resend échoué ({result.get('error')}), essai SMTP...")
     result = _send_email_smtp(to, subject_clean, html_body)
     if result["success"]:
         return result
 
-    # 2) Fallback CodingMailer
+    # 3) CodingMailer (dernier recours)
     print(f"[EMAIL] SMTP échoué ({result.get('error')}), essai CodingMailer...")
     return _send_email_codingmailer(to, subject_clean, html_body)
 

@@ -39,11 +39,15 @@ services:
         sync: false
       - key: SMS_SENDER
         value: MarcheCM
-      # ── Email Gmail SMTP (méthode principale d'envoi) ──
+      # ── Resend API (méthode principale — fonctionne sur Render free) ──
+      # Créer un compte gratuit sur https://resend.com → API Keys
+      - key: RESEND_API_KEY
+        sync: false  # ← Coller ici la clé API Resend
+      # ── Email Gmail SMTP (fallback) ──
       - key: GMAIL_USER
         value: comebuy237@gmail.com
       - key: GMAIL_APP_PASSWORD
-        sync: false  # ← Coller ici le mot de passe d'application Gmail (16 caractères)
+        sync: false
       # Email admin ComeBuy
       - key: COMEBUY_ADMIN_EMAIL
         value: comebuy237@gmail.com
