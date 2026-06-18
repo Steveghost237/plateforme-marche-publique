@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Phone, Lock, Eye, EyeOff, ArrowRight, Check, KeyRound } from 'lucide-react'
+import { Phone, Lock, Eye, EyeOff, ArrowRight, Check, KeyRound, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
@@ -73,8 +73,10 @@ export function Connexion() {
 export function Inscription() {
   const [step, setStep] = useState(1)
   const [tel, setTel] = useState('')
+  const [email, setEmail] = useState('')
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
+  const [otpCanal, setOtpCanal] = useState('email')
   const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -82,10 +84,16 @@ export function Inscription() {
   const navigate = useNavigate()
 
   const step1 = async e => {
-    e.preventDefault(); setLoading(true)
+    e.preventDefault()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Adresse Gmail/email invalide'); return
+    }
+    setLoading(true)
     try {
-      await api.post('/auth/inscription/otp', { telephone: tel, operateur: op })
-      toast.success('Code OTP envoyé !')
+      const res = await api.post('/auth/inscription/otp', { telephone: tel, operateur: op, email: email.trim().toLowerCase() })
+      const canal = res.data?.message?.includes('email') ? 'email' : 'SMS'
+      setOtpCanal(canal)
+      toast.success(`Code OTP envoyé sur votre ${canal === 'email' ? 'Gmail ✉️' : 'téléphone 📱'}`)
       setStep(2)
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
     finally { setLoading(false) }
@@ -103,7 +111,7 @@ export function Inscription() {
   const step3 = async e => {
     e.preventDefault(); setLoading(true)
     try {
-      const { data } = await api.post('/auth/inscription/finaliser', { telephone: tel, ...form })
+      const { data } = await api.post('/auth/inscription/finaliser', { telephone: tel, email: email || undefined, ...form })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success('Compte créé ! Bienvenue 🎉')
       navigate(data.user.role === 'livreur' ? '/livreur' : '/')
@@ -135,13 +143,22 @@ export function Inscription() {
       {step === 1 && (
         <form onSubmit={step1} className="space-y-4 animate-fade-up">
           <div>
+            <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Adresse Gmail / Email <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input className="input pl-10" placeholder="exemple@gmail.com" required type="email" autoComplete="email"
+                value={email} onChange={e => setEmail(e.target.value)}/>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">✉️ Le code de vérification sera envoyé sur cet email</p>
+          </div>
+          <div>
             <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Numéro de téléphone</label>
             <div className="relative"><Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
               <input className="input pl-10" placeholder="+237 6XX XXX XXX" required type="tel" inputMode="numeric" autoComplete="tel" value={tel} onChange={e => setTel(e.target.value)}/>
             </div>
           </div>
           <div>
-            <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Opérateur</label>
+            <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Opérateur Mobile Money</label>
             <div className="grid grid-cols-2 gap-3">
               {['MTN','Orange'].map(o => (
                 <button key={o} type="button" onClick={() => setOp(o)}
@@ -153,14 +170,21 @@ export function Inscription() {
             </div>
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
-            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Envoyer le code <ArrowRight size={16}/></>}
+            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Envoyer le code OTP <ArrowRight size={16}/></>}
           </button>
         </form>
       )}
 
       {step === 2 && (
         <form onSubmit={step2} className="space-y-5 animate-fade-up">
-          <p className="text-sm text-gray-500 text-center">Code envoyé au <strong>{tel}</strong></p>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+            <p className="text-sm text-blue-800 font-semibold">
+              {otpCanal === 'email' ? '✉️ Code envoyé sur votre Gmail' : '📱 Code envoyé par SMS'}
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              {otpCanal === 'email' ? email : tel}
+            </p>
+          </div>
           <div className="flex gap-2 justify-center">
             {otp.map((d, i) => (
               <input key={i} id={`otp-${i}`} maxLength={1} value={d} onChange={e => handleOtp(i, e.target.value)}

@@ -7,6 +7,18 @@ from uuid import UUID
 class DemandeOTPIn(BaseModel):
     telephone: str
     operateur: Optional[str] = None
+    email: Optional[str] = None  # Email pour envoi OTP par Gmail
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        import re
+        if v is None:
+            return v
+        v = v.strip().lower()
+        if not re.match(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", v):
+            raise ValueError("Adresse email invalide")
+        return v
 
 class VerifOTPIn(BaseModel):
     telephone: str
@@ -18,6 +30,13 @@ class FinaliserInscriptionIn(BaseModel):
     mot_de_passe: str
     email: Optional[str] = None
     role: Optional[str] = "client"
+
+    @field_validator("mot_de_passe")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Mot de passe trop court (minimum 8 caractères)")
+        return v
 
 class ConnexionIn(BaseModel):
     telephone: str

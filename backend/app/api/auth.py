@@ -11,6 +11,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.models.models import Utilisateur, FideliteCompte
 from app.schemas.schemas import DemandeOTPIn, VerifOTPIn, FinaliserInscriptionIn, ConnexionIn, RefreshIn, TokenOut, UtilisateurOut, UtilisateurUpdateIn
 from app.services.sms_service import envoyer_sms
+from app.services.email_service import send_otp_email, send_welcome_email, is_valid_email
 
 
 def _send_otp_sms_sync(telephone: str, otp: str, contexte: str = "inscription"):
@@ -109,21 +110,34 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     
     if not user:
         user = Utilisateur(telephone=p.telephone, nom_complet="", operateur=p.operateur,
+                           email=p.email,
                            otp_code=otp, otp_expire_at=expire, otp_tentatives=0)
         db.add(user)
     else:
         user.otp_code = otp; user.otp_expire_at = expire; user.otp_tentatives = 0
+        if p.email:
+            user.email = p.email
     
     db.commit()
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
 
-    # ENVOI EFFECTIF DU SMS
-    sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
+    # ── Envoi OTP par EMAIL (prioritaire) ──
+    email_result = {"success": False, "error": "Pas d'email fourni"}
+    if p.email and is_valid_email(p.email):
+        nom_tmp = user.nom_complet or ""
+        email_result = send_otp_email(p.email, nom_tmp, otp, contexte="inscription")
 
-    resp = {"message": "OTP envoyé"}
+    # ── Envoi OTP par SMS (fallback si pas d'email ou si email échoue) ──
+    sms_result = {"success": False, "simulation": True}
+    if not email_result.get("success"):
+        sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
+
+    canal = "email" if email_result.get("success") else "sms"
+    resp = {"message": f"OTP envoyé par {canal}"}
     if debug:
         resp["otp_dev"] = otp
+        resp["email_status"] = email_result
         resp["sms_status"] = sms_result
     return resp
 
@@ -189,7 +203,9 @@ def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
     if user.statut == "actif": raise HTTPException(409, "Déjà actif")
     user.nom_complet = p.nom_complet
     user.mot_de_passe_hash = hash_password(p.mot_de_passe)
-    user.email = p.email; user.statut = "actif"
+    if p.email:
+        user.email = p.email
+    user.statut = "actif"
     # Assigner le rôle choisi (client ou livreur uniquement, pas admin)
     role = p.role if p.role in ("client", "livreur") else "client"
     user.role = role
@@ -201,6 +217,14 @@ def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
         if not existing_livreur:
             db.add(Livreur(utilisateur_id=user.id, statut="disponible", niveau="debutant"))
     db.commit(); db.refresh(user)
+
+    # ── Email de bienvenue ──
+    if user.email and is_valid_email(user.email):
+        try:
+            send_welcome_email(user.email, user.nom_complet, user.telephone, user.role)
+        except Exception as e:
+            print(f"[WELCOME EMAIL WARN] {e}")
+
     return TokenOut(access_token=create_access_token({"sub": str(user.id)}),
                     refresh_token=create_refresh_token({"sub": str(user.id)}),
                     user=UtilisateurOut.model_validate(user))
@@ -245,12 +269,21 @@ def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[RESET OTP] {telephone} → {otp}")
 
-    # ENVOI EFFECTIF DU SMS
-    sms_result = _send_otp_sms_sync(telephone, otp, contexte="reset")
+    # ── Envoi OTP reset par EMAIL (prioritaire si email connu) ──
+    email_result = {"success": False}
+    if user.email and is_valid_email(user.email):
+        email_result = send_otp_email(user.email, user.nom_complet, otp, contexte="reset")
 
-    resp = {"message": "Code de réinitialisation envoyé"}
+    # ── Fallback SMS ──
+    sms_result = {"success": False, "simulation": True}
+    if not email_result.get("success"):
+        sms_result = _send_otp_sms_sync(telephone, otp, contexte="reset")
+
+    canal = "email" if email_result.get("success") else "sms"
+    resp = {"message": f"Code de réinitialisation envoyé par {canal}"}
     if debug:
         resp["otp_dev"] = otp
+        resp["email_status"] = email_result
         resp["sms_status"] = sms_result
     return resp
 

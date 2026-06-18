@@ -39,6 +39,13 @@ services:
         sync: false
       - key: SMS_SENDER
         value: MarcheCM
+      # ── Email via CodingMailer ──
+      # URL du service mailer (par défaut: https://codingmailer.onrender.com/send-email)
+      - key: CODINGMAILER_URL
+        value: https://codingmailer.onrender.com/send-email
+      # Email admin ComeBuy qui reçoit les notifications
+      - key: COMEBUY_ADMIN_EMAIL
+        sync: false
 
 # Base de données hébergée sur Neon.tech (gratuit)
 # Ajouter DATABASE_URL manuellement dans les env vars Render

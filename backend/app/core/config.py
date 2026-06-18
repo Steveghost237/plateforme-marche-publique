@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     AT_USERNAME: str = "sandbox"
     AT_API_KEY: str = ""
+    CODINGMAILER_URL: str = "https://codingmailer.onrender.com/send-email"
+    COMEBUY_ADMIN_EMAIL: str = "wilfriedtech.dev@gmail.com"
 
     class Config:
         env_file = ".env"
