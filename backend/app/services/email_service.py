@@ -207,7 +207,7 @@ def _send_email(to: str, subject: str, html_body: str) -> dict:
         with httpx.Client(timeout=10) as client:
             resp = client.post(
                 MAILER_URL,
-                json={"to": to, "subject": subject_clean, "message": html_body},
+                json={"to": to, "subject": subject_clean, "html": html_body, "message": html_body, "body": html_body},
                 headers={"Content-Type": "application/json"},
             )
         if resp.status_code in (200, 201, 204):

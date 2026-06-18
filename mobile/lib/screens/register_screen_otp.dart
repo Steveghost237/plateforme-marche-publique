@@ -22,6 +22,8 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
 
   int _currentStep = 0;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String _selectedRole = 'client';
 
   @override
@@ -754,7 +756,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   ),
                   child: TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     style: const TextStyle(
                       color: Color(0xFF0D2137),
                       fontSize: 16,
@@ -782,6 +784,14 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                           color: Color(0xFFFBBF24),
                           size: 20,
                         ),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          color: const Color(0xFF0D2137).withOpacity(0.5),
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -821,7 +831,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   ),
                   child: TextFormField(
                     controller: _confirmPasswordController,
-                    obscureText: true,
+                    obscureText: _obscureConfirmPassword,
                     style: const TextStyle(
                       color: Color(0xFF0D2137),
                       fontSize: 16,
@@ -849,6 +859,14 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                           color: Color(0xFFFBBF24),
                           size: 20,
                         ),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                          color: const Color(0xFF0D2137).withOpacity(0.5),
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
