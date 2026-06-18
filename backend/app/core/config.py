@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     AT_USERNAME: str = "sandbox"
     AT_API_KEY: str = ""
     CODINGMAILER_URL: str = "https://codingmailer.onrender.com/send-email"
-    COMEBUY_ADMIN_EMAIL: str = "wilfriedtech.dev@gmail.com"
+    COMEBUY_ADMIN_EMAIL: str = "comebuy237@gmail.com"
 
     class Config:
         env_file = ".env"

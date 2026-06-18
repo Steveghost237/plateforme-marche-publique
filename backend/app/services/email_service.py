@@ -13,7 +13,7 @@ import httpx
 from datetime import datetime
 
 MAILER_URL   = os.environ.get("CODINGMAILER_URL", "https://codingmailer.onrender.com/send-email")
-ADMIN_EMAIL  = os.environ.get("COMEBUY_ADMIN_EMAIL", "wilfriedtech.dev@gmail.com")
+ADMIN_EMAIL  = os.environ.get("COMEBUY_ADMIN_EMAIL", "comebuy237@gmail.com")
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
