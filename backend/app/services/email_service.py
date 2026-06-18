@@ -1,19 +1,26 @@
 """
-Service d'envoi d'emails via CodingMailer (codingmailer.onrender.com).
+Service d'envoi d'emails via Gmail SMTP (primaire) + CodingMailer (fallback).
 Gère : OTP inscription/reset, email de bienvenue, facture de commande.
 
 Variables d'environnement requises :
-  CODINGMAILER_URL    — URL du mailer (défaut: https://codingmailer.onrender.com/send-email)
-  COMEBUY_ADMIN_EMAIL — Email admin destinataire des notifications (ex: admin@comebuy.cm)
+  GMAIL_USER          — Adresse Gmail expéditrice (ex: comebuy237@gmail.com)
+  GMAIL_APP_PASSWORD  — Mot de passe d'application Google (16 caractères)
+  CODINGMAILER_URL    — URL du mailer fallback (optionnel)
+  COMEBUY_ADMIN_EMAIL — Email admin (ex: comebuy237@gmail.com)
 """
 import os
 import re
 import html
 import httpx
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime
 
-MAILER_URL   = os.environ.get("CODINGMAILER_URL", "https://codingmailer.onrender.com/send-email")
-ADMIN_EMAIL  = os.environ.get("COMEBUY_ADMIN_EMAIL", "comebuy237@gmail.com")
+MAILER_URL      = os.environ.get("CODINGMAILER_URL", "https://codingmailer.onrender.com/send-email")
+ADMIN_EMAIL     = os.environ.get("COMEBUY_ADMIN_EMAIL", "comebuy237@gmail.com")
+GMAIL_USER      = os.environ.get("GMAIL_USER", "comebuy237@gmail.com")
+GMAIL_PASSWORD  = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
@@ -192,36 +199,69 @@ def _html_invoice(nom: str, numero: str, lignes: list, sous_total: int,
 
 
 # ── Envoi HTTP (synchrone) ────────────────────────────────────
+def _send_email_smtp(to: str, subject: str, html_body: str) -> dict:
+    """Envoi direct via Gmail SMTP (méthode principale)."""
+    if not GMAIL_PASSWORD:
+        return {"success": False, "error": "GMAIL_APP_PASSWORD non configuré"}
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"ComeBuy <{GMAIL_USER}>"
+        msg["To"] = to
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.login(GMAIL_USER, GMAIL_PASSWORD)
+            srv.sendmail(GMAIL_USER, to, msg.as_string())
+
+        print(f"[SMTP ✓] → {to} | {subject}")
+        return {"success": True}
+    except smtplib.SMTPAuthenticationError:
+        print(f"[SMTP AUTH ✗] Vérifier GMAIL_USER / GMAIL_APP_PASSWORD")
+        return {"success": False, "error": "Authentification Gmail échouée"}
+    except Exception as e:
+        print(f"[SMTP ERROR] → {to} : {e}")
+        return {"success": False, "error": str(e)}
+
+
+def _send_email_codingmailer(to: str, subject: str, html_body: str) -> dict:
+    """Fallback via CodingMailer HTTP."""
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(
+                MAILER_URL,
+                json={"to": to, "subject": subject, "html": html_body,
+                      "message": html_body, "body": html_body},
+                headers={"Content-Type": "application/json"},
+            )
+        if resp.status_code in (200, 201, 204):
+            print(f"[CODINGMAILER ✓] → {to}")
+            return {"success": True}
+        print(f"[CODINGMAILER ✗] {resp.status_code} → {resp.text[:200]}")
+        return {"success": False, "error": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        print(f"[CODINGMAILER ERROR] → {e}")
+        return {"success": False, "error": str(e)}
+
+
 def _send_email(to: str, subject: str, html_body: str) -> dict:
-    """
-    Appelle le service CodingMailer.
-    Sécurité : validation email, timeout strict, gestion d'erreur complète.
-    """
+    """Envoie un email : Gmail SMTP en priorité, CodingMailer en fallback."""
     if not is_valid_email(to):
         print(f"[EMAIL] Adresse invalide ignorée : {to!r}")
         return {"success": False, "error": "Adresse email invalide"}
 
     subject_clean = _s(subject, 150)
 
-    try:
-        with httpx.Client(timeout=10) as client:
-            resp = client.post(
-                MAILER_URL,
-                json={"to": to, "subject": subject_clean, "html": html_body, "message": html_body, "body": html_body},
-                headers={"Content-Type": "application/json"},
-            )
-        if resp.status_code in (200, 201, 204):
-            print(f"[EMAIL ✓] → {to} | {subject_clean}")
-            return {"success": True}
-        else:
-            print(f"[EMAIL ✗] {resp.status_code} → {to} | {resp.text[:200]}")
-            return {"success": False, "error": f"HTTP {resp.status_code}"}
-    except httpx.TimeoutException:
-        print(f"[EMAIL TIMEOUT] → {to}")
-        return {"success": False, "error": "Timeout"}
-    except Exception as e:
-        print(f"[EMAIL ERROR] → {to} : {e}")
-        return {"success": False, "error": str(e)}
+    # 1) Essai Gmail SMTP
+    result = _send_email_smtp(to, subject_clean, html_body)
+    if result["success"]:
+        return result
+
+    # 2) Fallback CodingMailer
+    print(f"[EMAIL] SMTP échoué ({result.get('error')}), essai CodingMailer...")
+    return _send_email_codingmailer(to, subject_clean, html_body)
 
 
 # ── API publique ──────────────────────────────────────────────

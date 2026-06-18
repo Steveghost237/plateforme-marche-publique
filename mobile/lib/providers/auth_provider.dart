@@ -99,8 +99,8 @@ class AuthProvider with ChangeNotifier {
       if (response != null && response['otp_dev'] != null) {
         _devOtp = response['otp_dev'].toString();
       }
-      final msg = (response?['message'] ?? '').toString();
-      _otpCanal = msg.contains('email') ? 'email' : 'sms';
+      // Si un email a été fourni, on affiche toujours le canal email
+      _otpCanal = (email != null && email.isNotEmpty) ? 'email' : 'sms';
 
       _isLoading = false;
       notifyListeners();

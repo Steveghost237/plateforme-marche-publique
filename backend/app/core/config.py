@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     AT_API_KEY: str = ""
     CODINGMAILER_URL: str = "https://codingmailer.onrender.com/send-email"
     COMEBUY_ADMIN_EMAIL: str = "comebuy237@gmail.com"
+    GMAIL_USER: str = "comebuy237@gmail.com"
+    GMAIL_APP_PASSWORD: str = ""
 
     class Config:
         env_file = ".env"
