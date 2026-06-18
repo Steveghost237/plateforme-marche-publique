@@ -67,7 +67,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  String? _devOtp; // Pour stocker l'OTP de développement
+  String? _devOtp;
+  String _otpCanal = 'email'; // 'email' ou 'sms'
+
+  String get otpCanal => _otpCanal;
 
   Future<void> register({
     required String telephone,
@@ -81,20 +84,23 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Étape 1: Demander un OTP
+      final body = <String, dynamic>{
+        'telephone': telephone,
+        'operateur': 'mobile',
+        if (email != null && email.isNotEmpty) 'email': email.trim().toLowerCase(),
+      };
+
       final response = await _api.post(
         '/auth/inscription/otp',
-        {
-          'telephone': telephone,
-          'operateur': 'mobile', // Opérateur par défaut
-        },
+        body,
         auth: false,
       );
 
-      // Extraire l'OTP de développement de la réponse
       if (response != null && response['otp_dev'] != null) {
         _devOtp = response['otp_dev'].toString();
       }
+      final msg = (response?['message'] ?? '').toString();
+      _otpCanal = msg.contains('email') ? 'email' : 'sms';
 
       _isLoading = false;
       notifyListeners();

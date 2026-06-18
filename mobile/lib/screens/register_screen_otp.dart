@@ -14,6 +14,7 @@ class RegisterScreenOtp extends StatefulWidget {
 class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
   final _formKey = GlobalKey<FormState>();
   final _telephoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _nomController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -26,6 +27,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
   @override
   void dispose() {
     _telephoneController.dispose();
+    _emailController.dispose();
     _nomController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -46,6 +48,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
         telephone: _telephoneController.text.trim(),
         nomComplet: _nomController.text.trim(),
         password: _passwordController.text,
+        email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
       );
 
       setState(() {
@@ -119,7 +122,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'En production, ce code serait envoyé par SMS.',
+                    'En production, ce code est envoyé sur votre Gmail.',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
@@ -135,9 +138,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Code OTP envoyé par SMS'),
+          final canal = authProvider.otpCanal == 'email' ? 'Gmail \u2709' : 'SMS';
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Code OTP envoyé par $canal'),
               backgroundColor: Colors.green,
             ),
           );
@@ -186,6 +190,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
         nomComplet: _nomController.text.trim(),
         password: _passwordController.text,
         role: _selectedRole,
+        email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
       );
 
       setState(() => _isLoading = false);
@@ -401,6 +406,80 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // Champ email Gmail (requis)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFBBF24).withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(
+                      color: Color(0xFF0D2137),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Adresse Gmail / Email *',
+                      labelStyle: TextStyle(
+                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      hintText: 'exemple@gmail.com',
+                      hintStyle: TextStyle(
+                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                      ),
+                      helperText: 'Le code OTP sera envoyé sur cet email',
+                      helperStyle: TextStyle(
+                        color: const Color(0xFF0D2137).withOpacity(0.5),
+                        fontSize: 11,
+                      ),
+                      prefixIcon: Container(
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.email_rounded,
+                          color: Color(0xFFFBBF24),
+                          size: 20,
+                        ),
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Veuillez entrer votre adresse email';
+                      }
+                      final emailRegex = RegExp(
+                          r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}');
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return 'Adresse email invalide';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Champ téléphone avec fond clair
                 Container(
@@ -864,13 +943,59 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Entrez le code à 6 chiffres envoyé au ${_telephoneController.text}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
+                Consumer<AuthProvider>(
+                  builder: (context, auth, _) {
+                    final isEmail = auth.otpCanal == 'email';
+                    final dest = isEmail
+                        ? _emailController.text.trim()
+                        : _telephoneController.text.trim();
+                    return Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D4ED8).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF1D4ED8).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isEmail
+                                    ? Icons.email_rounded
+                                    : Icons.sms_rounded,
+                                color: const Color(0xFF1D4ED8),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isEmail
+                                      ? 'Code envoyé sur votre Gmail'
+                                      : 'Code envoyé par SMS',
+                                  style: const TextStyle(
+                                      color: Color(0xFF1D4ED8),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          dest,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 TextFormField(

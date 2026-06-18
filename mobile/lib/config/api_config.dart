@@ -5,7 +5,7 @@ class ApiConfig {
   // Pour device physique: IP de votre machine
   // Pour test local : utiliser l'IP WiFi du PC
   // Pour production : 'https://comebuy-api.onrender.com/api'
-  static const String baseUrl = 'http://192.168.1.91:8000/api';
+  static const String baseUrl = 'https://comebuy-api.onrender.com/api';
 
   // Endpoints
   static const String auth = '/auth';
