@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     GMAIL_USER: str = "comebuy237@gmail.com"
     GMAIL_APP_PASSWORD: str = ""
     RESEND_API_KEY: str = ""
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = "comebuy237@gmail.com"
 
     class Config:
         env_file = ".env"

@@ -23,6 +23,9 @@ GMAIL_USER      = os.environ.get("GMAIL_USER", "comebuy237@gmail.com")
 GMAIL_PASSWORD  = os.environ.get("GMAIL_APP_PASSWORD", "")
 RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "")
 RESEND_URL      = "https://api.resend.com/emails"
+BREVO_API_KEY   = os.environ.get("BREVO_API_KEY", "")
+BREVO_URL       = "https://api.brevo.com/v3/smtp/email"
+BREVO_SENDER    = os.environ.get("BREVO_SENDER_EMAIL", "comebuy237@gmail.com")
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
@@ -201,8 +204,38 @@ def _html_invoice(nom: str, numero: str, lignes: list, sous_total: int,
 
 
 # ── Envoi HTTP (synchrone) ────────────────────────────────────
+def _send_email_brevo(to: str, subject: str, html_body: str) -> dict:
+    """Envoi via Brevo API (HTTP, fonctionne sur Render free tier, tout destinataire)."""
+    if not BREVO_API_KEY:
+        return {"success": False, "error": "BREVO_API_KEY non configuré"}
+    try:
+        with httpx.Client(timeout=15) as client:
+            resp = client.post(
+                BREVO_URL,
+                headers={
+                    "api-key": BREVO_API_KEY,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json={
+                    "sender": {"name": "ComeBuy", "email": BREVO_SENDER},
+                    "to": [{"email": to}],
+                    "subject": subject,
+                    "htmlContent": html_body,
+                },
+            )
+        if resp.status_code in (200, 201):
+            print(f"[BREVO ✓] → {to} | {subject}")
+            return {"success": True}
+        print(f"[BREVO ✗] {resp.status_code} → {resp.text[:300]}")
+        return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+    except Exception as e:
+        print(f"[BREVO ERROR] → {e}")
+        return {"success": False, "error": str(e)}
+
+
 def _send_email_resend(to: str, subject: str, html_body: str) -> dict:
-    """Envoi via Resend API (HTTP, fonctionne sur Render free tier)."""
+    """Envoi via Resend API (fallback)."""
     if not RESEND_API_KEY:
         return {"success": False, "error": "RESEND_API_KEY non configuré"}
     try:
@@ -285,19 +318,19 @@ def _send_email(to: str, subject: str, html_body: str) -> dict:
 
     subject_clean = _s(subject, 150)
 
-    # 1) Resend API (HTTP — fonctionne sur Render free tier)
+    # 1) Brevo API (principal — tout destinataire, Render free OK)
+    result = _send_email_brevo(to, subject_clean, html_body)
+    if result["success"]:
+        return result
+
+    # 2) Resend API (fallback)
+    print(f"[EMAIL] Brevo échoué ({result.get('error')}), essai Resend...")
     result = _send_email_resend(to, subject_clean, html_body)
     if result["success"]:
         return result
 
-    # 2) Gmail SMTP (fallback — bloqué sur Render free tier)
-    print(f"[EMAIL] Resend échoué ({result.get('error')}), essai SMTP...")
-    result = _send_email_smtp(to, subject_clean, html_body)
-    if result["success"]:
-        return result
-
     # 3) CodingMailer (dernier recours)
-    print(f"[EMAIL] SMTP échoué ({result.get('error')}), essai CodingMailer...")
+    print(f"[EMAIL] Resend échoué ({result.get('error')}), essai CodingMailer...")
     return _send_email_codingmailer(to, subject_clean, html_body)
 
 
