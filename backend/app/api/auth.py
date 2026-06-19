@@ -1,5 +1,5 @@
 import os, random, string, asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -164,10 +164,12 @@ def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
         if not user.otp_expire_at:
             raise HTTPException(400, "OTP expiré")
             
-        # Comparaison simple sans timezone pour l'instant
         now = datetime.utcnow()
-        if now > user.otp_expire_at:
-            print(f"[DEBUG] OTP expiré: {now} > {user.otp_expire_at}")
+        expire = user.otp_expire_at
+        if expire.tzinfo is not None:
+            expire = expire.replace(tzinfo=None)
+        if now > expire:
+            print(f"[DEBUG] OTP expiré: {now} > {expire}")
             raise HTTPException(400, "OTP expiré")
             
         if user.otp_code != p.otp_code:
@@ -296,7 +298,10 @@ def reset_verify(body: dict = None, db: Session = Depends(get_db)):
     user = db.query(Utilisateur).filter(Utilisateur.telephone == telephone).first()
     if not user: raise HTTPException(404, "Numéro introuvable")
     if (user.otp_tentatives or 0) >= 3: raise HTTPException(429, "Trop de tentatives")
-    if not user.otp_expire_at or datetime.utcnow() > user.otp_expire_at:
+    _exp = user.otp_expire_at
+    if _exp and _exp.tzinfo is not None:
+        _exp = _exp.replace(tzinfo=None)
+    if not _exp or datetime.utcnow() > _exp:
         raise HTTPException(400, "Code expiré")
     if user.otp_code != otp_code:
         user.otp_tentatives = (user.otp_tentatives or 0) + 1
