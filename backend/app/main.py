@@ -11,6 +11,7 @@ from app.api.routes_extra import (
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router
 )
+from app.api.webhooks import webhook_router
 
 app = FastAPI(title="Marché en Ligne API", version="2.0.0", docs_url="/docs", redoc_url="/redoc")
 app.state.limiter = limiter
@@ -29,6 +30,7 @@ for r in [
     fid_router, notif_router, admin_router, liv_router,
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router,
+    webhook_router,
 ]:
     app.include_router(r, prefix="/api")
 

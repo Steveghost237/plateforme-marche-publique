@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import 'payment_waiting_screen.dart';
+
+// ─── Couleurs & constantes ────────────────────────────────
+const _navy  = Color(0xFF0D2137);
+const _amber = Color(0xFFFBBF24);
+const _bg    = Color(0xFFF8FAFC);
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -11,7 +17,8 @@ class CheckoutScreen extends StatefulWidget {
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _CheckoutScreenState extends State<CheckoutScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
   bool _isLoading = false;
   bool _adressesLoading = true;
@@ -20,24 +27,66 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAdresseId;
   List<Map<String, dynamic>> _adresses = [];
   final TextEditingController _telPaiementCtrl = TextEditingController();
+  late AnimationController _btnAnim;
 
-  final List<Map<String, String>> _creneaux = [
-    {'value': 'matin_8h_12h', 'label': 'Matin (8h - 12h)'},
-    {'value': 'apres_midi_12h_16h', 'label': 'Après-midi (12h - 16h)'},
-    {'value': 'soir_16h_20h', 'label': 'Soir (16h - 20h)'},
+  static const _creneaux = [
+    {'value': 'matin_8h_12h',        'label': 'Matin',       'sub': '8h – 12h',  'icon': '🌅'},
+    {'value': 'apres_midi_12h_16h',  'label': 'Après-midi',  'sub': '12h – 16h', 'icon': '☀️'},
+    {'value': 'soir_16h_20h',        'label': 'Soir',        'sub': '16h – 20h', 'icon': '🌆'},
   ];
 
-  final List<Map<String, String>> _paiements = [
-    {'value': 'mtn_momo', 'label': 'MTN Mobile Money', 'icon': '🟡'},
-    {'value': 'orange_money', 'label': 'Orange Money', 'icon': '🟠'},
-    {'value': 'stripe', 'label': 'Carte bancaire (Visa/MC)', 'icon': '💳'},
-    {'value': 'paypal', 'label': 'PayPal', 'icon': '🅿️'},
-    {'value': 'especes', 'label': 'Espèces à la livraison', 'icon': '💵'},
+  static const _paiements = [
+    {
+      'value': 'mtn_momo',
+      'label': 'MTN MoMo',
+      'sub': 'Mobile Money',
+      'color': 0xFFFFCC00,
+      'bg': 0xFFFFFBEB,
+      'border': 0xFFFCD34D,
+      'emoji': '🟡',
+    },
+    {
+      'value': 'orange_money',
+      'label': 'Orange Money',
+      'sub': 'Mobile Money',
+      'color': 0xFFFF6600,
+      'bg': 0xFFFFF7ED,
+      'border': 0xFFFDBA74,
+      'emoji': '🟠',
+    },
+    {
+      'value': 'stripe',
+      'label': 'Carte bancaire',
+      'sub': 'Visa · Mastercard',
+      'color': 0xFF635BFF,
+      'bg': 0xFFF5F3FF,
+      'border': 0xFFC4B5FD,
+      'emoji': '💳',
+    },
+    {
+      'value': 'paypal',
+      'label': 'PayPal',
+      'sub': 'Paiement international',
+      'color': 0xFF003087,
+      'bg': 0xFFEFF6FF,
+      'border': 0xFF93C5FD,
+      'emoji': '🅿️',
+    },
+    {
+      'value': 'especes',
+      'label': 'Espèces',
+      'sub': 'Payer à la livraison',
+      'color': 0xFF16A34A,
+      'bg': 0xFFF0FDF4,
+      'border': 0xFF86EFAC,
+      'emoji': '💵',
+    },
   ];
 
   @override
   void initState() {
     super.initState();
+    _btnAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
     _loadAdresses();
   }
 
@@ -281,246 +330,494 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void dispose() {
     _telPaiementCtrl.dispose();
+    _btnAnim.dispose();
     super.dispose();
+  }
+
+  // ── Section title ──
+  Widget _sectionTitle(String text, IconData icon) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _amber.withOpacity(.18),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: _amber),
+            ),
+            const SizedBox(width: 10),
+            Text(text,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: _navy)),
+          ],
+        ),
+      );
+
+  // ── Adresse card ──
+  Widget _adresseCard(Map<String, dynamic> a) {
+    final selected = _selectedAdresseId == a['id'];
+    return GestureDetector(
+      onTap: () => setState(() => _selectedAdresseId = a['id']),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? _navy : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: selected ? _amber : Colors.grey.shade200, width: selected ? 2 : 1),
+          boxShadow: selected
+              ? [BoxShadow(color: _navy.withOpacity(.18), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withOpacity(.04), blurRadius: 4)],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              a['est_par_defaut'] == true ? Icons.star_rounded : Icons.location_on_rounded,
+              color: selected ? _amber : Colors.grey.shade400,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a['libelle'] ?? a['quartier'] ?? '',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: selected ? Colors.white : _navy)),
+                  const SizedBox(height: 2),
+                  Text('${a['quartier'] ?? ''}, ${a['ville'] ?? ''}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: selected ? Colors.white70 : Colors.grey.shade500)),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: _amber, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Créneau card ──
+  Widget _creneauCard(Map<String, String> c) {
+    final selected = _selectedCreneau == c['value'];
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCreneau = c['value']!),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _navy : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: selected ? _amber : Colors.grey.shade200, width: selected ? 2 : 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(c['icon']!, style: const TextStyle(fontSize: 22)),
+            const SizedBox(height: 4),
+            Text(c['label']!,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : _navy)),
+            Text(c['sub']!,
+                style: TextStyle(
+                    fontSize: 10, color: selected ? Colors.white60 : Colors.grey.shade500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Payment card ──
+  Widget _paymentCard(Map<String, dynamic> p) {
+    final selected = _modePaiement == p['value'];
+    final color = Color(p['color'] as int);
+    final bg = Color(p['bg'] as int);
+    final border = Color(p['border'] as int);
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _modePaiement = p['value'] as String);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? bg : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: selected ? border : Colors.grey.shade200, width: selected ? 2 : 1),
+          boxShadow: selected
+              ? [BoxShadow(color: color.withOpacity(.15), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withOpacity(.03), blurRadius: 4)],
+        ),
+        child: Row(
+          children: [
+            Text(p['emoji'] as String, style: const TextStyle(fontSize: 26)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p['label'] as String,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: selected ? color : _navy)),
+                  Text(p['sub'] as String,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: selected ? color.withOpacity(.7) : Colors.grey.shade500)),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? color : Colors.transparent,
+                border: Border.all(
+                    color: selected ? color : Colors.grey.shade300, width: 2),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
-    final fraisLiv = cart.sousTotal >= 5000 ? 0 : 500;
+    final fraisLiv = cart.sousTotal >= 5000 ? 0 : 1000;
     final total = cart.sousTotal + fraisLiv;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Finaliser la commande')),
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: _navy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: const Text('Finaliser la commande',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── ADRESSE DE LIVRAISON ──
-            const Text('Adresse de livraison',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+
+            // ── ADRESSE ───────────────────────────────────────
+            _sectionTitle('Adresse de livraison', Icons.location_on_rounded),
             if (_adressesLoading)
-              const Center(child: CircularProgressIndicator())
+              const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(color: _amber)))
             else if (_adresses.isEmpty)
-              Card(
-                child: ListTile(
-                  leading:
-                      const Icon(Icons.add_location, color: Color(0xFFFBBF24)),
-                  title: const Text('Aucune adresse'),
-                  subtitle: const Text('Ajoutez une adresse pour continuer'),
-                  trailing: const Icon(Icons.add),
-                  onTap: _ajouterAdresse,
+              GestureDetector(
+                onTap: _ajouterAdresse,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                            color: _amber.withOpacity(.1),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.add_location_rounded,
+                            color: _amber, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Ajouter une adresse',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700, color: _navy)),
+                            Text('Requis pour la livraison',
+                                style:
+                                    TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                    ],
+                  ),
                 ),
               )
-            else
-              ..._adresses.map((a) => RadioListTile<String>(
-                    title: Text(a['libelle'] ?? a['quartier'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle:
-                        Text('${a['quartier'] ?? ''}, ${a['ville'] ?? ''}'),
-                    value: a['id'],
-                    groupValue: _selectedAdresseId,
-                    onChanged: (v) => setState(() => _selectedAdresseId = v),
-                    activeColor: const Color(0xFFFBBF24),
-                    secondary: Icon(
-                      a['est_par_defaut'] == true
-                          ? Icons.star
-                          : Icons.location_on,
-                      color: const Color(0xFFFBBF24),
-                      size: 20,
-                    ),
-                  )),
-            if (_adresses.isNotEmpty)
+            else ...[
+              ..._adresses.map(_adresseCard),
               TextButton.icon(
                 onPressed: _ajouterAdresse,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Ajouter une adresse'),
+                icon: const Icon(Icons.add_rounded, size: 16, color: _amber),
+                label: const Text('Ajouter une adresse',
+                    style: TextStyle(color: _amber, fontSize: 12)),
               ),
+            ],
 
             const SizedBox(height: 24),
-            // ── CRÉNEAU ──
-            const Text('Créneau de livraison',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ..._creneaux.map((c) => RadioListTile<String>(
-                  title: Text(c['label']!),
-                  value: c['value']!,
-                  groupValue: _selectedCreneau,
-                  onChanged: (v) => setState(() => _selectedCreneau = v!),
-                  activeColor: const Color(0xFFFBBF24),
-                )),
+
+            // ── CRÉNEAU ────────────────────────────────────────
+            _sectionTitle('Créneau de livraison', Icons.access_time_rounded),
+            Row(
+              children: _creneaux
+                  .map((c) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: _creneauCard(c),
+                        ),
+                      ))
+                  .toList(),
+            ),
 
             const SizedBox(height: 24),
-            // ── PAIEMENT ──
-            const Text('Mode de paiement',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ..._paiements.map((p) => RadioListTile<String>(
-                  title: Text(p['label']!),
-                  value: p['value']!,
-                  groupValue: _modePaiement,
-                  onChanged: (v) => setState(() => _modePaiement = v!),
-                  activeColor: const Color(0xFFFBBF24),
-                )),
 
-            // Champ téléphone visible uniquement si MTN ou Orange Money
+            // ── MODE DE PAIEMENT ───────────────────────────────
+            _sectionTitle('Mode de paiement', Icons.payment_rounded),
+            ..._paiements.map(_paymentCard),
+
+            // ── Champ téléphone (MoMo) ─────────────────────────
             if (_besoinTelephone) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _telPaiementCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Numéro Mobile Money à débiter',
-                  hintText: '6XXXXXXXX',
-                  prefixIcon: Icon(
-                    _modePaiement == 'mtn_momo'
-                        ? Icons.phone_android
-                        : Icons.phone_iphone,
-                    color: _modePaiement == 'mtn_momo'
-                        ? Colors.amber
-                        : Colors.orange,
-                  ),
-                  prefixText: '+237 ',
-                  border: const OutlineInputBorder(),
-                  helperText:
-                      'Une notification de paiement sera envoyée sur ce numéro',
-                ),
-              ),
-            ],
-
-            // Info Stripe
-            if (_modePaiement == 'stripe') ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade100),
+                  color: _modePaiement == 'mtn_momo'
+                      ? const Color(0xFFFFFBEB)
+                      : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: _modePaiement == 'mtn_momo'
+                          ? const Color(0xFFFCD34D)
+                          : const Color(0xFFFDBA74)),
                 ),
-                child: const Row(
-                  children: [
-                    Text('💳', style: TextStyle(fontSize: 20)),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Vous serez redirigé vers Stripe pour saisir vos informations de carte (Visa, Mastercard).',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            // Info PayPal
-            if (_modePaiement == 'paypal') ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.indigo.shade100),
-                ),
-                child: const Row(
-                  children: [
-                    Text('🅿️', style: TextStyle(fontSize: 20)),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Vous serez redirigé vers PayPal pour finaliser le paiement avec votre compte ou carte internationale.',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF3730A3)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 24),
-            // ── RÉCAPITULATIF ──
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Récapitulatif',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Divider(height: 24),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Sous-total'),
-                        Text('${_formatPrix(cart.sousTotal)} F',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Frais de livraison'),
+                        Icon(Icons.smartphone_rounded,
+                            size: 16,
+                            color: _modePaiement == 'mtn_momo'
+                                ? Colors.amber.shade700
+                                : Colors.orange.shade700),
+                        const SizedBox(width: 6),
                         Text(
-                          fraisLiv == 0
-                              ? 'Offert'
-                              : '${_formatPrix(fraisLiv)} F',
+                          'Numéro ${_modePaiement == 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: fraisLiv == 0 ? Colors.green : null),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: _modePaiement == 'mtn_momo'
+                                  ? Colors.amber.shade800
+                                  : Colors.orange.shade800),
                         ),
                       ],
                     ),
-                    const Divider(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(
-                          '${_formatPrix(total)} F',
-                          style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFBBF24)),
-                        ),
-                      ],
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _telPaiementCtrl,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600, color: _navy),
+                      decoration: InputDecoration(
+                        hintText: '6XXXXXXXX',
+                        prefixText: '+237 ',
+                        prefixStyle: const TextStyle(
+                            color: _navy, fontWeight: FontWeight.w600),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                                color: Colors.grey.shade200, width: 1)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                                color: _modePaiement == 'mtn_momo'
+                                    ? Colors.amber
+                                    : Colors.orange,
+                                width: 2)),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '📲 Vous recevrez une notification pour confirmer avec votre PIN',
+                      style: TextStyle(fontSize: 11, color: Colors.black54),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _passerCommande,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF0D2137))),
-                      )
-                    : const Text('Confirmer la commande',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+
+            const SizedBox(height: 28),
+
+            // ── RÉCAPITULATIF ──────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4))
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded,
+                          size: 18, color: _amber),
+                      const SizedBox(width: 8),
+                      const Text('Récapitulatif',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _navy)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _recapRow('Articles', '${_formatPrix(cart.sousTotal)} F', false),
+                  const SizedBox(height: 8),
+                  _recapRow(
+                    fraisLiv == 0 ? 'Livraison (offerte 🎁)' : 'Frais de livraison',
+                    fraisLiv == 0 ? 'Gratuit' : '${_formatPrix(fraisLiv)} F',
+                    false,
+                    valueColor: fraisLiv == 0 ? Colors.green.shade600 : null,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  ),
+                  _recapRow('Total à payer', '${_formatPrix(total)} F', true),
+                ],
               ),
             ),
           ],
         ),
       ),
+
+      // ── BOUTON FLOTTANT ────────────────────────────────────
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(.08),
+                blurRadius: 16,
+                offset: const Offset(0, -4))
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                Text('${_formatPrix(total)} FCFA',
+                    style: const TextStyle(
+                        color: _navy,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _passerCommande,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _amber,
+                  foregroundColor: _navy,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  disabledBackgroundColor: Colors.grey.shade200,
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: _navy))
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.lock_rounded, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            _modePaiement == 'especes'
+                                ? 'Confirmer la commande'
+                                : 'Payer ${_formatPrix(total)} F',
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recapRow(String label, String value, bool bold, {Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(
+                fontSize: bold ? 15 : 13,
+                fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
+                color: bold ? _navy : Colors.grey.shade600)),
+        Text(value,
+            style: TextStyle(
+                fontSize: bold ? 17 : 13,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                color: valueColor ?? (bold ? _amber : _navy))),
+      ],
     );
   }
 }

@@ -208,7 +208,7 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
     sous_total = sum(l.prix_unitaire * l.quantite for l in p.lignes)
 
     # Calcul frais livraison par distance + poids
-    frais     = 500
+    frais     = 1000
     poids_kg  = float(getattr(p, 'poids_estime_kg', None) or 0)
     if p.adresse_id:
         adr = db.query(Adresse).filter(Adresse.id == p.adresse_id).first()
@@ -314,13 +314,14 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
         op_hint = "mtn"
     elif "orange" in mp:
         op_hint = "orange"
+    backend_url = os.environ.get("BACKEND_URL", "https://comebuy-api.onrender.com")
     result = await initier_paiement(
         montant_fcfa=cmd.total_fcfa,
         telephone=telephone,
         email=user.email,
         reference=cmd.numero,
         description=f"Commande {cmd.numero} — ComeBuy",
-        callback_url=body.get("callback_url", ""),
+        callback_url=body.get("callback_url") or f"{backend_url}/api/webhooks/notchpay",
         operator=op_hint,
     )
     if result.get("success"):

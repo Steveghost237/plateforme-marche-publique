@@ -5,16 +5,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 
-/// Écran d'attente pendant un paiement externe (Stripe/PayPal/MoMo).
-/// - Pour Stripe/PayPal : ouvre [checkoutUrl] dans le navigateur, affiche un bouton "J'ai payé"
-///   qui appelle l'endpoint de vérification correspondant.
-/// - Pour MoMo : poll automatique de /statut-paiement-momo toutes les 3s pendant 90s.
+const _navy  = Color(0xFF0D2137);
+const _amber = Color(0xFFFBBF24);
+
 class PaymentWaitingScreen extends StatefulWidget {
   final String cmdId;
   final String numero;
   final String mode; // 'stripe' | 'paypal' | 'momo'
   final String? checkoutUrl;
-  final String? operator; // MTN | Orange (pour MoMo)
+  final String? operator;
   final String? telephone;
 
   const PaymentWaitingScreen({
@@ -31,17 +30,34 @@ class PaymentWaitingScreen extends StatefulWidget {
   State<PaymentWaitingScreen> createState() => _PaymentWaitingScreenState();
 }
 
-class _PaymentWaitingScreenState extends State<PaymentWaitingScreen> {
+class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
+    with TickerProviderStateMixin {
   final ApiService _api = ApiService();
-  String _status = 'waiting'; // waiting | success | error
+  String _status = 'waiting';
   String _errorMsg = '';
   int _pollCount = 0;
+  static const int _maxPolls = 30; // 30 × 3s = 90s
   Timer? _timer;
   bool _verifyingExternal = false;
+
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseAnim;
+  late AnimationController _successCtrl;
+  late Animation<double> _successAnim;
 
   @override
   void initState() {
     super.initState();
+    _pulseCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.92, end: 1.08).animate(
+        CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
+    _successCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
+    _successAnim = CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut);
+
     if (widget.mode == 'momo') {
       _startMomoPolling();
     } else {
@@ -52,6 +68,8 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _pulseCtrl.dispose();
+    _successCtrl.dispose();
     super.dispose();
   }
 
@@ -73,90 +91,66 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen> {
       if (result['success'] == true) {
         if (!mounted) return;
         Provider.of<CartProvider>(context, listen: false).clear();
+        _pulseCtrl.stop();
+        _successCtrl.forward();
         setState(() => _status = 'success');
       } else {
         setState(() {
           _status = 'error';
-          _errorMsg =
-              result['error']?.toString() ?? 'Paiement non confirmé. Réessayez.';
+          _errorMsg = result['error']?.toString() ?? 'Paiement non confirmé.';
         });
       }
     } catch (e) {
-      setState(() {
-        _status = 'error';
-        _errorMsg = e.toString();
-      });
+      setState(() { _status = 'error'; _errorMsg = e.toString(); });
     } finally {
       if (mounted) setState(() => _verifyingExternal = false);
     }
   }
 
   void _startMomoPolling() {
-    const maxAttempts = 30;
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+      if (!mounted) { timer.cancel(); return; }
       _pollCount += 1;
       setState(() {});
       try {
-        final result =
-            await _api.get('/commandes/${widget.cmdId}/statut-paiement-momo');
+        final result = await _api.get('/commandes/${widget.cmdId}/statut-paiement-momo');
         final status = (result['status'] ?? '').toString().toLowerCase();
-        if (status == 'complete' ||
-            status == 'completed' ||
-            status == 'success' ||
-            status == 'successful') {
+        if (['complete', 'completed', 'success', 'successful'].contains(status)) {
           timer.cancel();
           if (!mounted) return;
           Provider.of<CartProvider>(context, listen: false).clear();
+          _pulseCtrl.stop();
+          _successCtrl.forward();
           setState(() => _status = 'success');
-        } else if (['failed', 'canceled', 'cancelled', 'rejected']
-            .contains(status)) {
+        } else if (['failed', 'canceled', 'cancelled', 'rejected'].contains(status)) {
           timer.cancel();
           setState(() {
             _status = 'error';
-            _errorMsg = result['error']?.toString() ??
-                'Paiement $status. Veuillez réessayer.';
+            _errorMsg = result['error']?.toString() ?? 'Paiement échoué. Veuillez réessayer.';
           });
-        } else if (_pollCount >= maxAttempts) {
+        } else if (_pollCount >= _maxPolls) {
           timer.cancel();
           setState(() {
             _status = 'error';
-            _errorMsg =
-                'Délai dépassé (90s). Vérifiez votre téléphone et réessayez.';
+            _errorMsg = 'Délai dépassé (90s). Vérifiez votre téléphone ou réessayez.';
           });
         }
-      } catch (e) {
-        // ignore transient errors, keep polling
-      }
+      } catch (_) {}
     });
   }
 
+  // ── Build ──────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5EFE6),
+      backgroundColor: const Color(0xFFF0F4F8),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
-            child: Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxWidth: 420),
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 12,
-                      offset: Offset(0, 4))
-                ],
-              ),
-              child: _buildContent(),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: _buildCard(),
             ),
           ),
         ),
@@ -164,247 +158,324 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen> {
     );
   }
 
-  Widget _buildContent() {
-    if (_status == 'success') return _buildSuccess();
-    if (_status == 'error') return _buildError();
-    if (widget.mode == 'momo') return _buildMomoWaiting();
-    return _buildStripePaypalWaiting();
+  Widget _buildCard() {
+    return Container(
+      key: ValueKey(_status),
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 420),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: _navy.withOpacity(.10), blurRadius: 20, offset: const Offset(0, 8))
+        ],
+      ),
+      child: _status == 'success'
+          ? _buildSuccess()
+          : _status == 'error'
+              ? _buildError()
+              : widget.mode == 'momo'
+                  ? _buildMomoWaiting()
+                  : _buildStripePaypalWaiting(),
+    );
   }
 
+  // ── MoMo waiting ──
   Widget _buildMomoWaiting() {
     final isOrange = (widget.operator ?? '').toLowerCase().contains('orange');
+    final operatorColor = isOrange ? const Color(0xFFFF6600) : const Color(0xFFFFCC00);
+    final operatorBg = isOrange ? const Color(0xFFFFF7ED) : const Color(0xFFFFFBEB);
     final ussd = isOrange ? '#150*50#' : '*126#';
+    final progress = _pollCount / _maxPolls;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7),
-            shape: BoxShape.circle,
+        // Animated phone icon
+        ScaleTransition(
+          scale: _pulseAnim,
+          child: Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: operatorBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: operatorColor, width: 3),
+            ),
+            child: Center(
+              child: Text(isOrange ? '🟠' : '🟡',
+                  style: const TextStyle(fontSize: 40)),
+            ),
           ),
-          child: const Icon(Icons.smartphone,
-              size: 42, color: Color(0xFFD97706)),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
-          '${widget.operator ?? "Mobile Money"} — Confirmez sur votre téléphone',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0D2137)),
+          widget.operator ?? 'Mobile Money',
+          style: TextStyle(
+              fontSize: 22, fontWeight: FontWeight.w800, color: operatorColor),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 4),
+        const Text('En attente de votre confirmation',
+            style: TextStyle(fontSize: 14, color: Colors.black54)),
+        const SizedBox(height: 20),
+
+        // Steps
+        _buildStep('1', 'Notification envoyée sur votre téléphone', true),
+        const SizedBox(height: 8),
+        _buildStep('2', 'Entrez votre code PIN ${isOrange ? "Orange Money" : "MTN MoMo"}', false),
+        const SizedBox(height: 8),
+        _buildStep('3', 'Confirmation automatique ici', false),
+        const SizedBox(height: 20),
+
+        // Phone + USSD
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7).withOpacity(.4),
-            border: Border.all(color: const Color(0xFFFCD34D)),
+            color: operatorBg,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: operatorColor.withOpacity(.4)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text('📱 ${widget.telephone ?? ''}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 8),
-              Text(
-                '1. Vous allez recevoir une notification ${isOrange ? "Orange Money" : "MTN MoMo"}.\n'
-                '2. Si rien ne s\'affiche, composez $ussd\n'
-                '3. Entrez votre code PIN pour confirmer.\n'
-                '4. Cette page se mettra à jour automatiquement.',
-                style: const TextStyle(fontSize: 12, color: Colors.black87),
+              Icon(Icons.smartphone_rounded, color: operatorColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('+237 ${widget.telephone ?? ''}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13, color: _navy)),
+                    Text('Si aucune notification → composez $ussd',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        const SizedBox(height: 20),
+
+        // Progress bar
+        Column(
           children: [
-            const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2)),
-            const SizedBox(width: 8),
-            Text('En attente… (${_pollCount * 3}s / 90s)',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: Colors.grey.shade100,
+                valueColor: AlwaysStoppedAnimation<Color>(operatorColor),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text('${_pollCount * 3}s / 90s — Vérification en cours…',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
           ],
         ),
         const SizedBox(height: 16),
         TextButton(
-          onPressed: () {
-            _timer?.cancel();
-            Navigator.of(context).popUntil((r) => r.isFirst);
-          },
-          child: const Text('Annuler et retourner au panier',
-              style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+          onPressed: () { _timer?.cancel(); Navigator.of(context).popUntil((r) => r.isFirst); },
+          child: const Text('Annuler', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
         ),
       ],
     );
   }
 
+  Widget _buildStep(String num, String text, bool active) {
+    return Row(
+      children: [
+        Container(
+          width: 24, height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active ? _navy : Colors.grey.shade100,
+          ),
+          child: Center(
+            child: Text(num,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: active ? Colors.white : Colors.grey.shade400)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: active ? _navy : Colors.grey.shade500,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+        ),
+      ],
+    );
+  }
+
+  // ── Stripe / PayPal waiting ──
   Widget _buildStripePaypalWaiting() {
-    final providerName = widget.mode == 'stripe' ? 'Stripe' : 'PayPal';
+    final isStripe = widget.mode == 'stripe';
+    final color = isStripe ? const Color(0xFF635BFF) : const Color(0xFF003087);
+    final bg = isStripe ? const Color(0xFFF5F3FF) : const Color(0xFFEFF6FF);
+    final emoji = isStripe ? '💳' : '🅿️';
+    final name = isStripe ? 'Stripe' : 'PayPal';
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE0F2FE),
-            shape: BoxShape.circle,
+        ScaleTransition(
+          scale: _pulseAnim,
+          child: Container(
+            width: 90, height: 90,
+            decoration: BoxDecoration(
+              color: bg, shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(.3), width: 3),
+            ),
+            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 42))),
           ),
-          child: const Icon(Icons.credit_card,
-              size: 42, color: Color(0xFF0369A1)),
-        ),
-        const SizedBox(height: 16),
-        Text('Paiement $providerName en cours',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0D2137))),
-        const SizedBox(height: 12),
-        const Text(
-          'Une fenêtre s\'est ouverte dans votre navigateur. Effectuez le paiement, puis revenez ici et touchez le bouton ci-dessous.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.black54),
         ),
         const SizedBox(height: 20),
-        if (widget.checkoutUrl != null)
-          TextButton.icon(
+        Text('Paiement $name', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 8),
+        const Text(
+          'Une page de paiement s\'est ouverte dans votre navigateur.\nFinalisez le paiement puis revenez ici.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        if (widget.checkoutUrl != null) ...[
+          OutlinedButton.icon(
             onPressed: _openCheckoutUrl,
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: Text('Rouvrir $providerName'),
+            icon: Icon(Icons.open_in_new, size: 16, color: color),
+            label: Text('Rouvrir $name', style: TextStyle(color: color)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: color.withOpacity(.4)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
           ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _verifyingExternal ? null : _verifyStripeOrPaypal,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D2137),
+              backgroundColor: _navy,
               foregroundColor: Colors.white,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             icon: _verifyingExternal
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.check_circle_outline),
-            label: Text(_verifyingExternal
-                ? 'Vérification…'
-                : 'J\'ai effectué le paiement'),
+                ? const SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.check_circle_outline, size: 18),
+            label: Text(_verifyingExternal ? 'Vérification en cours…' : 'J\'ai effectué le paiement',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
         const SizedBox(height: 8),
         TextButton(
           onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-          child: const Text('Annuler', style: TextStyle(fontSize: 12)),
+          child: const Text('Annuler', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ),
       ],
     );
   }
 
+  // ── Success ──
   Widget _buildSuccess() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: const BoxDecoration(
-              color: Color(0xFFD1FAE5), shape: BoxShape.circle),
-          child: const Icon(Icons.check, size: 42, color: Color(0xFF059669)),
-        ),
-        const SizedBox(height: 16),
-        const Text('Paiement confirmé !',
-            style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0D2137))),
-        const SizedBox(height: 4),
-        Text(widget.numero,
-            style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFFD97706),
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        const Text(
-          'Votre commande a bien été enregistrée. Vous recevrez une notification dès qu\'elle sera prête.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.black54),
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () =>
-                Navigator.of(context).popUntil((r) => r.isFirst),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D2137),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Retour à l\'accueil'),
+    return ScaleTransition(
+      scale: _successAnim,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 90, height: 90,
+            decoration: const BoxDecoration(color: Color(0xFFD1FAE5), shape: BoxShape.circle),
+            child: const Icon(Icons.check_rounded, size: 50, color: Color(0xFF059669)),
           ),
-        ),
-      ],
+          const SizedBox(height: 20),
+          const Text('Paiement confirmé !',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _navy)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: _amber.withOpacity(.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(widget.numero,
+                style: const TextStyle(fontSize: 14, color: _navy, fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Votre commande a été enregistrée.\nVous recevrez une notification dès que votre livreur sera en route.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.5),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _navy,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.home_rounded, size: 18),
+              label: const Text('Retour à l\'accueil',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
+  // ── Error ──
   Widget _buildError() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 80,
-          height: 80,
-          decoration: const BoxDecoration(
-              color: Color(0xFFFEE2E2), shape: BoxShape.circle),
-          child: const Icon(Icons.cancel, size: 42, color: Color(0xFFDC2626)),
+          width: 90, height: 90,
+          decoration: const BoxDecoration(color: Color(0xFFFEE2E2), shape: BoxShape.circle),
+          child: const Icon(Icons.error_outline_rounded, size: 50, color: Color(0xFFDC2626)),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         const Text('Paiement non confirmé',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0D2137))),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _navy)),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(10),
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: const Color(0xFFFEE2E2),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(_errorMsg,
+              textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B))),
         ),
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () =>
-                Navigator.of(context).popUntil((r) => r.isFirst),
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D2137),
+              backgroundColor: _navy,
               foregroundColor: Colors.white,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Retour au panier'),
+            icon: const Icon(Icons.shopping_cart_rounded, size: 18),
+            label: const Text('Retour au panier', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
       ],
