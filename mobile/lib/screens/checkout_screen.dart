@@ -255,13 +255,18 @@ class _CheckoutScreenState extends State<CheckoutScreen>
         }
         if (paymentResult['success'] == true) {
           if (!mounted) return;
+          final fallback = paymentResult['fallback_to_hosted'] == true;
+          final checkoutUrl = paymentResult['checkout_url']?.toString() ?? '';
+          // Si le push USSD a échoué → on ouvre la page hébergée NotchPay
+          // (même flux que Stripe : le client paye dans le navigateur)
           Navigator.of(context).pushReplacement(MaterialPageRoute(
             builder: (_) => PaymentWaitingScreen(
               cmdId: cmdId.toString(),
               numero: numero,
-              mode: 'momo',
+              mode: fallback ? 'momo_hosted' : 'momo',
               operator: paymentResult['operator']?.toString(),
               telephone: telPaiement,
+              checkoutUrl: checkoutUrl.isNotEmpty ? checkoutUrl : null,
             ),
           ));
           return;

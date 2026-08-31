@@ -178,23 +178,32 @@ async def initier_paiement(
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             # ──── Étape 1 : Initialize ────────────────────────────────
+            print(f"[NOTCHPAY INIT] ref={reference} tel={tel_clean} channel={channel} montant={montant_fcfa}")
             init_resp = await client.post(
                 f"{NOTCHPAY_BASE}/payments/initialize",
                 json=init_payload,
                 headers=get_headers(),
             )
-            init_data = init_resp.json()
+            try:
+                init_data = init_resp.json()
+            except Exception:
+                init_data = {}
+            print(f"[NOTCHPAY INIT RESP] status={init_resp.status_code} body={init_data}")
+
             if init_resp.status_code not in (200, 201):
                 return {
                     "success": False,
-                    "error": init_data.get("message", "Erreur initialisation NotchPay"),
+                    "error": init_data.get("message", f"Erreur NotchPay initialisation (HTTP {init_resp.status_code})"),
                     "details": init_data,
                 }
 
-            tx_ref = init_data.get("transaction", {}).get("reference") or reference
-            authorization_url = init_data.get("authorization_url")
+            tx_ref = (init_data.get("transaction") or {}).get("reference") or reference
+            authorization_url = init_data.get("authorization_url") or ""
 
             # ──── Étape 2 : Direct charge → push USSD ─────────────────
+            # Orange Money CM : le push USSD n'est pas toujours activé.
+            # Si l'échec est détecté → on bascule automatiquement sur la
+            # page hébergée NotchPay (le client paye dans son navigateur).
             charge_payload = {
                 "channel": channel,
                 "data": {"phone": tel_clean},
@@ -204,29 +213,45 @@ async def initier_paiement(
                 json=charge_payload,
                 headers=get_headers(),
             )
-            charge_data = charge_resp.json()
-            print(f"[NOTCHPAY CHARGE {channel}] {tx_ref} → {charge_resp.status_code}: {charge_data}")
+            try:
+                charge_data = charge_resp.json()
+            except Exception:
+                charge_data = {}
+            print(f"[NOTCHPAY CHARGE {channel}] {tx_ref} → HTTP {charge_resp.status_code}: {charge_data}")
 
-            if charge_resp.status_code in (200, 201, 202):
-                # Le push USSD a bien été envoyé (ou la transaction est en attente)
+            charge_status = (
+                charge_data.get("status")
+                or (charge_data.get("transaction") or {}).get("status")
+                or ""
+            ).lower()
+
+            if charge_resp.status_code in (200, 201, 202) and charge_status not in ("failed", "canceled", "cancelled"):
+                # Le push USSD a bien été déclenché
                 return {
                     "success": True,
                     "transaction_ref": tx_ref,
                     "channel": channel,
                     "operator": "MTN" if channel == "cm.mtn" else "Orange",
-                    "status": charge_data.get("status") or charge_data.get("transaction", {}).get("status") or "pending",
-                    "authorization_url": authorization_url,  # fallback web si USSD échoue
-                    "message": f"Notification envoyée au {tel_clean}. Composez *126# si vous ne recevez rien et entrez votre code PIN.",
+                    "status": charge_status or "pending",
+                    "checkout_url": authorization_url,   # toujours inclus comme secours
+                    "message": (
+                        f"Notification envoyée au {tel_clean}. "
+                        f"Composez {'#150*50#' if channel == 'cm.orange' else '*126#'} "
+                        f"si vous ne recevez rien, puis entrez votre code PIN."
+                    ),
                 }
             else:
-                # Charge directe a échoué → fallback URL hosted
+                # ── Push USSD échoué → basculement sur page hébergée ──
+                err_msg = charge_data.get("message") or charge_data.get("error") or "Push USSD indisponible"
+                print(f"[NOTCHPAY FALLBACK HOSTED] {channel} charge échouée ({err_msg}), on utilise {authorization_url}")
                 return {
                     "success": True,
                     "transaction_ref": tx_ref,
                     "channel": channel,
+                    "operator": "MTN" if channel == "cm.mtn" else "Orange",
                     "fallback_to_hosted": True,
-                    "authorization_url": authorization_url,
-                    "error": charge_data.get("message", "Charge directe échouée, utilisez le lien"),
+                    "checkout_url": authorization_url,
+                    "message": err_msg,
                 }
     except Exception as e:
         print(f"[NOTCHPAY ERROR] {e}")

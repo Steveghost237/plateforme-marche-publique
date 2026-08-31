@@ -60,6 +60,10 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
 
     if (widget.mode == 'momo') {
       _startMomoPolling();
+    } else if (widget.mode == 'momo_hosted') {
+      // Ouvre le navigateur immédiatement + poll en arrière-plan
+      _openCheckoutUrl();
+      _startMomoPolling(); // polling silencieux — confirme auto si le paiement est fait
     } else {
       _openCheckoutUrl();
     }
@@ -78,6 +82,38 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
     final uri = Uri.parse(widget.checkoutUrl!);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  // Vérification manuelle pour momo_hosted : appelle /statut-paiement-momo
+  Future<void> _verifyMomoHosted() async {
+    setState(() => _verifyingExternal = true);
+    try {
+      final result = await _api.get('/commandes/${widget.cmdId}/statut-paiement-momo');
+      final status = (result['status'] ?? '').toString().toLowerCase();
+      if (['complete', 'completed', 'success', 'successful'].contains(status) || result['success'] == true && status == 'complete') {
+        if (!mounted) return;
+        Provider.of<CartProvider>(context, listen: false).clear();
+        _timer?.cancel();
+        _pulseCtrl.stop();
+        _successCtrl.forward();
+        setState(() => _status = 'success');
+      } else if (['failed', 'canceled', 'cancelled', 'rejected'].contains(status)) {
+        setState(() { _status = 'error'; _errorMsg = result['error']?.toString() ?? 'Paiement échoué.'; });
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Paiement en attente — finalisez sur la page Orange Money puis réessayez.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _verifyingExternal = false);
     }
   }
 
@@ -177,7 +213,9 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
               ? _buildError()
               : widget.mode == 'momo'
                   ? _buildMomoWaiting()
-                  : _buildStripePaypalWaiting(),
+                  : widget.mode == 'momo_hosted'
+                      ? _buildMomoHostedWaiting()
+                      : _buildStripePaypalWaiting(),
     );
   }
 
@@ -275,9 +313,133 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
           ],
         ),
         const SizedBox(height: 16),
+        // ── Bouton secours : ouvrir le lien de paiement si le push ne marche pas
+        if (widget.checkoutUrl != null && widget.checkoutUrl!.isNotEmpty) ...[
+          OutlinedButton.icon(
+            onPressed: _openCheckoutUrl,
+            icon: Icon(Icons.open_in_new, size: 14, color: operatorColor),
+            label: Text(
+              'Payer via le site ${isOrange ? "Orange Money" : "MTN MoMo"}',
+              style: TextStyle(color: operatorColor, fontSize: 12),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: operatorColor.withOpacity(.5)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
         TextButton(
           onPressed: () { _timer?.cancel(); Navigator.of(context).popUntil((r) => r.isFirst); },
           child: const Text('Annuler', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+        ),
+      ],
+    );
+  }
+
+  // ── MoMo Hosted (USSD push indisponible → navigateur NotchPay) ──
+  Widget _buildMomoHostedWaiting() {
+    final isOrange = (widget.operator ?? '').toLowerCase().contains('orange');
+    final operatorColor = isOrange ? const Color(0xFFFF6600) : const Color(0xFFFFCC00);
+    final operatorBg   = isOrange ? const Color(0xFFFFF7ED) : const Color(0xFFFFFBEB);
+    final name = isOrange ? 'Orange Money' : 'MTN MoMo';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Icône animée
+        ScaleTransition(
+          scale: _pulseAnim,
+          child: Container(
+            width: 90, height: 90,
+            decoration: BoxDecoration(
+              color: operatorBg, shape: BoxShape.circle,
+              border: Border.all(color: operatorColor, width: 3),
+            ),
+            child: Center(
+              child: Text(isOrange ? '🟠' : '🟡',
+                  style: const TextStyle(fontSize: 40)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text('Paiement $name',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: operatorColor)),
+        const SizedBox(height: 8),
+        const Text(
+          'La notification automatique est indisponible.\nCliquez sur le bouton ci-dessous pour payer via le site sécurisé.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.5),
+        ),
+        const SizedBox(height: 24),
+
+        // ── Bouton principal : ouvrir la page de paiement ──
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _openCheckoutUrl,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: operatorColor,
+              foregroundColor: isOrange ? Colors.white : _navy,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.open_in_browser_rounded, size: 20),
+            label: Text('Payer avec $name',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── Numéro de téléphone info ──
+        if (widget.telephone != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: operatorBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: operatorColor.withOpacity(.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.smartphone_rounded, size: 16, color: operatorColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('+237 ${widget.telephone}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _navy)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // ── Bouton "J'ai payé" → vérifie le statut côté serveur ──
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _verifyingExternal ? null : _verifyMomoHosted,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _navy,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: _verifyingExternal
+                ? const SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.check_circle_outline, size: 18),
+            label: Text(_verifyingExternal ? 'Vérification…' : 'J\'ai effectué le paiement',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () { _timer?.cancel(); Navigator.of(context).popUntil((r) => r.isFirst); },
+          child: const Text('Annuler', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ),
       ],
     );
