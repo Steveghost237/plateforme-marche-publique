@@ -225,10 +225,16 @@ async def initier_paiement(
                 or ""
             ).lower()
 
+            # Détecter si on est en mode sandbox (clé test)
+            is_sandbox = init_data.get("transaction", {}).get("sandbox", False)
+            if is_sandbox:
+                print(f"[NOTCHPAY SANDBOX] Compte en mode TEST — les vraies notifications ne seront pas envoyées.")
+
             if charge_resp.status_code in (200, 201, 202) and charge_status not in ("failed", "canceled", "cancelled"):
                 # Le push USSD a bien été déclenché
                 return {
                     "success": True,
+                    "sandbox": is_sandbox,
                     "transaction_ref": tx_ref,
                     "channel": channel,
                     "operator": "MTN" if channel == "cm.mtn" else "Orange",
@@ -243,9 +249,17 @@ async def initier_paiement(
             else:
                 # ── Push USSD échoué → basculement sur page hébergée ──
                 err_msg = charge_data.get("message") or charge_data.get("error") or "Push USSD indisponible"
-                print(f"[NOTCHPAY FALLBACK HOSTED] {channel} charge échouée ({err_msg}), on utilise {authorization_url}")
+                # Cas spécial : compte sandbox avec vrai numéro → message lisible
+                if "Invalid test phone number" in err_msg or is_sandbox:
+                    err_msg = (
+                        "Votre compte NotchPay est en mode TEST (sandbox). "
+                        "Les notifications ne sont pas envoyées sur de vrais numéros. "
+                        "Utilisez la page de paiement ci-dessous pour finaliser."
+                    )
+                print(f"[NOTCHPAY FALLBACK HOSTED] {channel} charge échouée, on utilise {authorization_url}")
                 return {
                     "success": True,
+                    "sandbox": is_sandbox,
                     "transaction_ref": tx_ref,
                     "channel": channel,
                     "operator": "MTN" if channel == "cm.mtn" else "Orange",

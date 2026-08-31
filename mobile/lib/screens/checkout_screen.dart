@@ -257,6 +257,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
           if (!mounted) return;
           final fallback = paymentResult['fallback_to_hosted'] == true;
           final checkoutUrl = paymentResult['checkout_url']?.toString() ?? '';
+          final isSandbox  = paymentResult['sandbox'] == true;
           // Si le push USSD a échoué → on ouvre la page hébergée NotchPay
           // (même flux que Stripe : le client paye dans le navigateur)
           Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -267,6 +268,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
               operator: paymentResult['operator']?.toString(),
               telephone: telPaiement,
               checkoutUrl: checkoutUrl.isNotEmpty ? checkoutUrl : null,
+              sandbox: isSandbox,
             ),
           ));
           return;

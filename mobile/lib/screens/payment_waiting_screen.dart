@@ -11,10 +11,11 @@ const _amber = Color(0xFFFBBF24);
 class PaymentWaitingScreen extends StatefulWidget {
   final String cmdId;
   final String numero;
-  final String mode; // 'stripe' | 'paypal' | 'momo'
+  final String mode; // 'stripe' | 'paypal' | 'momo' | 'momo_hosted'
   final String? checkoutUrl;
   final String? operator;
   final String? telephone;
+  final bool sandbox; // true = compte NotchPay en mode test
 
   const PaymentWaitingScreen({
     super.key,
@@ -24,6 +25,7 @@ class PaymentWaitingScreen extends StatefulWidget {
     this.checkoutUrl,
     this.operator,
     this.telephone,
+    this.sandbox = false,
   });
 
   @override
@@ -59,11 +61,12 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
     _successAnim = CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut);
 
     if (widget.mode == 'momo') {
-      _startMomoPolling();
+      _startMomoPolling(silent: false);
     } else if (widget.mode == 'momo_hosted') {
-      // Ouvre le navigateur immédiatement + poll en arrière-plan
+      // Ouvre le navigateur immédiatement + poll silencieux en arrière-plan
+      // (pas de timeout erreur — le bouton 'J\'ai payé' reste actif)
       _openCheckoutUrl();
-      _startMomoPolling(); // polling silencieux — confirme auto si le paiement est fait
+      _startMomoPolling(silent: true);
     } else {
       _openCheckoutUrl();
     }
@@ -143,11 +146,11 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
     }
   }
 
-  void _startMomoPolling() {
+  void _startMomoPolling({bool silent = false}) {
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted) { timer.cancel(); return; }
       _pollCount += 1;
-      setState(() {});
+      if (!silent) setState(() {});
       try {
         final result = await _api.get('/commandes/${widget.cmdId}/statut-paiement-momo');
         final status = (result['status'] ?? '').toString().toLowerCase();
@@ -160,13 +163,14 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
           setState(() => _status = 'success');
         } else if (['failed', 'canceled', 'cancelled', 'rejected'].contains(status)) {
           timer.cancel();
-          setState(() {
+          if (!silent) setState(() {
             _status = 'error';
             _errorMsg = result['error']?.toString() ?? 'Paiement échoué. Veuillez réessayer.';
           });
         } else if (_pollCount >= _maxPolls) {
           timer.cancel();
-          setState(() {
+          // Mode hébergé : pas d'erreur de timeout, le bouton 'J\'ai payé' reste actif
+          if (!silent) setState(() {
             _status = 'error';
             _errorMsg = 'Délai dépassé (90s). Vérifiez votre téléphone ou réessayez.';
           });
@@ -180,6 +184,26 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
+      // Bannière avertissement mode sandbox
+      bottomSheet: widget.sandbox
+          ? Container(
+              width: double.infinity,
+              color: const Color(0xFFFFF3CD),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: const Row(
+                children: [
+                  Icon(Icons.science_outlined, size: 16, color: Color(0xFF856404)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mode TEST — Obtenez une clé live sur business.notchpay.co pour des paiements réels.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF856404)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
