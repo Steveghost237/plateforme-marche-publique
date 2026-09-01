@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/social_media_bar.dart';
 import 'login_screen.dart';
 import 'orders_screen.dart';
 import 'addresses_screen.dart';
@@ -190,6 +191,20 @@ class ProfileScreen extends StatelessWidget {
                       );
                     }
                   },
+                ),
+                const SizedBox(height: 16),
+                // ── Réseaux sociaux ──────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: const SocialMediaBar(
+                    label: 'SUIVEZ-NOUS',
+                    style: 'chip',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Divider(),

@@ -1,0 +1,403 @@
+/* ── Root ── */
+.root {
+  min-height: 100vh;
+  background: #fff;
+  color: #0D2137;
+}
+
+/* ── Nav ── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(13, 33, 55, 0.97);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.navInner {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  color: #fff;
+}
+.logoIcon { font-size: 26px; }
+.logoText { font-weight: 300; letter-spacing: -0.5px; }
+.logoText b { font-weight: 800; color: #FBBF24; }
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.navLinks a {
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color .2s;
+}
+.navLinks a:hover { color: #fff; }
+.navCta {
+  background: #FBBF24 !important;
+  color: #0D2137 !important;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: 700 !important;
+}
+
+/* ── Hero ── */
+.hero {
+  background: linear-gradient(135deg, #0D2137 0%, #1a3a5c 60%, #0D2137 100%);
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  padding: 80px 24px;
+  gap: 60px;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+.heroContent { flex: 1; }
+.badge {
+  display: inline-block;
+  background: rgba(251,191,36,0.15);
+  border: 1px solid rgba(251,191,36,0.4);
+  color: #FBBF24;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+.heroTitle {
+  font-size: clamp(36px, 5vw, 58px);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  margin: 0 0 20px;
+  letter-spacing: -1px;
+}
+.accent { color: #FBBF24; }
+.heroSub {
+  font-size: 17px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.7;
+  max-width: 480px;
+  margin: 0 0 36px;
+}
+.heroBtns {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.btnPrimary {
+  background: #FBBF24;
+  color: #0D2137;
+  font-weight: 800;
+  padding: 14px 28px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 15px;
+  transition: transform .15s, box-shadow .15s;
+}
+.btnPrimary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(251,191,36,.4); }
+.btnOutline {
+  border: 2px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-weight: 600;
+  padding: 14px 28px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 15px;
+  transition: border-color .2s;
+}
+.btnOutline:hover { border-color: #fff; }
+.heroStats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 20px 24px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  width: fit-content;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px;
+  gap: 4px;
+}
+.stat b { font-size: 22px; color: #FBBF24; font-weight: 800; }
+.stat span { font-size: 12px; color: rgba(255,255,255,0.6); }
+.statDivider { width: 1px; height: 36px; background: rgba(255,255,255,0.15); }
+
+/* ── Phone visual ── */
+.heroVisual { flex-shrink: 0; }
+.phoneFrame {
+  width: 260px;
+  background: #1e3a5f;
+  border-radius: 36px;
+  padding: 16px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.1);
+}
+.phoneSc {
+  background: #f5f7fa;
+  border-radius: 24px;
+  overflow: hidden;
+  padding: 12px;
+}
+.appHeader {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0D2137;
+  margin-bottom: 10px;
+}
+.appSearch {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 10px;
+  border: 1px solid #e5e7eb;
+}
+.appGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.appCat {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  font-weight: 500;
+}
+.appLabel { font-size: 10px; color: #888; margin-bottom: 6px; font-weight: 600; }
+.payRow { display: flex; gap: 4px; flex-wrap: wrap; }
+.payBadge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* ── Sections ── */
+.section { padding: 80px 24px; }
+.sectionGray { padding: 80px 24px; background: #f8fafc; }
+.sectionInner { max-width: 1140px; margin: 0 auto; }
+.sectionTitle {
+  font-size: 36px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 12px;
+  color: #0D2137;
+}
+.sectionSub {
+  text-align: center;
+  color: #64748b;
+  font-size: 16px;
+  margin: 0 0 48px;
+}
+
+/* ── Payment cards ── */
+.payGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 48px;
+}
+.payCard {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e5e7eb;
+  transition: transform .2s, box-shadow .2s;
+}
+.payCard:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); }
+.payCardIcon {
+  width: 64px; height: 64px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.payCardName { font-size: 17px; font-weight: 700; margin: 0 0 8px; color: #0D2137; }
+.payCardDesc { font-size: 13px; color: #64748b; line-height: 1.6; margin: 0 0 16px; }
+.payCardFooter { display: flex; justify-content: space-between; align-items: center; }
+.payCardProvider { font-size: 11px; color: #94a3b8; font-weight: 600; }
+.payCardTag {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ── Partners ── */
+.partners { text-align: center; }
+.partnersLabel { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.partnerLogos { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.partnerChip {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+/* ── Features ── */
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+.featureCard {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 24px;
+  border: 1px solid #e5e7eb;
+}
+.featureIcon { font-size: 32px; margin-bottom: 14px; }
+.featureTitle { font-size: 17px; font-weight: 700; margin: 0 0 8px; color: #0D2137; }
+.featureDesc { font-size: 14px; color: #64748b; line-height: 1.6; margin: 0; }
+
+/* ── Download ── */
+.downloadSection {
+  background: linear-gradient(135deg, #0D2137, #1a3a5c);
+  padding: 80px 24px;
+}
+.downloadBtn {
+  display: inline-block;
+  background: #FBBF24;
+  color: #0D2137;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 16px 36px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .15s;
+}
+.downloadBtn:hover { transform: translateY(-2px); }
+
+/* ── API Card ── */
+.apiCard {
+  background: #0D2137;
+  border-radius: 16px;
+  padding: 32px;
+  color: #fff;
+}
+.apiInfo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.apiItem { display: flex; flex-direction: column; gap: 6px; }
+.apiLabel { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.8px; }
+.apiLink { color: #FBBF24; font-size: 14px; font-weight: 600; text-decoration: none; }
+.apiLink:hover { text-decoration: underline; }
+.code {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: rgba(255,255,255,0.08);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #93c5fd;
+  word-break: break-all;
+}
+
+/* ── Contact ── */
+.contactGrid {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 32px;
+}
+.contactCard {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px;
+  border: 1px solid #e5e7eb;
+  text-align: center;
+  min-width: 200px;
+}
+.contactIcon { font-size: 32px; margin-bottom: 10px; }
+.contactLabel { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.contactValue { font-size: 14px; font-weight: 600; color: #0D2137; text-decoration: none; }
+a.contactValue:hover { color: #FBBF24; }
+
+/* ── Hero social ── */
+.heroSocial {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.heroSocialLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  white-space: nowrap;
+}
+
+/* ── Footer social ── */
+.footerSocial {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+/* ── Footer ── */
+.footer {
+  background: #0D2137;
+  padding: 48px 24px;
+}
+.footerInner {
+  max-width: 1140px;
+  margin: 0 auto;
+  text-align: center;
+}
+.footerLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 20px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.footerDesc { color: rgba(255,255,255,0.5); font-size: 14px; margin: 0 0 24px; }
+.footerLinks {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.footerLinks a { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 13px; }
+.footerLinks a:hover { color: #FBBF24; }
+.footerCopy { color: rgba(255,255,255,0.3); font-size: 12px; margin: 0; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .hero { flex-direction: column; padding: 60px 20px; text-align: center; }
+  .heroSub { margin: 0 auto 36px; }
+  .heroBtns { justify-content: center; }
+  .heroStats { margin: 0 auto; }
+  .heroVisual { display: none; }
+  .navLinks a:not(.navCta) { display: none; }
+  .apiInfo { grid-template-columns: 1fr; }
+}

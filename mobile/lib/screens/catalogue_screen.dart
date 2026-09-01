@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/produit.dart';
+import '../widgets/social_media_bar.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 import '../providers/lang_provider.dart';
@@ -275,6 +276,42 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                                       _filteredProduits[index]);
                                 },
                               ),
+                              // ── RÉSEAUX SOCIAUX ──
+                              const SizedBox(height: 28),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [const Color(0xFF0D2137), const Color(0xFF1A3A5C)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Rejoignez notre communauté 🎉',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Bons plans, nouveautés et offres exclusives',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(.6),
+                                        fontSize: 12,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const SocialMediaBar(style: 'icon'),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
                             ],
                           ),
                         ),
