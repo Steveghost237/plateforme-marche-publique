@@ -293,6 +293,18 @@
   transition: transform .15s;
 }
 .downloadBtn:hover { transform: translateY(-2px); }
+.btnOutlineWhite {
+  display: inline-block;
+  border: 2px solid rgba(255,255,255,0.4);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 14px 28px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: border-color .2s, background .2s;
+}
+.btnOutlineWhite:hover { border-color: #fff; background: rgba(255,255,255,0.08); }
 
 /* ── API Card ── */
 .apiCard {

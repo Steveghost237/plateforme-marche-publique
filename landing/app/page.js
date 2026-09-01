@@ -177,10 +177,19 @@ export default function Home() {
           </p>
           <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
             <a
-              href="https://comebuy-api.onrender.com/static/app-release.apk"
+              href="https://github.com/Steveghost237/plateforme-marche-publique/releases/latest/download/app-release.apk"
               className={styles.downloadBtn}
+              download="ComeBuy.apk"
             >
               📱 Télécharger APK Android
+            </a>
+            <a
+              href="https://github.com/Steveghost237/plateforme-marche-publique/releases/latest"
+              target="_blank"
+              rel="noreferrer"
+              className={styles.btnOutlineWhite}
+            >
+              📋 Voir les versions
             </a>
           </div>
           <p style={{color:'rgba(255,255,255,0.5)',fontSize:12,marginTop:16}}>
