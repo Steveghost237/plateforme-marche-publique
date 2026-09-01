@@ -77,6 +77,7 @@ export function Inscription() {
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
   const [otpCanal, setOtpCanal] = useState('email')
+  const [otpDev, setOtpDev] = useState(null)
   const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -91,9 +92,14 @@ export function Inscription() {
     setLoading(true)
     try {
       const res = await api.post('/auth/inscription/otp', { telephone: tel, operateur: op, email: email.trim().toLowerCase() })
-      const canal = res.data?.message?.includes('email') ? 'email' : 'SMS'
+      const canal = res.data?.message?.includes('email') ? 'email' : res.data?.message?.includes('sms') ? 'SMS' : 'none'
       setOtpCanal(canal)
-      toast.success(`Code OTP envoyé sur votre ${canal === 'email' ? 'Gmail ✉️' : 'téléphone 📱'}`)
+      if (res.data?.otp_dev) {
+        setOtpDev(res.data.otp_dev)
+        toast('Code disponible directement dans l\'app', { icon: '🔑' })
+      } else {
+        toast.success(`Code OTP envoyé sur votre ${canal === 'email' ? 'Gmail ✉️' : 'téléphone 📱'}`)
+      }
       setStep(2)
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
     finally { setLoading(false) }
@@ -177,14 +183,22 @@ export function Inscription() {
 
       {step === 2 && (
         <form onSubmit={step2} className="space-y-5 animate-fade-up">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-            <p className="text-sm text-blue-800 font-semibold">
-              {otpCanal === 'email' ? '✉️ Code envoyé sur votre Gmail' : '📱 Code envoyé par SMS'}
-            </p>
-            <p className="text-xs text-blue-600 mt-0.5">
-              {otpCanal === 'email' ? email : tel}
-            </p>
-          </div>
+          {otpDev ? (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Votre code de vérification</p>
+              <p className="text-3xl font-black text-amber-800 tracking-[0.3em]">{otpDev}</p>
+              <p className="text-xs text-amber-600 mt-1">Copiez et saisissez ce code ci-dessous</p>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+              <p className="text-sm text-blue-800 font-semibold">
+                {otpCanal === 'email' ? '✉️ Code envoyé sur votre Gmail' : '📱 Code envoyé par SMS'}
+              </p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                {otpCanal === 'email' ? email : tel}
+              </p>
+            </div>
+          )}
           <div className="flex gap-2 justify-center">
             {otp.map((d, i) => (
               <input key={i} id={`otp-${i}`} maxLength={1} value={d} onChange={e => handleOtp(i, e.target.value)}

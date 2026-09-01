@@ -151,10 +151,13 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     if not email_result.get("success"):
         sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
 
-    canal = "email" if email_result.get("success") else "sms"
-    resp = {"message": f"OTP envoyé par {canal}"}
-    if debug:
+    delivery_ok   = email_result.get("success") or sms_result.get("success")
+    canal         = "email" if email_result.get("success") else ("sms" if sms_result.get("success") else "none")
+    resp = {"message": f"OTP envoyé par {canal}" if delivery_ok else "OTP généré"}
+    # Exposer l'OTP si aucun canal de livraison n'a fonctionné (fallback MVP)
+    if not delivery_ok or debug:
         resp["otp_dev"] = otp
+    if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
     return resp
