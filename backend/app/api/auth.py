@@ -2,6 +2,7 @@ import os, random, string, asyncio
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -113,12 +114,29 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
                            email=p.email,
                            otp_code=otp, otp_expire_at=expire, otp_tentatives=0)
         db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Race condition : une autre requête a déjà créé ce compte (double-tap)
+            db.rollback()
+            user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
+            if not user:
+                raise HTTPException(500, "Erreur lors de la création du compte")
+            if user.statut == "actif":
+                raise HTTPException(409, "Numéro déjà enregistré")
+            user.otp_code = otp
+            user.otp_expire_at = expire
+            user.otp_tentatives = 0
+            if p.email:
+                user.email = p.email
+            db.commit()
     else:
-        user.otp_code = otp; user.otp_expire_at = expire; user.otp_tentatives = 0
+        user.otp_code = otp
+        user.otp_expire_at = expire
+        user.otp_tentatives = 0
         if p.email:
             user.email = p.email
-    
-    db.commit()
+        db.commit()
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
 

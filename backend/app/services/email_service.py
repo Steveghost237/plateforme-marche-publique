@@ -311,7 +311,7 @@ def _send_email_codingmailer(to: str, subject: str, html_body: str) -> dict:
 
 
 def _send_email(to: str, subject: str, html_body: str) -> dict:
-    """Envoie un email : Resend API en priorité, puis SMTP, puis CodingMailer."""
+    """Envoie un email avec cascade : Brevo → SMTP → Resend → CodingMailer."""
     if not is_valid_email(to):
         print(f"[EMAIL] Adresse invalide ignorée : {to!r}")
         return {"success": False, "error": "Adresse email invalide"}
@@ -323,13 +323,19 @@ def _send_email(to: str, subject: str, html_body: str) -> dict:
     if result["success"]:
         return result
 
-    # 2) Resend API (fallback)
-    print(f"[EMAIL] Brevo échoué ({result.get('error')}), essai Resend...")
+    # 2) SMTP Gmail (fallback direct — contourne le blocage IP Brevo)
+    print(f"[EMAIL] Brevo échoué ({result.get('error')}), essai SMTP Gmail...")
+    result = _send_email_smtp(to, subject_clean, html_body)
+    if result["success"]:
+        return result
+
+    # 3) Resend API (fallback — nécessite domaine vérifié pour envoi externe)
+    print(f"[EMAIL] SMTP échoué ({result.get('error')}), essai Resend...")
     result = _send_email_resend(to, subject_clean, html_body)
     if result["success"]:
         return result
 
-    # 3) CodingMailer (dernier recours)
+    # 4) CodingMailer (dernier recours)
     print(f"[EMAIL] Resend échoué ({result.get('error')}), essai CodingMailer...")
     return _send_email_codingmailer(to, subject_clean, html_body)
 
