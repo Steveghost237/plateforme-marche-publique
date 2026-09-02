@@ -1,7 +1,68 @@
-name: hello
-on: push
+name: Build APK ComeBuy
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version ex 1.0.1'
+        required: false
+        default: '1.0.0'
 jobs:
-  test:
+  build-apk:
+    name: Build APK Release
     runs-on: ubuntu-latest
     steps:
-      - run: echo hello
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
+
+      - name: Setup keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.STORE_PASSWORD }}
+          KEY_AL: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 --decode > mobile/android/comebuy.jks
+            printf 'storeFile=../comebuy.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$STORE_PASS" "$KEY_AL" "$KEY_PASS" > mobile/android/key.properties
+            echo "Production signing OK"
+          else
+            echo "Debug signing (no KEYSTORE_BASE64 secret)"
+          fi
+
+      - name: Pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: mobile
+        run: flutter analyze --no-fatal-infos || true
+
+      - name: Build APK
+        working-directory: mobile
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComeBuy-APK-${{ github.run_number }}
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
