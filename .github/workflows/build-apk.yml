@@ -56,14 +56,17 @@ jobs:
       #      STORE_PASSWORD    : mot de passe du keystore
       - name: Setup signing keystore
         if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > mobile/android/comebuy.jks
-          cat > mobile/android/key.properties <<EOF
-          storeFile=../comebuy.jks
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
+          echo "$KEYSTORE_B64" | base64 --decode > mobile/android/comebuy.jks
+          echo "storeFile=../comebuy.jks"   > mobile/android/key.properties
+          echo "storePassword=$STORE_PASS" >> mobile/android/key.properties
+          echo "keyAlias=$KEY_ALIAS"       >> mobile/android/key.properties
+          echo "keyPassword=$KEY_PASS"     >> mobile/android/key.properties
 
       # ── 6. Dépendances Flutter ───────────────────────────────
       - name: Flutter pub get
@@ -114,6 +117,7 @@ jobs:
           echo "| Build | ${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Taille APK | ${APK_SIZE} |" >> $GITHUB_STEP_SUMMARY
           echo "| Backend | https://comebuy-api.onrender.com/api |" >> $GITHUB_STEP_SUMMARY
-          echo "| Signe | ${{ secrets.KEYSTORE_BASE64 != '' && 'Oui (production)' || 'Debug keystore' }} |" >> $GITHUB_STEP_SUMMARY
+          SIGNED=$( [ -f mobile/android/key.properties ] && echo "Oui (production)" || echo "Debug keystore" )
+          echo "| Signe | ${SIGNED} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Telecharger l'APK dans l'onglet **Artifacts** ci-dessus." >> $GITHUB_STEP_SUMMARY
