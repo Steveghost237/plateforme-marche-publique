@@ -1,45 +1,7 @@
-name: Build APK ComeBuy
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+name: hello
+on: push
 jobs:
-  build-apk:
-    name: Build APK Release
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.0'
-          channel: stable
-          cache: true
-      - name: Setup keystore
-        if: secrets.KEYSTORE_BASE64 != ''
-        env:
-          KB: ${{ secrets.KEYSTORE_BASE64 }}
-          SP: ${{ secrets.STORE_PASSWORD }}
-          KA: ${{ secrets.KEY_ALIAS }}
-          KP: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          echo "$KB" | base64 --decode > mobile/android/comebuy.jks
-          printf 'storeFile=../comebuy.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$SP" "$KA" "$KP" > mobile/android/key.properties
-      - name: Pub get
-        working-directory: mobile
-        run: flutter pub get
-      - name: Build APK
-        working-directory: mobile
-        run: flutter build apk --release --build-number=${{ github.run_number }}
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ComeBuy-APK-${{ github.run_number }}
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
+      - run: echo hello
