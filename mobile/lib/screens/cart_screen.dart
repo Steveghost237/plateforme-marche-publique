@@ -251,7 +251,7 @@ class CartScreen extends StatelessWidget {
                           ),
                           if (cart.sousTotal >= 5000)
                             const Text(
-                              'Livraison offerte 🎉',
+                              'Livraison offerte',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.green,

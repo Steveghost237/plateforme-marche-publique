@@ -1,0 +1,119 @@
+name: Build APK ComeBuy
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version (ex: 1.0.1)'
+        required: false
+        default: '1.0.0'
+      version_code:
+        description: 'Code de version (entier, ex: 2)'
+        required: false
+        default: '1'
+
+jobs:
+  build-apk:
+    name: Build APK Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 (requis pour compileSdk 36) ───────────────
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ── 3. Flutter stable ────────────────────────────────────
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      # ── 4. Vérifier les versions ─────────────────────────────
+      - name: Flutter & Dart versions
+        run: |
+          flutter --version
+          dart --version
+
+      # ── 5. Clé de signature (depuis GitHub Secrets) ──────────
+      #    Pour activer la signature production, ajoutez ces secrets
+      #    dans Settings → Secrets → Actions de votre repo GitHub :
+      #      KEYSTORE_BASE64   : contenu du .jks encodé en base64
+      #      KEY_ALIAS         : alias de la clé (ex: comebuy)
+      #      KEY_PASSWORD      : mot de passe de la clé
+      #      STORE_PASSWORD    : mot de passe du keystore
+      - name: Setup signing keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > mobile/android/comebuy.jks
+          cat > mobile/android/key.properties <<EOF
+          storeFile=../comebuy.jks
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      # ── 6. Dépendances Flutter ───────────────────────────────
+      - name: Flutter pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      # ── 7. Analyse statique (non bloquante) ──────────────────
+      - name: Flutter analyze
+        working-directory: mobile
+        run: flutter analyze --no-fatal-infos || true
+
+      # ── 8. Build APK release ─────────────────────────────────
+      #    L'URL de production est déjà configurée dans
+      #    mobile/lib/config/api_config.dart → https://comebuy-api.onrender.com/api
+      - name: Build APK release
+        working-directory: mobile
+        run: |
+          flutter build apk --release \
+            --build-name="${{ github.event.inputs.version_name || '1.0.0' }}" \
+            --build-number="${{ github.event.inputs.version_code || github.run_number }}"
+
+      # ── 9. Renommer l'APK avec version et date ───────────────
+      - name: Rename APK
+        run: |
+          VERSION="${{ github.event.inputs.version_name || '1.0.0' }}"
+          BUILD="${{ github.run_number }}"
+          DATE=$(date +'%Y%m%d')
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk \
+             "ComeBuy-v${VERSION}-build${BUILD}-${DATE}.apk"
+
+      # ── 10. Upload APK comme artifact GitHub ─────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComeBuy-APK-${{ github.run_number }}
+          path: ComeBuy-*.apk
+          retention-days: 30
+
+      # ── 11. Résumé du build ──────────────────────────────────
+      - name: Build summary
+        run: |
+          APK_SIZE=$(du -sh mobile/build/app/outputs/flutter-apk/app-release.apk | cut -f1)
+          echo "## APK ComeBuy construit avec succes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Propriete | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ github.event.inputs.version_name || '1.0.0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Taille APK | ${APK_SIZE} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | https://comebuy-api.onrender.com/api |" >> $GITHUB_STEP_SUMMARY
+          echo "| Signe | ${{ secrets.KEYSTORE_BASE64 != '' && 'Oui (production)' || 'Debug keystore' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Telecharger l'APK dans l'onglet **Artifacts** ci-dessus." >> $GITHUB_STEP_SUMMARY

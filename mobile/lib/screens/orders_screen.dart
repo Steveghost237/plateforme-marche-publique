@@ -48,6 +48,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
         return Colors.red;
       case 'en_livraison':
         return Colors.blue;
+      case 'payee':
+        return const Color(0xFF6366F1);
+      case 'en_attente':
+        return Colors.deepOrange;
       case 'assignee':
       case 'en_cours_marche':
         return Colors.orange;
@@ -58,6 +62,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   String _getStatutLabel(String statut) {
     switch (statut) {
+      case 'en_attente':
+        return 'En attente';
       case 'payee':
         return 'Confirmée';
       case 'assignee':

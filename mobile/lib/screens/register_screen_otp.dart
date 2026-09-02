@@ -140,7 +140,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
             ),
           );
         } else {
-          final canal = authProvider.otpCanal == 'email' ? 'Gmail \u2709' : 'SMS';
+          final canal = authProvider.otpCanal == 'email' ? 'Gmail' : 'SMS';
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Code OTP envoyé par $canal'),
@@ -171,20 +171,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       // Vérifier l'OTP
-      try {
-        await authProvider.verifyOtp(
-          telephone: _telephoneController.text.trim(),
-          otp: _otpController.text.trim(),
-        );
-      } catch (e) {
-        // Si l'OTP a échoué mais que le contournement a fonctionné
-        if (e.toString().contains('finalizeRegistration') ||
-            e.toString().contains('contournement')) {
-          // Le contournement a fonctionné, continuer avec la finalisation
-        } else {
-          rethrow;
-        }
-      }
+      await authProvider.verifyOtp(
+        telephone: _telephoneController.text.trim(),
+        otp: _otpController.text.trim(),
+      );
 
       // Finaliser l'inscription
       await authProvider.finalizeRegistration(
@@ -412,48 +402,47 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 // Champ email Gmail (requis)
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFBBF24).withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(
-                      color: Color(0xFF0D2137),
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       labelText: 'Adresse Gmail / Email *',
                       labelStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       hintText: 'exemple@gmail.com',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       helperText: 'Le code OTP sera envoyé sur cet email',
                       helperStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.5),
+                        color: Colors.white.withOpacity(0.6),
                         fontSize: 11,
                       ),
                       prefixIcon: Container(
                         margin: const EdgeInsets.all(12),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          color: const Color(0xFFFBBF24).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -483,46 +472,45 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ téléphone avec fond clair
+                // Champ téléphone
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFBBF24).withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: TextFormField(
                     controller: _telephoneController,
                     keyboardType: TextInputType.phone,
                     style: const TextStyle(
-                      color: Color(0xFF0D2137),
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       labelText: 'Téléphone',
                       labelStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       hintText: '690000000',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       prefixIcon: Container(
                         margin: const EdgeInsets.all(12),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          color: const Color(0xFFFBBF24).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -550,45 +538,44 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ nom avec fond clair
+                // Champ nom complet
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFBBF24).withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: TextFormField(
                     controller: _nomController,
                     style: const TextStyle(
-                      color: Color(0xFF0D2137),
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       labelText: 'Nom complet',
                       labelStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       hintText: 'Jean Dupont',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       prefixIcon: Container(
                         margin: const EdgeInsets.all(12),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          color: const Color(0xFFFBBF24).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -661,7 +648,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                                 ),
                                 child: Column(
                                   children: [
-                                    Text('🛒', style: TextStyle(fontSize: 28)),
+                                    Icon(Icons.shopping_cart_rounded, size: 28,
+                                        color: _selectedRole == 'client'
+                                            ? const Color(0xFF0D2137)
+                                            : Colors.white),
                                     const SizedBox(height: 4),
                                     Text('Client',
                                         style: TextStyle(
@@ -709,7 +699,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                                 ),
                                 child: Column(
                                   children: [
-                                    Text('🛵', style: TextStyle(fontSize: 28)),
+                                    Icon(Icons.delivery_dining, size: 28,
+                                        color: _selectedRole == 'livreur'
+                                            ? const Color(0xFF0D2137)
+                                            : Colors.white),
                                     const SizedBox(height: 4),
                                     Text('Livreur',
                                         style: TextStyle(
@@ -737,46 +730,50 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ mot de passe avec fond clair
+                // Champ mot de passe
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFBBF24).withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     style: const TextStyle(
-                      color: Color(0xFF0D2137),
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       labelText: 'Mot de passe',
                       labelStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       hintText: '••••••••',
+                      helperText: 'Minimum 8 caractères',
+                      helperStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 11,
+                      ),
                       hintStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       prefixIcon: Container(
                         margin: const EdgeInsets.all(12),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          color: const Color(0xFFFBBF24).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -788,7 +785,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                          color: const Color(0xFF0D2137).withOpacity(0.5),
+                          color: Colors.white.withOpacity(0.5),
                           size: 20,
                         ),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -803,8 +800,8 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                       if (value == null || value.isEmpty) {
                         return 'Veuillez entrer un mot de passe';
                       }
-                      if (value.length < 6) {
-                        return 'Le mot de passe doit contenir au moins 6 caractères';
+                      if (value.length < 8) {
+                        return 'Le mot de passe doit contenir au moins 8 caractères';
                       }
                       return null;
                     },
@@ -812,46 +809,45 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ confirmation mot de passe avec fond clair
+                // Champ confirmation mot de passe
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFBBF24).withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
                     style: const TextStyle(
-                      color: Color(0xFF0D2137),
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       labelText: 'Confirmer le mot de passe',
                       labelStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       hintText: '••••••••',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF0D2137).withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       prefixIcon: Container(
                         margin: const EdgeInsets.all(12),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.15),
+                          color: const Color(0xFFFBBF24).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -863,7 +859,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                          color: const Color(0xFF0D2137).withOpacity(0.5),
+                          color: Colors.white.withOpacity(0.5),
                           size: 20,
                         ),
                         onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
@@ -877,6 +873,9 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Veuillez confirmer votre mot de passe';
+                      }
+                      if (value.length < 8) {
+                        return 'Le mot de passe doit contenir au moins 8 caractères';
                       }
                       if (value != _passwordController.text) {
                         return 'Les mots de passe ne correspondent pas';
@@ -957,7 +956,7 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D2137),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1022,20 +1021,31 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   maxLength: 6,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
+                    letterSpacing: 12,
+                    color: Color(0xFF0D2137),
                   ),
                   decoration: InputDecoration(
-                    labelText: 'Code OTP',
-                    hintText: '000000',
+                    labelText: 'Code à 6 chiffres',
+                    hintText: '• • • • • •',
+                    filled: true,
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFFFBBF24), width: 2),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF0D2137)),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFFFBBF24), width: 3),
                     ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    labelStyle: const TextStyle(color: Color(0xFF6B7280)),
+                    hintStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 22, letterSpacing: 8),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -1048,44 +1058,50 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
                   },
                 ),
                 const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {
-                          setState(() => _currentStep = 0);
-                        },
-                        child: const Text('Retour'),
+                SizedBox(
+                  width: double.infinity,
+                  height: 58,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _verifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFBBF24),
+                      foregroundColor: const Color(0xFF0D2137),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _verifyOtp,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D2137),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Valider',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D2137)),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.verified_rounded, size: 22),
+                              SizedBox(width: 10),
+                              Text(
+                                'Valider le code',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                               ),
-                      ),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => _currentStep = 0),
+                    child: const Text(
+                      'Retour',
+                      style: TextStyle(color: Colors.white60, fontSize: 14),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ],
