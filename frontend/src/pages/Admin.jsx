@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Users, Bike, Settings, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity } from 'lucide-react'
+import { LayoutDashboard, Package, Users, Bike, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity, RefreshCw, ArrowUpRight, AlertCircle } from 'lucide-react'
 import api from '../utils/api'
 import { useAuth } from '../store'
 
@@ -91,33 +91,80 @@ export function AdminLayout({ children, title }) {
 export function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [commandes, setCommandes] = useState([])
+  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    api.get('/admin/dashboard').then(r => setStats(r.data)).catch(() => {})
-    api.get('/admin/commandes').then(r => setCommandes(r.data)).catch(() => {})
+  const loadData = useCallback(async () => {
+    setRefreshing(true)
+    await Promise.all([
+      api.get('/admin/dashboard').then(r => setStats(r.data)).catch(() => {}),
+      api.get('/admin/commandes').then(r => setCommandes(r.data)).catch(() => {}),
+    ])
+    setLastRefresh(new Date())
+    setRefreshing(false)
   }, [])
 
+  useEffect(() => {
+    loadData()
+    const timer = setInterval(loadData, 60000)
+    return () => clearInterval(timer)
+  }, [loadData])
+
   const STATUT_COLOR = {
-    livree:'text-green-600 bg-green-50', payee:'text-blue bg-blue/10',
-    en_livraison:'text-amber bg-amber/10', annulee:'text-rouge bg-rouge/10',
-    assignee:'text-blue bg-blue/10', en_cours_marche:'text-amber bg-amber/10',
-    brouillon:'text-gray-500 bg-gray-100', en_attente_paiement:'text-gray-500 bg-gray-100',
+    livree:              'text-green-700 bg-green-50',
+    payee:               'text-blue-700 bg-blue-50',
+    en_livraison:        'text-cyan-700 bg-cyan-50',
+    assignee:            'text-indigo-700 bg-indigo-50',
+    en_cours_marche:     'text-orange-700 bg-orange-50',
+    annulee:             'text-red-600 bg-red-50',
+    brouillon:           'text-gray-500 bg-gray-100',
+    en_attente_paiement: 'text-yellow-700 bg-yellow-50',
+    en_attente:          'text-yellow-700 bg-yellow-50',
   }
+
+  const STATUT_LABEL = {
+    livree:'Livrée', payee:'Confirmée', en_livraison:'En livraison',
+    assignee:'Assignée', en_cours_marche:'Au marché', annulee:'Annulée',
+    brouillon:'Brouillon', en_attente_paiement:'En attente paiement',
+    en_attente:'En attente',
+  }
+
+  const urgentes = commandes.filter(c => c.statut === 'payee').length
 
   return (
     <AdminLayout title="Dashboard">
+      {/* Header refresh */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-gray-400 text-xs">Dernière mise à jour : {lastRefresh.toLocaleTimeString('fr-FR')} · actualisation auto 60s</p>
+        <button onClick={loadData} disabled={refreshing}
+          className="flex items-center gap-1.5 text-xs text-navy hover:text-blue transition-colors disabled:opacity-50">
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''}/>
+          Actualiser
+        </button>
+      </div>
+
+      {/* Alerte commandes urgentes */}
+      {urgentes > 0 && (
+        <div className="flex items-center gap-3 bg-amber/10 border border-amber/30 text-amber-800 rounded-xl px-4 py-3 mb-6 text-sm">
+          <AlertCircle size={16} className="text-amber shrink-0"/>
+          <span><strong>{urgentes}</strong> commande{urgentes > 1 ? 's' : ''} payée{urgentes > 1 ? 's' : ''} en attente d'assignation livreur</span>
+          <Link to="/admin/commandes?statut=payee" className="ml-auto text-xs font-semibold underline">Traiter</Link>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label:'Commandes aujourd\'hui', val:stats?.commandes_aujourd_hui, icon:<ShoppingBag size={18}/>, color:'bg-blue/10 text-blue' },
-          { label:'En livraison actif',     val:stats?.en_cours_livraison,    icon:<Bike size={18}/>,        color:'bg-amber/10 text-amber' },
-          { label:'Livrées aujourd\'hui',   val:stats?.livrees_aujourd_hui,   icon:<CheckCircle size={18}/>, color:'bg-green-100 text-green-600' },
-          { label:'CA du jour (FCFA)',       val:stats?.ca_aujourd_hui?.toLocaleString(), icon:<TrendingUp size={18}/>, color:'bg-navy/10 text-navy' },
+          { label:"Commandes aujourd'hui", val:stats?.commandes_aujourd_hui ?? '—', icon:<ShoppingBag size={18}/>, color:'bg-blue-50 text-blue-600', sub: 'total du jour' },
+          { label:"En livraison",           val:stats?.en_cours_livraison ?? '—',   icon:<Bike size={18}/>,         color:'bg-amber-50 text-amber-600', sub: 'en cours maintenant' },
+          { label:"Livrées aujourd'hui",   val:stats?.livrees_aujourd_hui ?? '—',   icon:<CheckCircle size={18}/>,  color:'bg-green-50 text-green-600', sub: 'confirmées livrées' },
+          { label:'CA du jour',             val: stats?.ca_aujourd_hui != null ? `${stats.ca_aujourd_hui.toLocaleString()} F` : '—', icon:<TrendingUp size={18}/>, color:'bg-navy/10 text-navy', sub: 'FCFA encaissés' },
         ].map(k => (
-          <div key={k.label} className="bg-white rounded-2xl p-5 shadow-sm">
+          <div key={k.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${k.color}`}>{k.icon}</div>
-            <div className="font-bold text-navy text-2xl">{k.val ?? '—'}</div>
-            <div className="text-gray-400 text-xs mt-0.5">{k.label}</div>
+            <div className="font-bold text-navy text-2xl">{k.val}</div>
+            <div className="text-gray-500 text-xs font-medium mt-0.5">{k.label}</div>
+            <div className="text-gray-300 text-[10px] mt-0.5">{k.sub}</div>
           </div>
         ))}
       </div>
@@ -145,7 +192,7 @@ export function AdminDashboard() {
                   <td className="px-5 py-3 font-semibold text-amber">{c.total_fcfa?.toLocaleString()} F</td>
                   <td className="px-5 py-3">
                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${STATUT_COLOR[c.statut] || 'bg-gray-100 text-gray-500'}`}>
-                      {c.statut}
+                      {STATUT_LABEL[c.statut] || c.statut}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-gray-400 text-xs">
@@ -155,7 +202,12 @@ export function AdminDashboard() {
               ))}
             </tbody>
           </table>
-          {commandes.length === 0 && <div className="text-center py-10 text-gray-400">Aucune commande</div>}
+          {commandes.length === 0 && (
+          <div className="text-center py-16 text-gray-300">
+            <ShoppingBag size={40} className="mx-auto mb-3 opacity-40"/>
+            <p className="text-sm">Aucune commande pour le moment</p>
+          </div>
+        )}
         </div>
       </div>
     </AdminLayout>
