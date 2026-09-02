@@ -25,12 +25,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Flutter
+      - name: Flutter stable latest
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
           channel: stable
           cache: true
+
+      - name: Flutter version
+        run: flutter --version
 
       - name: Setup keystore
         env:
@@ -56,7 +58,7 @@ jobs:
         working-directory: mobile
         run: flutter analyze --no-fatal-infos || true
 
-      - name: Build APK
+      - name: Build APK release
         working-directory: mobile
         run: flutter build apk --release --build-number=${{ github.run_number }}
 
