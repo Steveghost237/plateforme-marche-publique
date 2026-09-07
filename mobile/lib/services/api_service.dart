@@ -178,7 +178,7 @@ class ApiService {
         }
         // Wait before retrying (server is waking up)
         await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
-      } on SocketException catch (e) {
+      } on SocketException catch (_) {
         if (attempt == maxRetries - 1) {
           throw ApiException(
             statusCode: 0,
