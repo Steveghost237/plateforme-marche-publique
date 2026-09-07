@@ -17,7 +17,7 @@ const NIVEAU_STYLE = {
   elite: 'bg-purple-50 text-purple-600',
 }
 
-const NIVEAU_LABEL = { junior: '🥉 Junior', senior: '🥈 Sénior', expert: '🥇 Expert', elite: '💎 Élite' }
+const NIVEAU_LABEL = { junior: 'Junior', senior: 'Sénior', expert: 'Expert', elite: 'Élite' }
 
 export default function AdminLivreurs() {
   const [livreurs, setLivreurs] = useState([])
@@ -25,12 +25,13 @@ export default function AdminLivreurs() {
   const [filtreStatut, setFiltreStatut] = useState('')
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [erreur, setErreur] = useState('')
 
   const fetchLivreurs = () => {
     setLoading(true)
     api.get('/admin/livreurs')
       .then(r => setLivreurs(r.data))
-      .catch(() => {})
+      .catch(e => setErreur(e?.response?.data?.detail || 'Erreur de chargement des livreurs'))
       .finally(() => setLoading(false))
   }
 
@@ -48,7 +49,9 @@ export default function AdminLivreurs() {
     try {
       await api.put(`/admin/livreurs/${livreurId}/verifier`)
       fetchLivreurs()
-    } catch {}
+    } catch (e) {
+      setErreur(e?.response?.data?.detail || 'Erreur lors de la vérification')
+    }
   }
 
   // Stats

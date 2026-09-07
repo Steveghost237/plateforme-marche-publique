@@ -43,14 +43,16 @@ export default function AdminCommandes() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { type: 'detail' | 'assign', commande }
+  const [erreur, setErreur] = useState('')
 
   const fetchCommandes = () => {
     setLoading(true)
+    setErreur('')
     const params = new URLSearchParams({ page })
     if (filtre) params.set('statut', filtre)
     api.get(`/admin/commandes?${params}`)
       .then(r => setCommandes(r.data))
-      .catch(() => {})
+      .catch(e => setErreur(e?.response?.data?.detail || 'Erreur de chargement des commandes'))
       .finally(() => setLoading(false))
   }
 
@@ -71,7 +73,9 @@ export default function AdminCommandes() {
       await api.put(`/admin/commandes/${cmdId}/assigner/${livreurId}`)
       setModal(null)
       fetchCommandes()
-    } catch {}
+    } catch (e) {
+      setErreur(e?.response?.data?.detail || 'Erreur lors de l\'assignation')
+    }
   }
 
   const livreursDispos = livreurs.filter(l => l.statut === 'disponible' && l.est_verifie)
