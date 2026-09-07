@@ -9,12 +9,14 @@ export default function AdminClients() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [erreur, setErreur] = useState('')
 
   const fetchClients = () => {
     setLoading(true)
+    setErreur('')
     api.get(`/admin/utilisateurs?role=client&page=${page}`)
       .then(r => setData(r.data))
-      .catch(() => {})
+      .catch(e => setErreur(e?.response?.data?.detail || 'Erreur de chargement des clients'))
       .finally(() => setLoading(false))
   }
 
@@ -34,7 +36,9 @@ export default function AdminClients() {
       await api.put(`/admin/utilisateurs/${userId}/statut`, { statut: newStatut })
       fetchClients()
       if (detail) setDetail(prev => prev ? { ...prev, statut: newStatut } : null)
-    } catch {}
+    } catch (e) {
+      setErreur(e?.response?.data?.detail || 'Erreur lors du changement de statut')
+    }
   }
 
   // Stats
@@ -45,6 +49,12 @@ export default function AdminClients() {
 
   return (
     <AdminLayout title="Gestion des Clients">
+      {erreur && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
+          {erreur}
+          <button onClick={() => setErreur('')} className="text-red-400 hover:text-red-600 font-bold ml-4">&times;</button>
+        </div>
+      )}
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

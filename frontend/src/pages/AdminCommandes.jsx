@@ -90,6 +90,12 @@ export default function AdminCommandes() {
 
   return (
     <AdminLayout title="Gestion des Commandes">
+      {erreur && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
+          {erreur}
+          <button onClick={() => setErreur('')} className="text-red-400 hover:text-red-600 font-bold ml-4">&times;</button>
+        </div>
+      )}
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {stats.map(s => (
