@@ -20,6 +20,7 @@ class Utilisateur(Base):
     otp_code           = Column(String(10))
     otp_expire_at      = Column(DateTime(timezone=True))
     otp_tentatives     = Column(SmallInteger, default=0)
+    otp_derniere_demande = Column(DateTime(timezone=True))
     role               = Column(String(20), default="client")
     statut             = Column(String(20), default="en_attente")
     fcm_token          = Column(Text)
