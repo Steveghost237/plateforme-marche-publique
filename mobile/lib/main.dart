@@ -46,6 +46,36 @@ class MarcheApp extends StatelessWidget {
               ),
             ),
           ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDDE1E7), width: 1.2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDDE1E7), width: 1.2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF0D2137), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE53935), width: 1.2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE53935), width: 2),
+            ),
+            labelStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+            hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 14),
+            errorStyle: const TextStyle(color: Color(0xFFE53935), fontSize: 12),
+            prefixIconColor: const Color(0xFF6B7280),
+            suffixIconColor: const Color(0xFF6B7280),
+          ),
         ),
         home: const SplashScreen(),
       ),

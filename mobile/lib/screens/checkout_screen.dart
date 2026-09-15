@@ -30,10 +30,19 @@ class _CheckoutScreenState extends State<CheckoutScreen>
   late AnimationController _btnAnim;
 
   static const _creneaux = [
-    {'value': 'matin_8h_12h',        'label': 'Matin',       'sub': '8h – 12h',  'icon': '🌅'},
-    {'value': 'apres_midi_12h_16h',  'label': 'Après-midi',  'sub': '12h – 16h', 'icon': '☀️'},
-    {'value': 'soir_16h_20h',        'label': 'Soir',        'sub': '16h – 20h', 'icon': '🌆'},
+    {'value': 'matin_8h_12h',        'label': 'Matin',       'sub': '8h – 12h' },
+    {'value': 'apres_midi_12h_16h',  'label': 'Après-midi',  'sub': '12h – 16h'},
+    {'value': 'soir_16h_20h',        'label': 'Soir',        'sub': '16h – 20h'},
   ];
+
+  IconData _creneauIcon(String value) {
+    switch (value) {
+      case 'matin_8h_12h':       return Icons.wb_twilight_rounded;
+      case 'apres_midi_12h_16h': return Icons.wb_sunny_rounded;
+      case 'soir_16h_20h':       return Icons.nights_stay_rounded;
+      default:                   return Icons.access_time_rounded;
+    }
+  }
 
   static const _paiements = [
     {
@@ -43,7 +52,6 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       'color': 0xFFFFCC00,
       'bg': 0xFFFFFBEB,
       'border': 0xFFFCD34D,
-      'emoji': '🟡',
     },
     {
       'value': 'orange_money',
@@ -52,7 +60,6 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       'color': 0xFFFF6600,
       'bg': 0xFFFFF7ED,
       'border': 0xFFFDBA74,
-      'emoji': '🟠',
     },
     {
       'value': 'stripe',
@@ -61,7 +68,6 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       'color': 0xFF635BFF,
       'bg': 0xFFF5F3FF,
       'border': 0xFFC4B5FD,
-      'emoji': '💳',
     },
     {
       'value': 'paypal',
@@ -70,7 +76,6 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       'color': 0xFF003087,
       'bg': 0xFFEFF6FF,
       'border': 0xFF93C5FD,
-      'emoji': '🅿️',
     },
     {
       'value': 'especes',
@@ -79,9 +84,19 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       'color': 0xFF16A34A,
       'bg': 0xFFF0FDF4,
       'border': 0xFF86EFAC,
-      'emoji': '💵',
     },
   ];
+
+  IconData _paymentIcon(String value) {
+    switch (value) {
+      case 'mtn_momo':      return Icons.phone_android_rounded;
+      case 'orange_money':  return Icons.smartphone_rounded;
+      case 'stripe':        return Icons.credit_card_rounded;
+      case 'paypal':        return Icons.account_balance_wallet_rounded;
+      case 'especes':       return Icons.payments_outlined;
+      default:              return Icons.payment_rounded;
+    }
+  }
 
   @override
   void initState() {
@@ -430,7 +445,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(c['icon']!, style: const TextStyle(fontSize: 22)),
+            Icon(_creneauIcon(c['value']!), size: 22, color: selected ? _amber : _navy),
             const SizedBox(height: 4),
             Text(c['label']!,
                 style: TextStyle(
@@ -472,7 +487,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
         ),
         child: Row(
           children: [
-            Text(p['emoji'] as String, style: const TextStyle(fontSize: 26)),
+            Icon(_paymentIcon(p['value'] as String), size: 26, color: selected ? color : Colors.grey.shade500),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -684,7 +699,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      '📲 Vous recevrez une notification pour confirmer avec votre PIN',
+                      'Vous recevrez une notification pour confirmer avec votre PIN',
                       style: TextStyle(fontSize: 11, color: Colors.black54),
                     ),
                   ],
@@ -725,7 +740,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
                   _recapRow('Articles', '${_formatPrix(cart.sousTotal)} F', false),
                   const SizedBox(height: 8),
                   _recapRow(
-                    fraisLiv == 0 ? 'Livraison (offerte 🎁)' : 'Frais de livraison',
+                    fraisLiv == 0 ? 'Livraison offerte' : 'Frais de livraison',
                     fraisLiv == 0 ? 'Gratuit' : '${_formatPrix(fraisLiv)} F',
                     false,
                     valueColor: fraisLiv == 0 ? Colors.green.shade600 : null,

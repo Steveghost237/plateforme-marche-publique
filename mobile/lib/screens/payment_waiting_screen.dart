@@ -266,8 +266,11 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
               border: Border.all(color: operatorColor, width: 3),
             ),
             child: Center(
-              child: Text(isOrange ? '🟠' : '🟡',
-                  style: const TextStyle(fontSize: 40)),
+              child: Icon(
+                Icons.smartphone_rounded,
+                size: 44,
+                color: operatorColor,
+              ),
             ),
           ),
         ),
@@ -382,8 +385,11 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
               border: Border.all(color: operatorColor, width: 3),
             ),
             child: Center(
-              child: Text(isOrange ? '🟠' : '🟡',
-                  style: const TextStyle(fontSize: 40)),
+              child: Icon(
+                Icons.smartphone_rounded,
+                size: 44,
+                color: operatorColor,
+              ),
             ),
           ),
         ),
@@ -503,7 +509,6 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
     final isStripe = widget.mode == 'stripe';
     final color = isStripe ? const Color(0xFF635BFF) : const Color(0xFF003087);
     final bg = isStripe ? const Color(0xFFF5F3FF) : const Color(0xFFEFF6FF);
-    final emoji = isStripe ? '💳' : '🅿️';
     final name = isStripe ? 'Stripe' : 'PayPal';
 
     return Column(
@@ -517,7 +522,13 @@ class _PaymentWaitingScreenState extends State<PaymentWaitingScreen>
               color: bg, shape: BoxShape.circle,
               border: Border.all(color: color.withOpacity(.3), width: 3),
             ),
-            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 42))),
+            child: Center(
+              child: Icon(
+                isStripe ? Icons.credit_card_rounded : Icons.account_balance_wallet_rounded,
+                size: 42,
+                color: color,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 20),

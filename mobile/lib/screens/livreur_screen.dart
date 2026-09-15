@@ -10,17 +10,25 @@ class LivreurScreen extends StatefulWidget {
   State<LivreurScreen> createState() => _LivreurScreenState();
 }
 
-class _LivreurScreenState extends State<LivreurScreen> {
+class _LivreurScreenState extends State<LivreurScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
   List<Commande> _disponibles = [];
   List<Commande> _enCours = [];
   bool _isLoading = true;
-  int _selectedTab = 0;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -35,10 +43,22 @@ class _LivreurScreenState extends State<LivreurScreen> {
         _disponibles = (dispo as List).map((c) => Commande.fromJson(c)).toList();
         _enCours = (cours as List).map((c) => Commande.fromJson(c)).toList();
         _isLoading = false;
-        if (_enCours.isNotEmpty) _selectedTab = 0;
       });
+      if (_enCours.isEmpty && _disponibles.isNotEmpty) {
+        _tabController.animateTo(1);
+      } else {
+        _tabController.animateTo(0);
+      }
     } catch (e) {
       setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -52,7 +72,7 @@ class _LivreurScreenState extends State<LivreurScreen> {
         ),
       );
       _loadData();
-      setState(() => _selectedTab = 0);
+      _tabController.animateTo(0);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
@@ -64,13 +84,13 @@ class _LivreurScreenState extends State<LivreurScreen> {
     try {
       await _api.post('/commandes/$id/statut', {'statut': statut});
       final messages = {
-        'en_cours_marche': 'Vous êtes au marché 🛒',
-        'en_livraison': 'En route vers le client 🛵',
-        'livree': 'Livraison confirmée ✅',
+        'en_cours_marche': 'Vous êtes au marché',
+        'en_livraison': 'En route vers le client',
+        'livree': 'Livraison confirmée',
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(messages[statut] ?? 'Statut mis à jour'),
+          content: Text(messages[statut] ?? 'Statut mis a jour'),
           backgroundColor: Colors.green,
         ),
       );
@@ -117,8 +137,7 @@ class _LivreurScreenState extends State<LivreurScreen> {
           Container(
             color: const Color(0xFF0D2137),
             child: TabBar(
-              controller: null,
-              onTap: (index) => setState(() => _selectedTab = index),
+              controller: _tabController,
               indicatorColor: const Color(0xFFFBBF24),
               labelColor: const Color(0xFFFBBF24),
               unselectedLabelColor: Colors.white70,
@@ -131,9 +150,13 @@ class _LivreurScreenState extends State<LivreurScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _selectedTab == 0
-                    ? _buildEnCoursTab()
-                    : _buildDisponiblesTab(),
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildEnCoursTab(),
+                      _buildDisponiblesTab(),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -426,9 +449,9 @@ class _LivreurScreenState extends State<LivreurScreen> {
 
   String _getNextLabel(String statut) {
     const map = {
-      'assignee': '🛒 Je suis au marché',
-      'en_cours_marche': '🛵 Je suis en route',
-      'en_livraison': '✅ Livraison effectuée',
+      'assignee': 'Je suis au marché',
+      'en_cours_marche': 'Je suis en route',
+      'en_livraison': 'Livraison effectuée',
     };
     return map[statut] ?? 'Continuer';
   }
@@ -449,13 +472,14 @@ class _LivreurScreenState extends State<LivreurScreen> {
   String _getStatutLabel(String statut) {
     switch (statut) {
       case 'assignee':
-        return '🔵 Assigné';
+        return 'Assigné';
       case 'en_cours_marche':
-        return '🛒 Au marché';
+        return 'Au marché';
       case 'en_livraison':
-        return '🛵 En livraison';
+        return 'En livraison';
       default:
         return statut;
     }
   }
+
 }
