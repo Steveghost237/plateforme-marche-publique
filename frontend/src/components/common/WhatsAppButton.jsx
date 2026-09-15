@@ -1,7 +1,7 @@
 import { MessageCircle } from 'lucide-react'
 
 const WHATSAPP_NUMBER = '237652799122'
-const DEFAULT_MESSAGE = 'Bonjour Marché·CM ! J\'ai une question concernant votre service de livraison.'
+const DEFAULT_MESSAGE = 'Bonjour Comebuy ! J\'ai une question concernant votre service de livraison😊🛍️.'
 
 export default function WhatsAppButton() {
   const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(DEFAULT_MESSAGE)}`
