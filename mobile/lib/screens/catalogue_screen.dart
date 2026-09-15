@@ -39,16 +39,23 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     });
     try {
       final sectionsData = await _api.get('/catalogue/sections', auth: false);
-      final produitsData = await _api.get(
-        '/catalogue/produits?limit=100${_selectedSection != null ? '&section=$_selectedSection' : ''}',
-        auth: false,
-      );
+      final produits = <Produit>[];
+      var page = 1;
+      while (true) {
+        final data = await _api.get(
+          '/catalogue/produits?page=$page&limit=100${_selectedSection != null ? '&section=$_selectedSection' : ''}',
+          auth: false,
+        );
+        final batch = (data as List).map((p) => Produit.fromJson(p)).toList();
+        produits.addAll(batch);
+        if (batch.length < 100) break;
+        page++;
+      }
 
       setState(() {
         _sections =
             (sectionsData as List).map((s) => Section.fromJson(s)).toList();
-        _produits =
-            (produitsData as List).map((p) => Produit.fromJson(p)).toList();
+        _produits = produits;
         _isLoading = false;
       });
     } catch (e) {

@@ -323,12 +323,22 @@ export function Catalogue() {
   const [suggestOpen, setSuggestOpen] = useState(false)
   const meta = SECTION_META[section] || SECTION_META.menus_ingredients
 
-  const loadProduits = () => {
+  const loadProduits = async () => {
     setLoading(true); setError(false)
-    api.get(`/catalogue/produits?section=${section}&limit=60`)
-      .then(r => setProduits(r.data))
-      .catch(() => { setProduits([]); setError(true) })
-      .finally(() => setLoading(false))
+    try {
+      let all = [], page = 1
+      while (true) {
+        const r = await api.get(`/catalogue/produits?section=${section}&page=${page}&limit=100`)
+        all = all.concat(r.data)
+        if (r.data.length < 100) break
+        page += 1
+      }
+      setProduits(all)
+    } catch {
+      setProduits([]); setError(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {

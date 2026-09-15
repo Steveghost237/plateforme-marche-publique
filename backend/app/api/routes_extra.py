@@ -382,7 +382,8 @@ def update_prix(produit_id: UUID, body: dict, db: Session = Depends(get_db), adm
         ))
         prod.prix_base_fcfa = nouveau_prix
 
-    for field in ("prix_max_fcfa", "est_actif", "est_populaire", "est_nouveau", "stock_dispo"):
+    for field in ("prix_max_fcfa", "est_actif", "est_populaire", "est_nouveau", "stock_dispo",
+                  "image_url", "nom", "description"):
         if field in body:
             setattr(prod, field, body[field])
 
