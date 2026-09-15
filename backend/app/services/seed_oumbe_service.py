@@ -4,10 +4,18 @@ import os, json, re, html
 from sqlalchemy.orm import Session
 from app.models.models import Section, Produit
 
-DATA_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "oumbe_products.json",
-)
+BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_FILE = os.path.join(BACKEND_ROOT, "data", "oumbe_products.json")
+LOCAL_IMAGES_DIR = os.path.join(BACKEND_ROOT, "static", "images", "oumbe")
+
+
+def local_image_path(slug: str):
+    """Chemin /static/... de l'image locale si elle a été téléchargée, sinon None."""
+    if os.path.isdir(LOCAL_IMAGES_DIR):
+        for f in os.listdir(LOCAL_IMAGES_DIR):
+            if f.startswith(slug + "."):
+                return f"/static/images/oumbe/{f}"
+    return None
 
 SECTIONS = [
     dict(code="epicerie",   nom="Épicerie & Alimentaire",
@@ -93,7 +101,7 @@ def run_import(db: Session) -> dict:
             continue
         slug = f"oumbe-{p['slug']}"[:150]
         prix = int(p["price"])
-        image = p.get("img")
+        image = local_image_path(p["slug"]) or p.get("img")
         desc = clean_desc(p.get("desc"))
 
         obj = db.query(Produit).filter(Produit.slug == slug).first()
