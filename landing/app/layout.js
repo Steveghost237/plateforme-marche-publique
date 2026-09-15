@@ -16,8 +16,11 @@ export default function RootLayout({ children }) {
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body style={{ margin: 0, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <body style={{ margin: 0, fontFamily: "'Open Sans', 'Segoe UI', system-ui, sans-serif" }}>
         {children}
       </body>
     </html>

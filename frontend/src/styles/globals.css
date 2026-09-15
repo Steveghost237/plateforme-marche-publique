@@ -4,8 +4,8 @@
 
 @layer base {
   html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
-  body { font-family: 'Jost', sans-serif; background: #F5EFE6; color: #1a1a1a; }
-  h1, h2, h3, h4 { font-family: 'Cormorant Garamond', Georgia, serif; }
+  body { font-family: 'Open Sans', system-ui, sans-serif; background: #F5EFE6; color: #1a1a1a; }
+  h1, h2, h3, h4 { font-family: 'Montserrat', Helvetica, Arial, sans-serif; letter-spacing: -0.01em; }
   * { box-sizing: border-box; }
 }
 

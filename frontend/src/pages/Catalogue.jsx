@@ -14,6 +14,10 @@ const SECTION_META = {
   boissons:          { label:'Boissons',            emoji:'🥤', img:'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=1200&q=80&fit=crop', color:'#1B4A8A',  fallbacks:['https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80&fit=crop'] },
   boulangerie:       { label:'Boulangerie',         emoji:'🍞', img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&q=80&fit=crop', color:'#7a3e10',  fallbacks:['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=400&q=80&fit=crop'] },
   epices:            { label:'Épices & Condiments', emoji:'🌶️', img:'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=1200&q=80&fit=crop', color:'#8a1a1a',  fallbacks:['https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1532336414038-cf19250c5757?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1509358271058-acd22cc93898?w=400&q=80&fit=crop'] },
+  epicerie:          { label:'Épicerie',            emoji:'🛒', img:'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80&fit=crop', color:'#7a3e10',  fallbacks:['https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?w=400&q=80&fit=crop'] },
+  entretien:         { label:'Entretien & Maison',  emoji:'🧹', img:'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=1200&q=80&fit=crop', color:'#0e7490',  fallbacks:['https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1563453392212-326f5e854473?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1584813470613-5b1c1cad3d69?w=400&q=80&fit=crop'] },
+  cosmetique:        { label:'Cosmétique & Hygiène',emoji:'🧴', img:'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&q=80&fit=crop', color:'#a21caf',  fallbacks:['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&q=80&fit=crop','https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400&q=80&fit=crop'] },
+  ma_liste:          { label:'Ma Liste de Marché',  emoji:'📝', img:'https://images.unsplash.com/photo-1543168256-418811576931?w=1200&q=80&fit=crop', color:'#0D2137',  fallbacks:[] },
 }
 
 // SafeImg importé depuis components/common/SafeImg
@@ -151,6 +155,9 @@ function SuggestionModal({ isOpen, onClose, sectionCode }) {
                   <option value="boissons">🥤 Boissons</option>
                   <option value="boulangerie">🍞 Boulangerie</option>
                   <option value="epices">🌶️ Épices & Condiments</option>
+                  <option value="epicerie">🛒 Épicerie & Alimentaire</option>
+                  <option value="entretien">🧹 Entretien & Maison</option>
+                  <option value="cosmetique">🧴 Cosmétique & Hygiène</option>
                 </select>
               </div>
 
@@ -170,6 +177,134 @@ function SuggestionModal({ isOpen, onClose, sectionCode }) {
             </form>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── MA LISTE DE MARCHÉ (articles personnalisés) ───────────────
+function MaListeBuilder() {
+  const { addCustom } = usePanier()
+  const navigate = useNavigate()
+  const [produit, setProduit] = useState(null)
+  const [checking, setChecking] = useState(true)
+  const [items, setItems]   = useState([])
+  const [form, setForm]     = useState({ nom: '', quantite: 1, prix: '' })
+
+  useEffect(() => {
+    api.get('/catalogue/produits?section=ma_liste&limit=10')
+      .then(r => setProduit(r.data.find(p => p.slug === 'article-personnalise') || r.data[0] || null))
+      .catch(() => {})
+      .finally(() => setChecking(false))
+  }, [])
+
+  const addItem = (e) => {
+    e?.preventDefault()
+    const nom = form.nom.trim()
+    if (nom.length < 2) { toast.error('Décrivez l\'article (ex: Sardine 125g, Riz parfumé 5kg…)'); return }
+    setItems(it => [...it, { nom, quantite: Math.max(1, parseInt(form.quantite) || 1), prix: parseInt(form.prix) || 0 }])
+    setForm({ nom: '', quantite: 1, prix: '' })
+  }
+
+  const totalEstime = items.reduce((a, i) => a + i.prix * i.quantite, 0)
+
+  const addAllToCart = () => {
+    if (!produit) { toast.error('Fonctionnalité en cours d\'activation — réessayez bientôt'); return }
+    items.forEach(i => addCustom(produit, { nom: i.nom, quantite: i.quantite, prixUnit: i.prix }))
+    toast.success(`${items.length} article${items.length > 1 ? 's' : ''} ajouté${items.length > 1 ? 's' : ''} au panier`, { icon: '📝' })
+    navigate('/panier')
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Bandeau explicatif */}
+      <div className="bg-gradient-to-r from-[#0D2137] to-[#1B4A7A] rounded-2xl p-5 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="relative">
+          <h3 className="font-bold text-base mb-1.5">📝 Votre liste, vos produits</h3>
+          <p className="text-white/70 text-sm leading-relaxed max-w-2xl">
+            Un produit n'est pas au catalogue ? Écrivez-le ici : notre livreur le trouvera au marché.
+            Le <strong className="text-amber-400">prix est estimatif</strong> — le montant exact est confirmé à l'achat.
+          </p>
+        </div>
+      </div>
+
+      {/* Formulaire d'ajout */}
+      <form onSubmit={addItem} className="bg-white rounded-2xl shadow-sm p-5">
+        <div className="grid sm:grid-cols-[1fr_110px_140px_auto] gap-3 items-end">
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1.5">Article *</label>
+            <input
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] focus:ring-2 focus:ring-[#0D2137]/10"
+              placeholder="Ex: Sardine 125g, Riz parfumé 5 kg, Savon…"
+              value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1.5">Quantité</label>
+            <input type="number" min="1"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+              value={form.quantite} onChange={e => setForm(f => ({ ...f, quantite: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1.5">Prix estimé (F)</label>
+            <input type="number" min="0" step="25"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+              placeholder="Optionnel"
+              value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))}
+            />
+          </div>
+          <button type="submit"
+            className="bg-[#0D2137] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all flex items-center justify-center gap-2 min-h-[42px]">
+            <Plus size={15}/> Ajouter
+          </button>
+        </div>
+      </form>
+
+      {/* Liste en cours */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-[#0D2137] uppercase tracking-wide">Ma liste ({items.length} article{items.length > 1 ? 's' : ''})</span>
+          {items.length > 0 && (
+            <span className="text-xs text-amber-600 font-semibold">≈ {totalEstime.toLocaleString()} F estimés</span>
+          )}
+        </div>
+        {items.length === 0 ? (
+          <div className="text-center py-14 text-gray-400">
+            <span className="text-4xl block mb-3">📝</span>
+            <p className="text-sm font-medium">Votre liste est vide</p>
+            <p className="text-xs mt-1">Ajoutez vos articles un par un avec le formulaire ci-dessus</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {items.map((it, i) => (
+              <div key={i} className="px-5 py-3 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</span>
+                <span className="flex-1 text-sm font-medium text-[#0D2137] truncate">{it.nom}</span>
+                <span className="text-xs text-gray-400 shrink-0">×{it.quantite}</span>
+                <span className="text-sm font-bold text-amber-500 w-20 text-right shrink-0">
+                  {it.prix > 0 ? `${(it.prix * it.quantite).toLocaleString()} F` : 'au marché'}
+                </span>
+                <button onClick={() => setItems(arr => arr.filter((_, j) => j !== i))}
+                  className="text-gray-300 hover:text-red-400 transition-colors p-1 shrink-0">
+                  <X size={14}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {items.length > 0 && (
+          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+            <button onClick={addAllToCart} disabled={checking || !produit}
+              className="w-full bg-[#0D2137] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+              <ShoppingCart size={16}/> Ajouter {items.length} article{items.length > 1 ? 's' : ''} au panier
+            </button>
+            {!produit && !checking && (
+              <p className="text-center text-xs text-red-500 mt-2">Fonctionnalité en cours d'activation — le produit référence n'est pas encore disponible.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -231,7 +366,9 @@ export function Catalogue() {
             <h1 className="font-serif text-white font-bold text-2xl md:text-3xl">
               {meta.emoji} {meta.label}
             </h1>
-            <p className="text-white/60 text-xs mt-0.5">{produits.length} produits · Marché en ligne Cameroun</p>
+            <p className="text-white/60 text-xs mt-0.5">
+              {section === 'ma_liste' ? 'Vos articles sur mesure · Prix confirmés au marché' : `${produits.length} produits · Marché en ligne Cameroun`}
+            </p>
           </div>
         </div>
       </div>
@@ -242,6 +379,20 @@ export function Catalogue() {
 
         {/* Contenu principal */}
         <div className="flex-1 min-w-0">
+          {/* Mobile section tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 lg:hidden scrollbar-none">
+            {Object.entries(SECTION_META).map(([code, s]) => (
+              <Link key={code} to={`/catalogue/${code}`}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors
+                  ${code === section ? 'bg-[#0D2137] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
+                <span>{s.emoji}</span> {s.label}
+              </Link>
+            ))}
+          </div>
+
+          {section === 'ma_liste' ? (
+            <MaListeBuilder/>
+          ) : (<>
           {/* Barre recherche + filtres */}
           <div className="flex flex-wrap gap-3 mb-5 items-center">
             <div className="relative flex-1 min-w-48">
@@ -271,17 +422,6 @@ export function Catalogue() {
                 value={prixMax} onChange={e => setPrixMax(e.target.value)} min={0} step={500}/>
               {prixMax && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">FCFA</span>}
             </div>
-          </div>
-
-          {/* Mobile section tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 lg:hidden scrollbar-none">
-            {Object.entries(SECTION_META).map(([code, s]) => (
-              <Link key={code} to={`/catalogue/${code}`}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors
-                  ${code === section ? 'bg-[#0D2137] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
-                <span>{s.emoji}</span> {s.label}
-              </Link>
-            ))}
           </div>
 
           {loading ? (
@@ -363,6 +503,7 @@ export function Catalogue() {
               </div>
             </>
           )}
+          </>)}
         </div>
       </div>
 

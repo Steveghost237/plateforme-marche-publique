@@ -28,24 +28,32 @@ export const useAuth = create(persist((set, get) => ({
 
 // ── PANIER ────────────────────────────────────────────────────
 export const usePanier = create(persist((set, get) => ({
-  lignes: [], // [{produit, quantite, prixUnit, ingredients:[]}]
+  lignes: [], // [{produit, quantite, prixUnit, ingredients:[], note, key}]
 
-  add: (produit, quantite, prixUnit, ingredients = []) => {
+  add: (produit, quantite, prixUnit, ingredients = [], note = null, key = null) => {
     const lignes = get().lignes
-    const idx = lignes.findIndex(l => l.produit.id === produit.id)
-    if (idx >= 0) {
+    const k = key || produit.id
+    const idx = lignes.findIndex(l => (l.key || l.produit.id) === k)
+    if (idx >= 0 && !note) {
       const next = [...lignes]
       next[idx] = { ...next[idx], quantite: next[idx].quantite + quantite }
       set({ lignes: next })
     } else {
-      set({ lignes: [...lignes, { produit, quantite, prixUnit, ingredients }] })
+      set({ lignes: [...lignes, { produit, quantite, prixUnit, ingredients, note, key: k }] })
     }
   },
-  setQty: (id, q) => {
-    if (q <= 0) set(s => ({ lignes: s.lignes.filter(l => l.produit.id !== id) }))
-    else set(s => ({ lignes: s.lignes.map(l => l.produit.id === id ? { ...l, quantite: q } : l) }))
+  // Article personnalisé (section "Ma Liste") — chaque ligne reste distincte
+  addCustom: (produit, { nom, quantite = 1, prixUnit = 0 }) => {
+    const key = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    set(s => ({ lignes: [...s.lignes, {
+      produit, quantite, prixUnit, ingredients: [], note: nom, key, custom: true,
+    }] }))
   },
-  remove: (id) => set(s => ({ lignes: s.lignes.filter(l => l.produit.id !== id) })),
+  setQty: (id, q) => {
+    if (q <= 0) set(s => ({ lignes: s.lignes.filter(l => (l.key || l.produit.id) !== id) }))
+    else set(s => ({ lignes: s.lignes.map(l => (l.key || l.produit.id) === id ? { ...l, quantite: q } : l) }))
+  },
+  remove: (id) => set(s => ({ lignes: s.lignes.filter(l => (l.key || l.produit.id) !== id) })),
   clear: () => set({ lignes: [] }),
 
   get count() { return get().lignes.reduce((a, l) => a + l.quantite, 0) },

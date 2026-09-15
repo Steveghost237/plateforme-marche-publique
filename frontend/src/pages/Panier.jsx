@@ -8,7 +8,8 @@ import { useT } from '../store/langStore'
 import SafeImg from '../components/common/SafeImg'
 
 const SECTION_ICONS = {
-  menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞', epices: '🌶️'
+  menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞', epices: '🌶️',
+  epicerie: '🛒', entretien: '🧹', cosmetique: '🧴', ma_liste: '📝'
 }
 
 // ── PANIER ────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ export function Panier() {
   }))
 
   const sousTotal = lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
-  const fraisLiv  = sousTotal >= 5000 ? 0 : 500
+  const fraisLiv  = sousTotal >= 5000 ? 0 : 1000
   const total     = sousTotal + fraisLiv
   const points    = Math.floor(total / 500)
 
@@ -74,31 +75,38 @@ export function Panier() {
               </div>
               {/* Items */}
               <div className="divide-y divide-gray-50">
-                {items.map(l => (
-                  <div key={l.produit.id} className="p-4 flex gap-3 items-start">
-                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100">
-                      <SafeImg src={getImageUrl(l.produit.image_url)} alt={l.produit.nom} className="w-full h-full object-cover"/>
+                {items.map(l => {
+                  const k = l.key || l.produit.id
+                  return (
+                  <div key={k} className="p-4 flex gap-3 items-start">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center">
+                      {l.custom
+                        ? <span className="text-xl">📝</span>
+                        : <SafeImg src={getImageUrl(l.produit.image_url)} alt={l.produit.nom} className="w-full h-full object-cover"/>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-[#0D2137] text-sm truncate">{l.produit.nom}</h3>
+                      <h3 className="font-semibold text-[#0D2137] text-sm truncate">{l.note || l.produit.nom}</h3>
+                      {l.custom && (
+                        <p className="text-[10px] text-amber-600 font-semibold mt-0.5">Article personnalisé · prix estimatif</p>
+                      )}
                       {l.ingredients?.length > 0 && (
                         <p className="text-xs text-gray-400 mt-0.5">✏️ {l.ingredients.length} ingrédient(s) personnalisé(s)</p>
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => setQty(l.produit.id, l.quantite - 1)}
+                          <button onClick={() => setQty(k, l.quantite - 1)}
                             className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                             <Minus size={11}/>
                           </button>
                           <span className="font-bold text-[#0D2137] w-6 text-center text-sm">{l.quantite}</span>
-                          <button onClick={() => setQty(l.produit.id, l.quantite + 1)}
+                          <button onClick={() => setQty(k, l.quantite + 1)}
                             className="w-7 h-7 rounded-full bg-[#0D2137] text-white hover:bg-amber-400 hover:text-gray-900 flex items-center justify-center transition-all">
                             <Plus size={11}/>
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-amber-500 font-bold text-sm">{(l.prixUnit * l.quantite).toLocaleString()} F</span>
-                          <button onClick={() => remove(l.produit.id)}
+                          <button onClick={() => remove(k)}
                             className="text-gray-300 hover:text-red-400 transition-colors p-1">
                             <Trash2 size={14}/>
                           </button>
@@ -106,7 +114,7 @@ export function Panier() {
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           ))}
@@ -125,8 +133,8 @@ export function Panier() {
             {/* Mini-liste */}
             <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
               {lignes.map(l => (
-                <div key={l.produit.id} className="flex justify-between text-xs text-gray-600">
-                  <span className="truncate flex-1">{l.produit.nom} ×{l.quantite}</span>
+                <div key={l.key || l.produit.id} className="flex justify-between text-xs text-gray-600">
+                  <span className="truncate flex-1">{l.note || l.produit.nom} ×{l.quantite}</span>
                   <span className="font-semibold ml-2 shrink-0">{(l.prixUnit*l.quantite).toLocaleString()} F</span>
                 </div>
               ))}
@@ -242,9 +250,10 @@ export function Checkout() {
         poids_estime_kg: poidsKg,
         lignes: lignes.map(l => ({
           produit_id: l.produit.id,
-          section_id: l.produit.section?.id,
+          section_id: l.produit.section?.id || l.produit.section_id,
           quantite: l.quantite,
           prix_unitaire: l.prixUnit,
+          note_ligne: l.note || null,
           ingredients: l.ingredients?.map(i => ({ingredient_id: i.ingredient_id, quantite: i.quantite, unite: i.unite, prix_choisi: i.prix_choisi})) || [],
         }))
       }
@@ -333,8 +342,8 @@ export function Checkout() {
           {/* Lignes produits */}
           <div className="space-y-1 mb-3 max-h-32 overflow-y-auto">
             {lignesSnap.map(l => (
-              <div key={l.produit?.id || Math.random()} className="flex justify-between text-xs text-gray-600">
-                <span className="truncate flex-1">{l.produit?.nom} <span className="text-gray-400">×{l.quantite}</span></span>
+              <div key={l.key || l.produit?.id || Math.random()} className="flex justify-between text-xs text-gray-600">
+                <span className="truncate flex-1">{l.note || l.produit?.nom} <span className="text-gray-400">×{l.quantite}</span></span>
                 <span className="font-semibold ml-2 shrink-0">{(l.prixUnit * l.quantite).toLocaleString()} F</span>
               </div>
             ))}

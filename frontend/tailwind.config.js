@@ -20,8 +20,8 @@ export default {
         rouge: '#B53528',
       },
       fontFamily: {
-        serif: ['"Cormorant Garamond"','Georgia','serif'],
-        sans:  ['"Jost"','system-ui','sans-serif'],
+        serif: ['"Montserrat"','Helvetica','Arial','sans-serif'],
+        sans:  ['"Open Sans"','system-ui','sans-serif'],
       },
     },
   },

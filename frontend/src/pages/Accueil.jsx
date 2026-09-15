@@ -50,6 +50,10 @@ const SECTIONS_DATA = [
   { code:'boissons',          label:'Boissons',            desc:'Jus naturels, eaux et boissons locales', img:'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=600&q=80&fit=crop' },
   { code:'boulangerie',       label:'Boulangerie',         desc:'Pains frais et viennoiseries artisanales',img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&q=80&fit=crop' },
   { code:'epices',            label:'Épices & Condiments', desc:'Toutes les épices du terroir camerounais',img:'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=600&q=80&fit=crop' },
+  { code:'epicerie',          label:'Épicerie',            desc:'Riz, huiles, conserves et produits du quotidien', img:'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80&fit=crop' },
+  { code:'entretien',         label:'Entretien & Maison',  desc:'Lessive, nettoyants et hygiène de la maison', img:'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=600&q=80&fit=crop' },
+  { code:'cosmetique',        label:'Cosmétique & Hygiène',desc:'Savons, soins et produits d\'hygiène', img:'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80&fit=crop' },
+  { code:'ma_liste',          label:'Ma Liste de Marché',  desc:'Écrivez vos articles même hors catalogue', img:'https://images.unsplash.com/photo-1543168256-418811576931?w=600&q=80&fit=crop' },
 ]
 
 const FALLBACK_PRODUCTS = [
@@ -238,8 +242,8 @@ export default function Accueil() {
         <div className="max-w-7xl mx-auto px-6">
           <div className={`text-center mb-12 transition-all duration-700 ${secVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <span className="text-amber-600 text-xs font-bold tracking-[.3em] uppercase block mb-2">Catalogue complet</span>
-            <h2 className="font-serif text-[#0D2137] font-bold mb-3" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>Nos 5 Sections</h2>
-            <p className="text-gray-500 max-w-md mx-auto text-sm">Du plat traditionnel aux épices locales, nous couvrons tout ce dont vous avez besoin.</p>
+            <h2 className="font-serif text-[#0D2137] font-bold mb-3" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>Toutes nos Sections</h2>
+            <p className="text-gray-500 max-w-md mx-auto text-sm">Du plat traditionnel à l'épicerie du quotidien en passant par votre liste libre — nous couvrons tout ce dont vous avez besoin.</p>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

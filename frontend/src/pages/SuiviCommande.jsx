@@ -294,7 +294,7 @@ export default function SuiviCommande() {
           <h3 className="font-bold text-[#0D2137] text-sm mb-3">Récapitulatif</h3>
           {commande.lignes?.map(l => (
             <div key={l.id} className="flex justify-between text-xs text-gray-600 py-1.5 border-b border-gray-50 last:border-0">
-              <span className="truncate flex-1">{l.produit_nom || l.nom} × {l.quantite}</span>
+              <span className="truncate flex-1">{l.note_ligne || l.produit_nom || l.nom} × {l.quantite}</span>
               <span className="font-semibold ml-2 shrink-0">{((l.prix_unitaire || 0) * l.quantite).toLocaleString()} F</span>
             </div>
           ))}
