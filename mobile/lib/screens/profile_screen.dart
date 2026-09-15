@@ -180,7 +180,7 @@ class ProfileScreen extends StatelessWidget {
                   title: 'Contacter sur WhatsApp',
                   onTap: () async {
                     final url = Uri.parse(
-                        'https://wa.me/237600000000?text=${Uri.encodeComponent("Bonjour Marché·CM ! J\'ai une question.")}');
+                        'https://wa.me/237652799122?text=${Uri.encodeComponent("Bonjour Marché·CM ! J\'ai une question.")}');
                     try {
                       await launchUrl(url,
                           mode: LaunchMode.externalApplication);

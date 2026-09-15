@@ -108,7 +108,7 @@ export default function Footer({ className = '' }) {
             <div className="flex flex-col items-center gap-1.5">
               <span className="text-2xl">💬</span>
               <p className="text-white/70 text-xs font-semibold">Support WhatsApp</p>
-              <a href="https://wa.me/237695860673" className="text-amber-400 text-[10px] hover:underline">+237 695 860 673</a>
+              <a href="https://wa.me/237652799122" className="text-amber-400 text-[10px] hover:underline">+237 652 799 122</a>
             </div>
           </div>
         </div>
