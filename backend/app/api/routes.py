@@ -229,7 +229,8 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
     db.add(cmd); db.flush()
     for l in p.lignes:
         ligne = CommandeLigne(commande_id=cmd.id, produit_id=l.produit_id, section_id=l.section_id,
-                              quantite=l.quantite, prix_unitaire=l.prix_unitaire, prix_total=l.prix_unitaire*l.quantite)
+                              quantite=l.quantite, prix_unitaire=l.prix_unitaire, prix_total=l.prix_unitaire*l.quantite,
+                              note_ligne=l.note_ligne)
         db.add(ligne); db.flush()
         for ing in l.ingredients:
             db.add(CommandeIngredient(ligne_id=ligne.id, ingredient_id=ing.ingredient_id,
@@ -291,6 +292,7 @@ def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
         "lignes": [{
             "id": str(l.id),
             "produit_nom": l.produit.nom if l.produit else None,
+            "note_ligne": l.note_ligne,
             "quantite": l.quantite,
             "prix_unitaire": l.prix_unitaire,
             "prix_total": l.prix_total,

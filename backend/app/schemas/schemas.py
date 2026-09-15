@@ -153,6 +153,7 @@ class LigneCmdIn(BaseModel):
     section_id: UUID
     quantite: int
     prix_unitaire: int
+    note_ligne: Optional[str] = None  # article personnalisé saisi par le client
     ingredients: List[IngredientCmdIn] = []
 
 class CommandeCreateIn(BaseModel):
