@@ -243,7 +243,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          '${ligne.produitNom} × ${ligne.quantite}',
+                                          '${ligne.libelle} × ${ligne.quantite}',
                                           style: const TextStyle(fontSize: 14),
                                         ),
                                       ),

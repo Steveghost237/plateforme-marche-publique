@@ -5,15 +5,21 @@ class CartItem {
   final Produit produit;
   int quantite;
   final List<Map<String, dynamic>>? ingredientsPersonnalises;
+  final String? note; // article personnalisé saisi par le client
+  final int? prixOverride; // prix estimé pour les articles personnalisés
 
   CartItem({
     required this.produit,
     this.quantite = 1,
     this.ingredientsPersonnalises,
+    this.note,
+    this.prixOverride,
   });
 
+  bool get isCustom => note != null && note!.isNotEmpty;
+
   int get total {
-    int prixTotal = produit.prixFcfa;
+    int prixTotal = prixOverride ?? produit.prixFcfa;
     if (ingredientsPersonnalises != null) {
       prixTotal += ingredientsPersonnalises!
           .fold(0, (sum, ing) => sum + ((ing['prix_choisi'] as int?) ?? 0));
@@ -76,6 +82,20 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Article personnalisé (section "Ma Liste") — chaque ligne reste distincte
+  void addCustomItem(Produit produit,
+      {required String nom, int quantite = 1, int prixEstime = 0}) {
+    final key =
+        'custom_${DateTime.now().millisecondsSinceEpoch}_${_items.length}';
+    _items[key] = CartItem(
+      produit: produit,
+      quantite: quantite,
+      note: nom,
+      prixOverride: prixEstime,
+    );
+    notifyListeners();
+  }
+
   void clear() {
     _items.clear();
     notifyListeners();
@@ -87,7 +107,8 @@ class CartProvider with ChangeNotifier {
         'produit_id': item.produit.id,
         'section_id': item.produit.sectionId ?? item.produit.sectionCode,
         'quantite': item.quantite,
-        'prix_unitaire': item.produit.prixFcfa,
+        'prix_unitaire': item.prixOverride ?? item.produit.prixFcfa,
+        'note_ligne': item.note,
         'ingredients': item.ingredientsPersonnalises ?? [],
       };
     }).toList();

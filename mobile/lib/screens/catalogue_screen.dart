@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 import '../providers/lang_provider.dart';
 import '../utils/image_utils.dart';
+import '../widgets/custom_list_builder.dart';
 import 'menu_customization_screen.dart';
 
 class CatalogueScreen extends StatefulWidget {
@@ -249,7 +250,9 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                           ],
                         ),
                       )
-                    : RefreshIndicator(
+                    : _selectedSection == 'ma_liste'
+                        ? const CustomListBuilder()
+                        : RefreshIndicator(
                         onRefresh: _loadData,
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(16),

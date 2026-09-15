@@ -103,13 +103,17 @@ class Commande {
 class LigneCommande {
   final String id;
   final String? produitNom;
+  final String? noteLigne; // article personnalisé saisi par le client
   final int quantite;
   final int prixUnitaire;
   final int prixTotal;
 
+  String get libelle => noteLigne ?? produitNom ?? 'Article';
+
   LigneCommande({
     required this.id,
     this.produitNom,
+    this.noteLigne,
     required this.quantite,
     required this.prixUnitaire,
     required this.prixTotal,
@@ -119,6 +123,7 @@ class LigneCommande {
     return LigneCommande(
       id: json['id'],
       produitNom: json['produit_nom'],
+      noteLigne: json['note_ligne'],
       quantite: json['quantite'],
       prixUnitaire: json['prix_unitaire'],
       prixTotal: json['prix_total'],

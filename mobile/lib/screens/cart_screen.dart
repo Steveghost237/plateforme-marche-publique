@@ -55,7 +55,9 @@ class CartScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   itemCount: cart.items.length,
                   itemBuilder: (context, index) {
-                    final item = cart.items.values.toList()[index];
+                    final entry = cart.items.entries.toList()[index];
+                    final itemKey = entry.key;
+                    final item = entry.value;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Padding(
@@ -64,7 +66,15 @@ class CartScreen extends StatelessWidget {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: item.produit.imageUrl != null &&
+                              child: item.isCustom
+                                  ? Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: const Color(0xFFFFF7E6),
+                                      child: const Icon(Icons.edit_note,
+                                          size: 36, color: Color(0xFFFBBF24)),
+                                    )
+                                  : item.produit.imageUrl != null &&
                                       ImageUtils.isValidImageUrl(
                                           item.produit.imageUrl)
                                   ? CachedNetworkImage(
@@ -103,7 +113,7 @@ class CartScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item.produit.nom,
+                                    item.note ?? item.produit.nom,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -113,9 +123,16 @@ class CartScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${item.produit.prixFcfa} F / ${item.produit.unite}',
+                                    item.isCustom
+                                        ? (item.prixOverride != null &&
+                                                item.prixOverride! > 0
+                                            ? '≈ ${item.prixOverride} F (estimé)'
+                                            : 'Prix confirmé au marché')
+                                        : '${item.produit.prixFcfa} F / ${item.produit.unite}',
                                     style: TextStyle(
-                                      color: Colors.grey[600],
+                                      color: item.isCustom
+                                          ? const Color(0xFFB45309)
+                                          : Colors.grey[600],
                                       fontSize: 14,
                                     ),
                                   ),
@@ -128,11 +145,11 @@ class CartScreen extends StatelessWidget {
                                         onPressed: () {
                                           if (item.quantite > 1) {
                                             cart.updateQuantite(
-                                              item.produit.id,
+                                              itemKey,
                                               item.quantite - 1,
                                             );
                                           } else {
-                                            cart.removeItem(item.produit.id);
+                                            cart.removeItem(itemKey);
                                           }
                                         },
                                         color: const Color(0xFF0D2137),
@@ -155,7 +172,7 @@ class CartScreen extends StatelessWidget {
                                             Icons.add_circle_outline),
                                         onPressed: () {
                                           cart.updateQuantite(
-                                            item.produit.id,
+                                            itemKey,
                                             item.quantite + 1,
                                           );
                                         },
@@ -190,7 +207,7 @@ class CartScreen extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () {
-                                cart.removeItem(item.produit.id);
+                                cart.removeItem(itemKey);
                               },
                               color: Colors.red,
                             ),

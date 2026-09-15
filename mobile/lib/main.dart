@@ -30,11 +30,17 @@ class MarcheApp extends StatelessWidget {
             secondary: const Color(0xFFFBBF24), // Amber
           ),
           useMaterial3: true,
-          fontFamily: 'Roboto',
+          fontFamily: 'Open Sans',
           appBarTheme: const AppBarTheme(
             backgroundColor: Color(0xFF0D2137),
             foregroundColor: Colors.white,
             elevation: 0,
+            titleTextStyle: TextStyle(
+              fontFamily: 'Montserrat',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(

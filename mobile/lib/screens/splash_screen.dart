@@ -74,8 +74,9 @@ class _SplashScreenState extends State<SplashScreen> {
             const Text(
               'Marché en Ligne',
               style: TextStyle(
+                fontFamily: 'Montserrat',
                 fontSize: 28,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 color: Colors.white,
               ),
             ),
