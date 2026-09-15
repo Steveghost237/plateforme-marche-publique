@@ -488,3 +488,20 @@ def simuler_frais(body: dict, db: Session = Depends(get_db), _=Depends(get_curre
     d = detail_frais(dist, pointe, db, poids_kg)
     d["frais_fcfa"] = d["frais_total"]  # alias
     return d
+
+# ══════════════════════════════════════════════
+# ADMIN — SEED CATALOGUE (import produits Oumbemarket)
+# ══════════════════════════════════════════════
+admin_seed_router = APIRouter(prefix="/admin/seed", tags=["Admin - Seed"])
+
+@admin_seed_router.post("/oumbe")
+def seed_oumbe_endpoint(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    """Importe les sections (Épicerie, Entretien, Cosmétique, Ma Liste)
+    et les 180 produits Oumbemarket de façon idempotente."""
+    from app.services.seed_oumbe_service import run_import
+    try:
+        recap = run_import(db)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Import échoué: {e}")
+    return {"ok": True, **recap}
