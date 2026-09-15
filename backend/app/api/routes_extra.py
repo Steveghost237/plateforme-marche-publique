@@ -56,7 +56,7 @@ def detail_frais(distance_km: float, pointe: bool, db: Session, poids_kg: float 
     """
     zone, _ = _get_zone(distance_km, db)
     if zone is None:
-        return {"frais_total": 500, "frais_base": 500, "part_distance": 0,
+        return {"frais_total": 1000, "frais_base": 1000, "part_distance": 0,
                 "part_poids": 0, "majoration": 0, "zone_nom": None,
                 "delai_min": 30, "delai_max": 60, "est_pointe": pointe}
 
@@ -121,9 +121,9 @@ def calculer_frais(body: dict, db: Session = Depends(get_db)):
             lon = float(adr.longitude)
 
     if lat is None or lon is None:
-        return {"frais_fcfa": 500, "frais_total": 500, "distance_km": None,
+        return {"frais_fcfa": 1000, "frais_total": 1000, "distance_km": None,
                 "message": "Coordonnées manquantes — tarif forfaitaire",
-                "frais_base": 500, "part_distance": 0, "part_poids": 0,
+                "frais_base": 1000, "part_distance": 0, "part_poids": 0,
                 "majoration": 0, "est_pointe": False, "poids_kg": poids_kg}
 
     dist   = haversine(MARCHE_LAT, MARCHE_LON, lat, lon)

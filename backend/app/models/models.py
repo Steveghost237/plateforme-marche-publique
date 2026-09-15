@@ -67,7 +67,7 @@ class ZoneLivraison(Base):
     prix_par_kg_fcfa      = Column(Numeric(8, 2), default=100) # tarif par kg
     majoration_pointe_pct = Column(SmallInteger, default=20)   # % majoration Lun-Ven
     # Champ legacy conservé pour compatibilité
-    frais_fcfa            = Column(Integer, default=500)
+    frais_fcfa            = Column(Integer, default=1000)
     delai_min             = Column(Integer, default=30)
     delai_max             = Column(Integer, default=60)
     actif                 = Column(Boolean, default=True)
@@ -204,7 +204,7 @@ class Commande(Base):
     creneau             = Column(String(30))
     date_livraison      = Column(Date)
     sous_total_fcfa     = Column(Integer, default=0)
-    frais_livraison     = Column(Integer, default=500)
+    frais_livraison     = Column(Integer, default=1000)
     reduction_points    = Column(Integer, default=0)
     total_fcfa          = Column(Integer, default=0)
     points_gagnes       = Column(Integer, default=0)

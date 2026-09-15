@@ -195,7 +195,7 @@ export function Checkout() {
   const [showNewAdr, setShowNewAdr]   = useState(false)
 
   // Frais calculés dynamiquement (formule combinée distance + poids)
-  const fraisLiv = sousTotal >= 5000 ? 0 : (fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 500) : 500)
+  const fraisLiv = sousTotal >= 5000 ? 0 : (fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
   const total    = sousTotal + fraisLiv
   const points   = Math.floor(total / 500)
 
@@ -448,7 +448,7 @@ export function Checkout() {
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Yaoundé — tous quartiers</span>
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Douala — tous quartiers</span>
                 </div>
-                <p className="text-blue-500 mt-1.5">Frais à partir de 500 F · Gratuit dès 5 000 F de commande</p>
+                <p className="text-blue-500 mt-1.5">Frais à partir de 1000 F · Gratuit dès 5 000 F de commande</p>
               </div>
               {adresses.length > 0 ? (
                 <div className="space-y-2 mb-4">

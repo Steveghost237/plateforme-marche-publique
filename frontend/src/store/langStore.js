@@ -16,7 +16,7 @@ const fr = {
   nav_deconnexion: 'Déconnexion',
   nav_notifications: 'Notifications',
   nav_recherche: 'Rechercher',
-  nav_promo_banner: 'Livraison à domicile — Yaoundé & Douala · Frais à partir de 500 FCFA',
+  nav_promo_banner: 'Livraison à domicile — Yaoundé & Douala · Frais à partir de 1000 FCFA',
   nav_create_account: 'Créer un compte gratuit',
   // Sections menu
   sec_menus: 'Menus',
@@ -233,7 +233,7 @@ const en = {
   nav_deconnexion: 'Logout',
   nav_notifications: 'Notifications',
   nav_recherche: 'Search',
-  nav_promo_banner: 'Home delivery — Yaoundé & Douala · From 500 FCFA',
+  nav_promo_banner: 'Home delivery — Yaoundé & Douala · From 1000 FCFA',
   nav_create_account: 'Create a free account',
   sec_menus: 'Meals',
   sec_fruits: 'Fruits',
