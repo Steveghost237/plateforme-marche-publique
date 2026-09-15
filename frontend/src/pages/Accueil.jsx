@@ -510,7 +510,7 @@ export default function Accueil() {
           <div className="absolute inset-0 bg-[#0D2137]/88" />
         </div>
         <div className={`relative max-w-2xl mx-auto px-6 text-center transition-all duration-800 ${ctaVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <span className="text-amber-400 text-xs font-bold tracking-[.3em] uppercase block mb-4">Disponible bientôt</span>
+          <span className="text-amber-400 text-xs font-bold tracking-[.3em] uppercase block mb-4">Disponible sur Android</span>
           <h2 className="font-serif text-white font-bold mb-4" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>
             L'application mobile<br/>Marché·CM
           </h2>
@@ -518,22 +518,25 @@ export default function Accueil() {
             Suivez vos livraisons en temps réel, recevez des notifications à chaque étape
             et gérez votre programme de fidélité depuis votre smartphone.
           </p>
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
-            {[
-              { store:'App Store',    icon:<svg viewBox="0 0 24 24" className="w-5 h-5 fill-current shrink-0"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg> },
-              { store:'Google Play',  icon:<svg viewBox="0 0 24 24" className="w-5 h-5 fill-current shrink-0"><path d="M3.18 23.76c.31.17.67.19 1.01.04l12.44-7.17-2.79-2.79-10.66 9.92zM.25 2.27C.09 2.6 0 2.98 0 3.41v17.17c0 .43.09.82.25 1.14l.07.06 9.62-9.62v-.23L.32 2.21l-.07.06zM20.94 10.3L18.1 8.62l-3.08 3.08 3.08 3.08 2.87-1.67c.82-.48.82-1.25-.03-1.81zM4.19.2L16.63 7.37l-2.79 2.79L3.18.24c.34-.15.72-.13 1.01-.04z"/></svg> },
-            ].map(({ store, icon }) => (
-              <button key={store} className="flex items-center gap-2.5 bg-white text-[#0D2137] px-6 py-3.5 rounded-xl font-bold text-sm hover:bg-amber-50 transition-colors shadow-lg">
-                {icon} {store}
-              </button>
-            ))}
+          <div className="flex flex-wrap justify-center gap-4 mb-6">
+            <a
+              href="https://github.com/Steveghost237/plateforme-marche-publique/releases/download/apk-latest/comebuy.apk"
+              download
+              className="flex items-center gap-3 bg-amber-500 text-[#0D2137] px-8 py-4 rounded-xl font-bold text-sm hover:bg-amber-400 transition-colors shadow-xl shadow-amber-500/20"
+            >
+              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current shrink-0"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.46 11.46 0 0 0-8.94 0L5.65 5.67c-.19-.29-.54-.38-.84-.22-.3.16-.42.54-.26.85L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+              Télécharger l'APK Android
+            </a>
           </div>
+          <p className="text-white/40 text-xs mb-8">
+            Version Android · installation directe (autorisez les sources inconnues si demandé)
+          </p>
           <div className="flex flex-wrap justify-center gap-4 text-sm">
-            <a href="tel:+237600000000" className="flex items-center gap-1.5 text-white/40 hover:text-white transition-colors text-xs">
-              <Phone size={13}/> +237 6XX XXX XXX
+            <a href="tel:+237695860673" className="flex items-center gap-1.5 text-white/40 hover:text-white transition-colors text-xs">
+              <Phone size={13}/> +237 695 860 673
             </a>
             <span className="text-white/20 text-xs">|</span>
-            <a href="mailto:contact@marche.cm" className="text-white/40 hover:text-white transition-colors text-xs">contact@marche.cm</a>
+            <a href="mailto:comebuy237@gmail.com" className="text-white/40 hover:text-white transition-colors text-xs">comebuy237@gmail.com</a>
           </div>
         </div>
       </section>

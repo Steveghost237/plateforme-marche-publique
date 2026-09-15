@@ -15,6 +15,8 @@ jobs:
   build-apk:
     name: Build APK Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,3 +70,14 @@ jobs:
           name: ComeBuy-APK-${{ github.run_number }}
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      - name: Publish APK to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk comebuy.apk
+          gh release view apk-latest >/dev/null 2>&1 \
+            || gh release create apk-latest \
+                 --title "ComeBuy APK — dernière version" \
+                 --notes "Cette release contient toujours la dernière version de l'application Android ComeBuy."
+          gh release upload apk-latest comebuy.apk --clobber
