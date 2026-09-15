@@ -106,9 +106,9 @@ export function Panier() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-amber-500 font-bold text-sm">{(l.prixUnit * l.quantite).toLocaleString()} F</span>
-                          <button onClick={() => remove(k)}
-                            className="text-gray-300 hover:text-red-400 transition-colors p-1">
-                            <Trash2 size={14}/>
+                          <button onClick={() => remove(k)} title="Retirer cet article"
+                            className="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-500 transition-colors flex items-center justify-center">
+                            <Trash2 size={13}/>
                           </button>
                         </div>
                       </div>

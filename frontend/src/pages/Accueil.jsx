@@ -1,42 +1,42 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowLeft, ChevronRight, Star, Truck, Shield, Clock, MapPin, Phone, CheckCircle } from 'lucide-react'
-import api from '../utils/api'
+import api, { getImageUrl } from '../utils/api'
 import { useT } from '../store/langStore'
 import SafeImg from '../components/common/SafeImg'
 
 // ── Images Unsplash libres ────────────────────────────────────
 const HERO_SLIDES = [
   {
-    img: 'https://images.unsplash.com/photo-1595475207225-428b62bda831?w=1600&q=85&fit=crop',
+    img: '/images/accueil/photo-1595475207225-428b62bda831.jpg',
     tag: 'Composez votre repas',
     title: 'Vos ingrédients\nfrais, choisis\npar vous',
     sub: 'Ndolé, ERU, Poulet DG, Mbongo Tchobi — choisissez chaque ingrédient, ajustez les quantités, et composez le plat qui vous ressemble.',
     href: '/catalogue/menus_ingredients',
   },
   {
-    img: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=85&fit=crop',
+    img: '/images/accueil/photo-1542838132-92c53300491e.jpg',
     tag: 'Fruits & Légumes Frais',
     title: 'Directement\ndu marché\nà votre table',
     sub: 'Ananas, mangues, plantains, tomates — sélectionnez vos fruits et légumes, nos livreurs les achètent frais au marché pour vous.',
     href: '/catalogue/fruits',
   },
   {
-    img: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1600&q=85&fit=crop',
+    img: '/images/accueil/photo-1509440159596-0249088772ff.jpg',
     tag: 'Boulangerie du Matin',
     title: 'Pain chaud,\nviennoiseries\net pâtisseries',
     sub: 'Chaque matin, nos livreurs récupèrent les produits les plus frais de nos boulangers partenaires.',
     href: '/catalogue/boulangerie',
   },
   {
-    img: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=1600&q=85&fit=crop',
+    img: '/images/accueil/photo-1596040033229-a9821ebd058d.jpg',
     tag: 'Épices & Condiments',
     title: 'Les épices qui\ndonnent du goût\nà vos plats',
     sub: 'Poivre de Penja, njansang, mbongo — tous les condiments du terroir camerounais.',
     href: '/catalogue/epices',
   },
   {
-    img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&q=85&fit=crop',
+    img: '/images/accueil/photo-1556909114-f6e7ad7d3136.jpg',
     tag: 'Livraison Express',
     title: 'Commandé,\nlivré en\nmoins d\'une heure',
     sub: 'Nos livreurs engagés couvrent Yaoundé et Douala, 7j/7, du matin au soir.',
@@ -45,30 +45,30 @@ const HERO_SLIDES = [
 ]
 
 const SECTIONS_DATA = [
-  { code:'menus_ingredients', label:'Menus & Ingrédients', desc:'Composez vos plats ingrédient par ingrédient', img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=600&q=80&fit=crop' },
-  { code:'fruits',            label:'Fruits & Légumes',    desc:'Produits frais cueillis chaque matin',   img:'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&q=80&fit=crop' },
-  { code:'boissons',          label:'Boissons',            desc:'Jus naturels, eaux et boissons locales', img:'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=600&q=80&fit=crop' },
-  { code:'boulangerie',       label:'Boulangerie',         desc:'Pains frais et viennoiseries artisanales',img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&q=80&fit=crop' },
-  { code:'epices',            label:'Épices & Condiments', desc:'Toutes les épices du terroir camerounais',img:'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=600&q=80&fit=crop' },
-  { code:'epicerie',          label:'Épicerie',            desc:'Riz, huiles, conserves et produits du quotidien', img:'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80&fit=crop' },
-  { code:'entretien',         label:'Entretien & Maison',  desc:'Lessive, nettoyants et hygiène de la maison', img:'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=600&q=80&fit=crop' },
-  { code:'cosmetique',        label:'Cosmétique & Hygiène',desc:'Savons, soins et produits d\'hygiène', img:'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80&fit=crop' },
-  { code:'ma_liste',          label:'Ma Liste de Marché',  desc:'Écrivez vos articles même hors catalogue', img:'https://images.unsplash.com/photo-1543168256-418811576931?w=600&q=80&fit=crop' },
+  { code:'menus_ingredients', label:'Menus & Ingrédients', desc:'Composez vos plats ingrédient par ingrédient', img:'/images/accueil/photo-1565299507177-b0ac66763828.jpg' },
+  { code:'fruits',            label:'Fruits & Légumes',    desc:'Produits frais cueillis chaque matin',   img:'/images/accueil/photo-1610832958506-aa56368176cf.jpg' },
+  { code:'boissons',          label:'Boissons',            desc:'Jus naturels, eaux et boissons locales', img:'/images/accueil/photo-1544145945-f90425340c7e.jpg' },
+  { code:'boulangerie',       label:'Boulangerie',         desc:'Pains frais et viennoiseries artisanales',img:'/images/accueil/photo-1509440159596-0249088772ff.jpg' },
+  { code:'epices',            label:'Épices & Condiments', desc:'Toutes les épices du terroir camerounais',img:'/images/accueil/photo-1596040033229-a9821ebd058d.jpg' },
+  { code:'epicerie',          label:'Épicerie',            desc:'Riz, huiles, conserves et produits du quotidien', img:'/images/accueil/photo-1542838132-92c53300491e.jpg' },
+  { code:'entretien',         label:'Entretien & Maison',  desc:'Lessive, nettoyants et hygiène de la maison', img:'/images/accueil/photo-1583947215259-38e31be8751f.jpg' },
+  { code:'cosmetique',        label:'Cosmétique & Hygiène',desc:'Savons, soins et produits d\'hygiène', img:'/images/accueil/photo-1556228720-195a672e8a03.jpg' },
+  { code:'ma_liste',          label:'Ma Liste de Marché',  desc:'Écrivez vos articles même hors catalogue', img:'/images/accueil/photo-1543168256-418811576931.jpg' },
 ]
 
 const FALLBACK_PRODUCTS = [
-  { nom:'Menu ERU complet',    prix:4000, img:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&q=80&fit=crop', slug:'menu-eru',     badge:'Bestseller' },
-  { nom:'Ndolé aux crevettes', prix:3500, img:'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80&fit=crop', slug:'menu-ndole',   badge:'Populaire' },
-  { nom:'Poulet DG',           prix:4500, img:'https://images.unsplash.com/photo-1598103442097-8b74394b95c7?w=400&q=80&fit=crop', slug:'menu-poulet-dg', badge:null },
-  { nom:'Koki traditionnel',   prix:2500, img:'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80&fit=crop', slug:'menu-koki',    badge:'Nouveau' },
-  { nom:'Mbongo Tchobi',       prix:5000, img:'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&q=80&fit=crop', slug:'menu-mbongo',  badge:null },
-  { nom:'Okok aux arachides',  prix:3000, img:'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80&fit=crop', slug:'menu-okok',    badge:null },
+  { nom:'Menu ERU complet',    prix:4000, img:'/images/accueil/photo-1565299507177-b0ac66763828.jpg', slug:'menu-eru',     badge:'Bestseller' },
+  { nom:'Ndolé aux crevettes', prix:3500, img:'/images/accueil/photo-1547592180-85f173990554.jpg', slug:'menu-ndole',   badge:'Populaire' },
+  { nom:'Poulet DG',           prix:4500, img:'/images/accueil/photo-1567620832903-9fc6debc209f.jpg', slug:'menu-poulet-dg', badge:null },
+  { nom:'Koki traditionnel',   prix:2500, img:'/images/accueil/photo-1512621776951-a57141f2eefd.jpg', slug:'menu-koki',    badge:'Nouveau' },
+  { nom:'Mbongo Tchobi',       prix:5000, img:'/images/accueil/photo-1565299585323-38d6b0865b47.jpg', slug:'menu-mbongo',  badge:null },
+  { nom:'Okok aux arachides',  prix:3000, img:'/images/accueil/photo-1574484284002-952d92456975.jpg', slug:'menu-okok',    badge:null },
 ]
 
 const TESTIMONIALS = [
-  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
-  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'https://images.unsplash.com/photo-1531427186611-ecfd6d936e79?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
-  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'https://images.unsplash.com/photo-1592621385612-4d7129426394?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
+  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'/images/accueil/photo-1531746020798-e6953c6e8e04.jpg', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
+  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'/images/accueil/photo-1507003211169-0a1dd7228f2d.jpg', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
+  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'/images/accueil/photo-1592621385612-4d7129426394.jpg', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
 ]
 
 // ── Hook: Intersection Observer ───────────────────────────────
@@ -280,9 +280,9 @@ export default function Accueil() {
           </div>
           <div className="grid lg:grid-cols-3 gap-8">
             {[
-              { n:'01', title:t('how_step1'), desc:t('how_step1_desc'), img:'https://images.unsplash.com/photo-1601758174039-c9b9c8f8b4c5?w=600&q=80&fit=crop' },
-              { n:'02', title:t('how_step2'), desc:t('how_step2_desc'), img:'https://images.unsplash.com/photo-1591291621164-2c6367723315?w=600&q=80&fit=crop' },
-              { n:'03', title:t('how_step3'), desc:t('how_step3_desc'), img:'https://images.unsplash.com/photo-1605379399642-870262d3d051?w=600&q=80&fit=crop' },
+              { n:'01', title:t('how_step1'), desc:t('how_step1_desc'), img:'/images/accueil/photo-1506617564039-2f3b650b7010.jpg' },
+              { n:'02', title:t('how_step2'), desc:t('how_step2_desc'), img:'/images/accueil/photo-1563013544-824ae1b704d3.jpg' },
+              { n:'03', title:t('how_step3'), desc:t('how_step3_desc'), img:'/images/accueil/photo-1526367790999-0150786686a2.jpg' },
             ].map((step, i) => (
               <div key={step.n}
                 className={`group transition-all duration-700 ${hiwVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
@@ -318,7 +318,7 @@ export default function Accueil() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
             {products.map((p, i) => {
               const fb = FALLBACK_PRODUCTS[i % FALLBACK_PRODUCTS.length]
-              const img   = p.image_url || fb.img
+              const img   = getImageUrl(p.image_url) || fb.img
               const nom   = p.nom
               const prix  = p.prix_base_fcfa || fb.prix
               const badge = p.est_populaire ? 'Populaire' : p.est_nouveau ? 'Nouveau' : fb.badge
@@ -362,19 +362,19 @@ export default function Accueil() {
           <div className={`relative transition-all duration-800 ${conVis ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'}`}>
             <div className="grid grid-cols-2 gap-3">
               <SafeImg
-                src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=85&fit=crop"
+                src="/images/accueil/photo-1542838132-92c53300491e.jpg"
                 alt="Marché local Cameroun"
                 className="rounded-2xl w-full h-64 object-cover shadow-lg"
               />
               <div className="flex flex-col gap-3">
                 <SafeImg
-                  src="https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&q=85&fit=crop"
+                  src="/images/accueil/photo-1565299507177-b0ac66763828.jpg"
                   alt="Plat camerounais"
                   className="rounded-2xl w-full flex-1 object-cover shadow-md"
                   style={{height:'120px'}}
                 />
                 <SafeImg
-                  src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=85&fit=crop"
+                  src="/images/accueil/photo-1558618666-fcd25c85cd64.jpg"
                   alt="Livraison à domicile"
                   className="rounded-2xl w-full flex-1 object-cover shadow-md"
                   style={{height:'120px'}}
@@ -437,18 +437,18 @@ export default function Accueil() {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { niveau:'Bronze', pts:'0 – 999 pts',       avantage:'Livraison −10%',  detail:'Sur les frais de livraison',           grad:'from-amber-700 to-amber-600', ring:'ring-amber-200', tc:'text-amber-800' },
-              { niveau:'Argent', pts:'1 000 – 4 999 pts', avantage:'Réduction −10%',  detail:'Sur le montant total de la commande',   grad:'from-gray-500 to-gray-400',   ring:'ring-gray-200',  tc:'text-gray-600' },
-              { niveau:'Or',     pts:'5 000 – 9 999 pts', avantage:'Réduction −15%',  detail:'Sur le total + un produit offert',      grad:'from-amber-500 to-amber-400', ring:'ring-amber-100', tc:'text-amber-600' },
-              { niveau:'VIP',    pts:'10 000+ pts',        avantage:'Réduction −25%',  detail:'Tous avantages + livraison express offerte', grad:'from-purple-700 to-purple-600', ring:'ring-purple-200', tc:'text-purple-700' },
+              { niveau:'Bronze', pts:'0 – 999 pts',       avantage:'Livraison −10%',  detail:'Sur les frais de livraison',           grad:'from-amber-700 to-amber-600', ring:'ring-amber-200', tc:'text-amber-800', img:'/images/accueil/photo-1549465220-1a8b9238cd48.jpg' },
+              { niveau:'Argent', pts:'1 000 – 4 999 pts', avantage:'Réduction −10%',  detail:'Sur le montant total de la commande',   grad:'from-gray-500 to-gray-400',   ring:'ring-gray-200',  tc:'text-gray-600', img:'/images/accueil/photo-1533282960533-51328aa49826.jpg' },
+              { niveau:'Or',     pts:'5 000 – 9 999 pts', avantage:'Réduction −15%',  detail:'Sur le total + un produit offert',      grad:'from-amber-500 to-amber-400', ring:'ring-amber-100', tc:'text-amber-600', img:'/images/accueil/photo-1567427017947-545c5f8d16ad.jpg' },
+              { niveau:'VIP',    pts:'10 000+ pts',        avantage:'Réduction −25%',  detail:'Tous avantages + livraison express offerte', grad:'from-purple-700 to-purple-600', ring:'ring-purple-200', tc:'text-purple-700', img:'/images/accueil/photo-1601662528567-526cd06f6582.jpg' },
             ].map((n, i) => (
               <div key={n.niveau}
                 className={`rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 hover:-translate-y-1
                   ${fidVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
                 style={{transitionDelay:`${i*100}ms`}}>
-                <div className={`bg-gradient-to-br ${n.grad} px-5 py-6 text-white`}>
-                  <div className={`w-11 h-11 rounded-full bg-white/20 ring-2 ${n.ring} flex items-center justify-center mb-3`}>
-                    <Star size={18} fill="white" stroke="none" />
+                <div className={`bg-gradient-to-br ${n.grad} px-5 py-6 text-white relative`}>
+                  <div className={`w-16 h-16 rounded-full bg-white/20 ring-4 ${n.ring} overflow-hidden mb-3 shadow-md`}>
+                    <SafeImg src={n.img} alt={n.niveau} className="w-full h-full object-cover" />
                   </div>
                   <div className="font-serif font-bold text-2xl">{n.niveau}</div>
                   <div className="text-white/65 text-xs mt-1">{n.pts}</div>
@@ -503,7 +503,7 @@ export default function Accueil() {
       <section ref={ctaRef} className="relative py-24 overflow-hidden">
         <div className="absolute inset-0">
           <SafeImg
-            src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&q=75&fit=crop"
+            src="/images/accueil/photo-1542838132-92c53300491e.jpg"
             alt="Marché Cameroun"
             className="w-full h-full object-cover"
           />
