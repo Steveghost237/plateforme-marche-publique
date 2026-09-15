@@ -59,13 +59,16 @@ export default function Footer({ className = '' }) {
               <MapPin size={12} className="mt-0.5 shrink-0 text-amber-400"/>
               <span>Yaoundé &amp; Douala, Cameroun</span>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <Phone size={12} className="text-amber-400 shrink-0"/>
-              <span>+237 6XX XXX XXX</span>
+            <div className="flex items-start gap-2 text-xs">
+              <Phone size={12} className="text-amber-400 shrink-0 mt-0.5"/>
+              <div className="flex flex-col">
+                <a href="tel:+237695860673" className="hover:text-white transition-colors">+237 695 860 673</a>
+                <a href="tel:+237652799122" className="hover:text-white transition-colors">+237 652 799 122</a>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Mail size={12} className="text-amber-400 shrink-0"/>
-              <span>contact@comebuy.cm</span>
+              <a href="mailto:comebuy237@gmail.com" className="hover:text-white transition-colors">comebuy237@gmail.com</a>
             </div>
           </div>
           <p className="text-white/50 font-medium mt-5 mb-2 text-xs">Horaires de livraison</p>
@@ -105,7 +108,7 @@ export default function Footer({ className = '' }) {
             <div className="flex flex-col items-center gap-1.5">
               <span className="text-2xl">💬</span>
               <p className="text-white/70 text-xs font-semibold">Support WhatsApp</p>
-              <a href="https://wa.me/237600000000" className="text-amber-400 text-[10px] hover:underline">+237 6XX XXX XXX</a>
+              <a href="https://wa.me/237695860673" className="text-amber-400 text-[10px] hover:underline">+237 695 860 673</a>
             </div>
           </div>
         </div>

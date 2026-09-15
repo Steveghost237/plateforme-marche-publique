@@ -62,9 +62,9 @@ const FALLBACK_PRODUCTS = [
 ]
 
 const TESTIMONIALS = [
-  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100&q=80&fit=crop&facepad=2', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
-  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80&fit=crop&facepad=2', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
-  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100&q=80&fit=crop&facepad=2', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
+  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
+  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'https://images.unsplash.com/photo-1531427186611-ecfd6d936e79?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
+  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'https://images.unsplash.com/photo-1592621385612-4d7129426394?w=200&q=80&fit=crop&facepad=2&crop=faces', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
 ]
 
 // ── Hook: Intersection Observer ───────────────────────────────
@@ -276,9 +276,9 @@ export default function Accueil() {
           </div>
           <div className="grid lg:grid-cols-3 gap-8">
             {[
-              { n:'01', title:t('how_step1'), desc:t('how_step1_desc'), img:'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&q=80&fit=crop' },
-              { n:'02', title:t('how_step2'), desc:t('how_step2_desc'), img:'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=500&q=80&fit=crop' },
-              { n:'03', title:t('how_step3'), desc:t('how_step3_desc'), img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&fit=crop' },
+              { n:'01', title:t('how_step1'), desc:t('how_step1_desc'), img:'https://images.unsplash.com/photo-1601758174039-c9b9c8f8b4c5?w=600&q=80&fit=crop' },
+              { n:'02', title:t('how_step2'), desc:t('how_step2_desc'), img:'https://images.unsplash.com/photo-1591291621164-2c6367723315?w=600&q=80&fit=crop' },
+              { n:'03', title:t('how_step3'), desc:t('how_step3_desc'), img:'https://images.unsplash.com/photo-1605379399642-870262d3d051?w=600&q=80&fit=crop' },
             ].map((step, i) => (
               <div key={step.n}
                 className={`group transition-all duration-700 ${hiwVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
