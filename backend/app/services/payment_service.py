@@ -31,6 +31,8 @@ _FALLBACK_DNS_HOSTS = {
     "checkout.stripe.com",
     "api-m.sandbox.paypal.com",
     "api-m.paypal.com",
+    "demo.campay.net",
+    "campay.net",
 }
 _original_getaddrinfo = socket.getaddrinfo
 _dns_cache: dict = {}
@@ -67,7 +69,8 @@ def _patched_getaddrinfo(host, port, *args, **kwargs):
         if (host_str in _FALLBACK_DNS_HOSTS
                 or host_str.endswith(".notchpay.co")
                 or host_str.endswith(".stripe.com")
-                or host_str.endswith(".paypal.com")):
+                or host_str.endswith(".paypal.com")
+                or host_str.endswith(".campay.net")):
             ip = _resolve_via_google(host_str)
             if ip:
                 return _original_getaddrinfo(ip, port, *args, **kwargs)
@@ -90,6 +93,125 @@ PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = os.environ.get("PAYPAL_SECRET", "")
 PAYPAL_SANDBOX = os.environ.get("PAYPAL_SANDBOX", "true").lower() in ("true", "1", "yes")
 PAYPAL_BASE = "https://api-m.sandbox.paypal.com" if PAYPAL_SANDBOX else "https://api-m.paypal.com"
+
+# ── Campay (MTN MoMo / Orange Money) ────────────────────
+# Token permanent généré sur le dashboard Campay (dev.campay.net).
+# CAMPAY_BASE_URL: https://demo.campay.net (test) ou https://campay.net (prod)
+CAMPAY_TOKEN = os.environ.get("CAMPAY_TOKEN", "")
+CAMPAY_BASE = os.environ.get("CAMPAY_BASE_URL", "https://demo.campay.net").rstrip("/")
+
+
+# ══════════════════════════════════════════════════════════
+# CAMPAY — MTN Mobile Money & Orange Money Cameroun
+# ══════════════════════════════════════════════════════════
+
+def _campay_headers():
+    return {
+        "Authorization": f"Token {CAMPAY_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+
+def _campay_phone(telephone: str) -> str:
+    """Normalise le numéro au format Campay : 237XXXXXXXXX (sans +)."""
+    digits = "".join(c for c in telephone if c.isdigit())
+    if digits.startswith("237"):
+        return digits
+    if digits.startswith("6"):
+        return "237" + digits
+    return digits
+
+
+def campay_actif() -> bool:
+    return bool(CAMPAY_TOKEN)
+
+
+async def initier_paiement_campay(
+    montant_fcfa: int,
+    telephone: str,
+    reference: str,
+    description: str = "Commande ComeBuy",
+) -> dict:
+    """Déclenche un push USSD MTN/Orange via Campay POST /api/collect/.
+    Le client reçoit une demande de paiement sur son téléphone (code PIN)."""
+    if not CAMPAY_TOKEN:
+        print(f"[CAMPAY SIMULATION] {reference} → {montant_fcfa} FCFA pour {telephone}")
+        return {
+            "success": True,
+            "simulation": True,
+            "reference": reference,
+            "transaction_ref": reference,
+            "message": "Paiement simulé (pas de token Campay configuré)",
+        }
+
+    tel = _campay_phone(telephone)
+    payload = {
+        "amount": str(int(montant_fcfa)),
+        "currency": "XAF",
+        "from": tel,
+        "description": description[:100],
+        "external_reference": reference,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{CAMPAY_BASE}/api/collect/",
+                json=payload,
+                headers=_campay_headers(),
+            )
+            try:
+                data = resp.json()
+            except Exception:
+                data = {}
+            print(f"[CAMPAY COLLECT] ref={reference} tel={tel} → HTTP {resp.status_code}: {data}")
+
+            if resp.status_code in (200, 201, 202):
+                ref = data.get("reference") or reference
+                return {
+                    "success": True,
+                    "transaction_ref": ref,
+                    "status": (data.get("status") or "PENDING").lower(),
+                    "operator": data.get("operator"),
+                    "ussd_code": data.get("ussd_code"),
+                    "message": (
+                        f"Demande de paiement envoyée au {tel}. "
+                        f"Confirmez avec votre code PIN "
+                        f"({'*126#' if 'mtn' in (data.get('operator') or '').lower() else '#150*50#'})."
+                    ),
+                }
+            return {
+                "success": False,
+                "error": data.get("message") or data.get("detail") or f"Erreur Campay (HTTP {resp.status_code})",
+                "details": data,
+            }
+    except Exception as e:
+        print(f"[CAMPAY ERROR] {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def verifier_paiement_campay(reference: str) -> dict:
+    """Poll le statut d'une transaction Campay. Statuts: PENDING / SUCCESSFUL / FAILED."""
+    if not CAMPAY_TOKEN:
+        return {"success": True, "simulation": True, "status": "successful"}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                f"{CAMPAY_BASE}/api/transaction/{reference}/",
+                headers=_campay_headers(),
+            )
+            data = resp.json()
+            if resp.status_code == 200:
+                return {
+                    "success": True,
+                    "status": (data.get("status") or "").lower(),
+                    "amount": data.get("amount"),
+                    "currency": data.get("currency"),
+                    "operator": data.get("operator"),
+                    "reference": data.get("reference"),
+                }
+            return {"success": False, "error": data.get("detail", "Transaction introuvable")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 def get_headers():

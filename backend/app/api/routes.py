@@ -301,12 +301,13 @@ def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
 
 @cmd_router.post("/{cmd_id}/initier-paiement")
 async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    """Initie un paiement Mobile Money via NotchPay (MTN MoMo / Orange Money)"""
+    """Initie un paiement Mobile Money (MTN MoMo / Orange Money).
+    Provider : Campay si CAMPAY_TOKEN configuré, sinon NotchPay."""
     body = body or {}
     cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
     if not cmd: raise HTTPException(404)
     if cmd.statut not in ("en_attente_paiement", "brouillon"): raise HTTPException(400, "Commande déjà payée ou annulée")
-    from app.services.payment_service import initier_paiement
+    from app.services.payment_service import initier_paiement, initier_paiement_campay, campay_actif
     telephone = body.get("telephone_paiement") or user.telephone
     # Déterminer l'opérateur depuis le mode de paiement (champ sur Paiement)
     pmt_row = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
@@ -316,16 +317,25 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
         op_hint = "mtn"
     elif "orange" in mp:
         op_hint = "orange"
-    backend_url = os.environ.get("BACKEND_URL", "https://comebuy-api.onrender.com")
-    result = await initier_paiement(
-        montant_fcfa=cmd.total_fcfa,
-        telephone=telephone,
-        email=user.email,
-        reference=cmd.numero,
-        description=f"Commande {cmd.numero} — ComeBuy",
-        callback_url=body.get("callback_url") or f"{backend_url}/api/webhooks/notchpay",
-        operator=op_hint,
-    )
+
+    if campay_actif():
+        result = await initier_paiement_campay(
+            montant_fcfa=cmd.total_fcfa,
+            telephone=telephone,
+            reference=cmd.numero,
+            description=f"Commande {cmd.numero} — ComeBuy",
+        )
+    else:
+        backend_url = os.environ.get("BACKEND_URL", "https://comebuy-api.onrender.com")
+        result = await initier_paiement(
+            montant_fcfa=cmd.total_fcfa,
+            telephone=telephone,
+            email=user.email,
+            reference=cmd.numero,
+            description=f"Commande {cmd.numero} — ComeBuy",
+            callback_url=body.get("callback_url") or f"{backend_url}/api/webhooks/notchpay",
+            operator=op_hint,
+        )
     if result.get("success"):
         pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
         if pmt:
@@ -337,14 +347,17 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
 
 @cmd_router.get("/{cmd_id}/statut-paiement-momo")
 async def statut_paiement_momo(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    """Poll le statut d'un paiement MoMo (NotchPay) et marque la commande payée si confirmé."""
+    """Poll le statut d'un paiement MoMo (Campay ou NotchPay) et marque la commande payée si confirmé."""
     cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
     if not cmd: raise HTTPException(404)
     pmt = db.query(Paiement).filter(Paiement.commande_id == cmd_id).first()
     if not pmt or not pmt.reference_externe:
         raise HTTPException(400, "Aucun paiement MoMo initié")
-    from app.services.payment_service import verifier_paiement
-    result = await verifier_paiement(pmt.reference_externe)
+    from app.services.payment_service import verifier_paiement, verifier_paiement_campay, campay_actif
+    if campay_actif():
+        result = await verifier_paiement_campay(pmt.reference_externe)
+    else:
+        result = await verifier_paiement(pmt.reference_externe)
     status = (result.get("status") or "").lower()
     # NotchPay statuts : pending, processing, complete, failed, canceled
     if result.get("success") and (status in ("complete", "completed", "success", "successful") or result.get("simulation")):
