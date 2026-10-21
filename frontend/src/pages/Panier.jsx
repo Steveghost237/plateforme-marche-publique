@@ -19,8 +19,9 @@ export function Panier() {
     lignes: s.lignes, setQty: s.setQty, remove: s.remove
   }))
 
+  const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
   const sousTotal = lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
-  const fraisLiv  = sousTotal >= 5000 ? 0 : 1000
+  const fraisLiv  = lignes.length > 0 && lignes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : 1000
   const total     = sousTotal + fraisLiv
   const points    = Math.floor(total / 500)
 
@@ -147,16 +148,8 @@ export function Panier() {
               </div>
               <div className="flex justify-between text-gray-500">
                 <span>Frais de livraison</span>
-                {fraisLiv === 0
-                  ? <span className="text-green-500 font-semibold">Offerte 🎉</span>
-                  : <span>{fraisLiv.toLocaleString()} F</span>}
+                <span>{fraisLiv.toLocaleString()} F</span>
               </div>
-              {fraisLiv > 0 && (
-                <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1.5 rounded-lg">
-                  <Check size={11}/> Livraison offerte dès 5 000 F
-                  <span className="ml-auto font-semibold">{(5000-sousTotal).toLocaleString()} F restants</span>
-                </div>
-              )}
               {/* Points */}
               <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg">
                 <Star size={11} fill="currentColor"/> +{points} points fidélité gagnés
@@ -202,8 +195,9 @@ export function Checkout() {
   const [newAdr, setNewAdr]           = useState({ quartier:'', ville:'Yaoundé', libelle:'Domicile' })
   const [showNewAdr, setShowNewAdr]   = useState(false)
 
-  // Frais calculés dynamiquement (formule combinée distance + poids)
-  const fraisLiv = sousTotal >= 5000 ? 0 : (fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
+  const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
+  // Frais calculés dynamiquement (formule combinée distance + poids) — minimum 1000 F, gratuit pour le produit test
+  const fraisLiv = lignes.length > 0 && lignes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : Math.max(1000, fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
   const total    = sousTotal + fraisLiv
   const points   = Math.floor(total / 500)
 
@@ -306,7 +300,7 @@ export function Checkout() {
       clear()
       setStep(4)
     } catch(err) {
-      toast.error(err.response?.data?.detail || 'Erreur lors de la commande')
+      toast.error(err.message || err.response?.data?.detail || 'Erreur lors de la commande')
     } finally { setLoading(false) }
   }
 
@@ -356,12 +350,7 @@ export function Checkout() {
             </div>
 
             {/* Détail livraison */}
-            {fraisLiv === 0 ? (
-              <div className="flex justify-between text-sm text-green-600 font-semibold">
-                <span>Livraison</span><span>Offerte 🎉</span>
-              </div>
-            ) : (
-              <div className="bg-blue-50 rounded-xl p-2.5 space-y-1">
+            <div className="bg-blue-50 rounded-xl p-2.5 space-y-1">
                 <p className="text-[10px] font-bold text-blue-600 mb-1">
                   Livraison {fraisInfo?.zone_nom ? `— ${fraisInfo.zone_nom}` : ''}
                   {fraisInfo?.distance_km ? ` (${fraisInfo.distance_km} km)` : ''}
@@ -394,7 +383,6 @@ export function Checkout() {
                   <span>{fraisLiv.toLocaleString()} F</span>
                 </div>
               </div>
-            )}
 
             {/* TOTAL */}
             <div className="flex justify-between font-bold text-[#0D2137] text-lg pt-2 border-t-2 border-[#0D2137]/10">
@@ -457,7 +445,7 @@ export function Checkout() {
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Yaoundé — tous quartiers</span>
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Douala — tous quartiers</span>
                 </div>
-                <p className="text-blue-500 mt-1.5">Frais à partir de 1000 F · Gratuit dès 5 000 F de commande</p>
+                <p className="text-blue-500 mt-1.5">Frais à partir de 1000 F · Livraison jamais gratuite</p>
               </div>
               {adresses.length > 0 ? (
                 <div className="space-y-2 mb-4">
@@ -626,14 +614,11 @@ export function Checkout() {
                 Livraison
                 {fraisLoading && <div className="w-3 h-3 border border-gray-300 border-t-[#0D2137] rounded-full animate-spin"/>}
               </span>
-              {sousTotal >= 5000
-                ? <span className="text-green-500 font-semibold">Offerte 🎉</span>
-                : <span className={fraisInfo ? 'text-[#0D2137] font-semibold' : ''}>{fraisLiv.toLocaleString()} F</span>
-              }
+              <span className={fraisInfo ? 'text-[#0D2137] font-semibold' : ''}>{fraisLiv.toLocaleString()} F</span>
             </div>
 
             {/* Facture livraison détaillée */}
-            {fraisInfo && sousTotal < 5000 && (
+            {fraisInfo && (
               <div className="border border-blue-100 rounded-xl overflow-hidden">
                 <div className="bg-blue-600 px-3 py-1.5 flex items-center justify-between">
                   <span className="text-white text-[10px] font-bold">
@@ -671,13 +656,6 @@ export function Checkout() {
                     <span>{(fraisInfo.frais_total||fraisInfo.frais_fcfa||0).toLocaleString()} F</span>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {sousTotal < 5000 && (
-              <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1.5 rounded-lg">
-                <Check size={11}/> Livraison offerte dès 5 000 F
-                <span className="ml-auto font-semibold">{(5000-sousTotal).toLocaleString()} F restants</span>
               </div>
             )}
 

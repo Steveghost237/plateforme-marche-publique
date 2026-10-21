@@ -38,7 +38,7 @@ function SidebarNav({ current }) {
       ))}
       <div className="mt-4 hidden xl:block bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-3 border border-amber-100">
         <p className="text-xs font-bold text-amber-700 mb-1">🚚 Livraison</p>
-        <p className="text-xs text-amber-600">Offerte dès 5 000 F</p>
+        <p className="text-xs text-amber-600">À partir de 1000 F</p>
         <p className="text-xs text-amber-600 mt-0.5">Yaoundé · Douala</p>
       </div>
     </aside>
@@ -616,13 +616,13 @@ export function ProduitDetail() {
     const pMax = Number(ing.prix_max_fcfa || 0)
     
     // Si pas de variation de prix ou quantité invalide
-    if (qMax === qMin || pMax === pMin) return pMin
+    if (qMax === qMin || pMax === pMin) return Math.min(Math.max(pMin, 50), 100000)
     
     // Calculer le ratio de la quantité actuelle par rapport à la plage
     const ratio = Math.max(0, Math.min(1, (qte - qMin) / (qMax - qMin)))
     
-    // Calculer le prix proportionnel
-    const prix = Math.round(pMin + ratio * (pMax - pMin))
+    // Calculer le prix proportionnel, borné entre 50 et 100 000 FCFA
+    const prix = Math.min(Math.max(Math.round(pMin + ratio * (pMax - pMin)), 50), 100000)
     
     return prix
   }

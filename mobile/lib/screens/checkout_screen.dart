@@ -528,7 +528,10 @@ class _CheckoutScreenState extends State<CheckoutScreen>
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
-    final fraisLiv = cart.sousTotal >= 5000 ? 0 : 1000;
+    const produitTestId = '88a2bd29-d234-4ec8-a35b-6470be95d328';
+    final fraisLiv = cart.items.values.isNotEmpty && cart.items.values.every((item) => item.produit.id == produitTestId)
+        ? 0
+        : 1000;
     final total = cart.sousTotal + fraisLiv;
 
     return Scaffold(
@@ -740,10 +743,9 @@ class _CheckoutScreenState extends State<CheckoutScreen>
                   _recapRow('Articles', '${_formatPrix(cart.sousTotal)} F', false),
                   const SizedBox(height: 8),
                   _recapRow(
-                    fraisLiv == 0 ? 'Livraison offerte' : 'Frais de livraison',
-                    fraisLiv == 0 ? 'Gratuit' : '${_formatPrix(fraisLiv)} F',
+                    'Frais de livraison',
+                    '${_formatPrix(fraisLiv)} F',
                     false,
-                    valueColor: fraisLiv == 0 ? Colors.green.shade600 : null,
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),

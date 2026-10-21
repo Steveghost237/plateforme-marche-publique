@@ -433,14 +433,14 @@ export default function Accueil() {
           <div className={`text-center mb-14 transition-all duration-700 ${fidVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <span className="text-amber-600 text-xs font-bold tracking-[.3em] uppercase block mb-2">Récompenses exclusives</span>
             <h2 className="font-serif text-[#0D2137] font-bold mb-3" style={{fontSize:'clamp(2rem,4vw,3rem)'}}>Programme de Fidélité</h2>
-            <p className="text-gray-500 max-w-md mx-auto text-sm">1 point par tranche de 500 FCFA — échangez contre des réductions et livraisons gratuites.</p>
+            <p className="text-gray-500 max-w-md mx-auto text-sm">1 point par tranche de 500 FCFA — échangez contre des réductions et avantages livraison.</p>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { niveau:'Bronze', pts:'0 – 999 pts',       avantage:'Livraison −10%',  detail:'Sur les frais de livraison',           grad:'from-amber-700 to-amber-600', ring:'ring-amber-200', tc:'text-amber-800', img:'/images/accueil/photo-1549465220-1a8b9238cd48.jpg' },
               { niveau:'Argent', pts:'1 000 – 4 999 pts', avantage:'Réduction −10%',  detail:'Sur le montant total de la commande',   grad:'from-gray-500 to-gray-400',   ring:'ring-gray-200',  tc:'text-gray-600', img:'/images/accueil/photo-1533282960533-51328aa49826.jpg' },
               { niveau:'Or',     pts:'5 000 – 9 999 pts', avantage:'Réduction −15%',  detail:'Sur le total + un produit offert',      grad:'from-amber-500 to-amber-400', ring:'ring-amber-100', tc:'text-amber-600', img:'/images/accueil/photo-1567427017947-545c5f8d16ad.jpg' },
-              { niveau:'VIP',    pts:'10 000+ pts',        avantage:'Réduction −25%',  detail:'Tous avantages + livraison express offerte', grad:'from-purple-700 to-purple-600', ring:'ring-purple-200', tc:'text-purple-700', img:'/images/accueil/photo-1601662528567-526cd06f6582.jpg' },
+              { niveau:'VIP',    pts:'10 000+ pts',        avantage:'Réduction −25%',  detail:'Tous avantages + livraison express prioritaire', grad:'from-purple-700 to-purple-600', ring:'ring-purple-200', tc:'text-purple-700', img:'/images/accueil/photo-1601662528567-526cd06f6582.jpg' },
             ].map((n, i) => (
               <div key={n.niveau}
                 className={`rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 hover:-translate-y-1

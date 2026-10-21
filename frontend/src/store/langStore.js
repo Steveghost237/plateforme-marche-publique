@@ -65,7 +65,7 @@ const fr = {
   cart_total: 'Total',
   cart_subtotal: 'Sous-total',
   cart_delivery: 'Frais de livraison',
-  cart_free_delivery: 'Livraison offerte',
+  cart_free_delivery: 'Livraison à partir de 1000 F',
   cart_checkout: 'Commander',
   cart_continue_shopping: 'Continuer mes achats',
   cart_remove: 'Supprimer',

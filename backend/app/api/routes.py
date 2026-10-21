@@ -217,9 +217,12 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
             pointe = est_heure_pointe(datetime.utcnow())
             frais  = calculer_frais_livraison(dist, pointe, db, poids_kg)
 
-    # Livraison offerte si commande >= 5000 FCFA
-    if sous_total >= 5000:
+    # Frais de livraison minimum 1000 FCFA, sauf produit test "Produit Test Campay"
+    PRODUIT_TEST_LIVRAISON_GRATUITE = UUID("88a2bd29-d234-4ec8-a35b-6470be95d328")
+    if all(l.produit_id == PRODUIT_TEST_LIVRAISON_GRATUITE for l in p.lignes):
         frais = 0
+    else:
+        frais = max(1000, frais)
 
     total = sous_total + frais
     cmd = Commande(numero=_numero(db), client_id=user.id, adresse_id=p.adresse_id,

@@ -70,7 +70,7 @@ def detail_frais(distance_km: float, pointe: bool, db: Session, poids_kg: float 
     sous_total    = frais_base + part_distance + part_poids
 
     majoration = round(sous_total * maj_pct / 100) if pointe else 0
-    frais_total = max(100, sous_total + majoration)  # minimum 100 FCFA
+    frais_total = max(1000, sous_total + majoration)  # minimum 1000 FCFA, livraison jamais gratuite
 
     return {
         "frais_total":     frais_total,

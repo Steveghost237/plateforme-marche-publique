@@ -165,10 +165,10 @@ export default function AdminPrix() {
                     {/* Prix de base */}
                     <div className="col-span-2 text-right">
                       {isEditing ? (
-                        <input type="number" min="0"
+                        <input type="number" min="50" max="100000"
                           className="w-full border border-amber-300 rounded-lg px-2 py-1 text-xs text-right focus:outline-none focus:border-amber-500 bg-amber-50"
                           value={editVal.prix_base_fcfa}
-                          onChange={e => setEditVal(v=>({...v, prix_base_fcfa: parseInt(e.target.value)||0}))}/>
+                          onChange={e => setEditVal(v=>({...v, prix_base_fcfa: Math.min(Math.max(parseInt(e.target.value)||0, 50), 100000)}))}/>
                       ) : (
                         <span className="font-bold text-amber-600 text-sm">{(p.prix_base_fcfa||0).toLocaleString()} F</span>
                       )}
@@ -177,11 +177,11 @@ export default function AdminPrix() {
                     {/* Prix max */}
                     <div className="col-span-2 text-right">
                       {isEditing ? (
-                        <input type="number" min="0"
+                        <input type="number" min="50" max="100000"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-right focus:outline-none bg-white"
                           placeholder="–"
                           value={editVal.prix_max_fcfa}
-                          onChange={e => setEditVal(v=>({...v, prix_max_fcfa: e.target.value ? parseInt(e.target.value) : ''}))}/>
+                          onChange={e => setEditVal(v=>({...v, prix_max_fcfa: e.target.value ? Math.min(Math.max(parseInt(e.target.value), 50), 100000) : ''}))}/>
                       ) : (
                         <span className="text-xs text-gray-400">{p.prix_max_fcfa ? p.prix_max_fcfa.toLocaleString() + ' F' : '—'}</span>
                       )}

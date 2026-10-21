@@ -277,7 +277,7 @@ export function Fidelite() {
 
   const RECOMPENSES_DEFAUT = [
     { emoji:'🎁', nom:'−15% sur votre commande', desc:'Valable 30 jours · Niveau OR', pts:750 },
-    { emoji:'🚚', nom:'Livraison offerte',          desc:'Sur prochaine commande',     pts:500 },
+    { emoji:'🚚', nom:'−20% sur la livraison',    desc:'Sur prochaine commande',     pts:500 },
     { emoji:'🛒', nom:'Produit offert',             desc:'Fruit au choix ≤ 500F',      pts:1000 },
   ]
 
@@ -483,7 +483,7 @@ export function MesAdresses() {
 export function Aide() {
   const FAQ = [
     { q: 'Comment passer une commande ?', a: 'Parcourez le catalogue, ajoutez des produits au panier, puis finalisez votre commande en choisissant un créneau de livraison et un mode de paiement.' },
-    { q: 'Quels sont les frais de livraison ?', a: 'Les frais de livraison sont de 500 FCFA. La livraison est offerte pour toute commande supérieure ou égale à 5 000 FCFA.' },
+    { q: 'Quels sont les frais de livraison ?', a: 'Les frais de livraison sont calculés selon la distance et le poids, avec un minimum de 1000 FCFA. Aucune livraison n\'est gratuite.' },
     { q: 'Comment fonctionne le programme fidélité ?', a: 'Vous gagnez 1 point par tranche de 500 FCFA dépensés. Accumulez des points pour monter de niveau et débloquer des récompenses.' },
     { q: 'Comment annuler une commande ?', a: 'Vous pouvez annuler une commande tant qu\'elle n\'a pas encore été assignée à un livreur, depuis la page Mes Commandes.' },
     { q: 'Quels modes de paiement acceptez-vous ?', a: 'MTN Mobile Money, Orange Money, et paiement en espèces à la livraison.' },

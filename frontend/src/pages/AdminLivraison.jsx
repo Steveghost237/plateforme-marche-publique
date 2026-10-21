@@ -166,7 +166,7 @@ export default function AdminLivraison() {
               <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
                 <span className="flex items-center gap-1"><Zap size={10} className="text-amber-500"/> Majoration Lun–Ven : 11h–14h et 18h–22h</span>
                 <span className="flex items-center gap-1 text-gray-400">🚫 Pas de majoration le weekend</span>
-                <span className="flex items-center gap-1 text-green-600">✓ Livraison offerte ≥ 5 000 FCFA</span>
+                <span className="flex items-center gap-1 text-green-600">✓ Minimum 1000 FCFA · jamais gratuite</span>
               </div>
             </div>
           </div>

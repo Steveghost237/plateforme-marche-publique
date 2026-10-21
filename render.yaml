@@ -25,7 +25,13 @@ services:
         value: '["*"]'
       - key: DEBUG
         value: false
-      # ── NotchPay Mobile Money (MTN MoMo / Orange Money) ──
+      # ── Campay Mobile Money (MTN MoMo / Orange Money) ──
+      # Obtenir sur https://campay.net ou https://dev.campay.net → Applications
+      - key: CAMPAY_TOKEN
+        sync: false
+      - key: CAMPAY_BASE_URL
+        value: https://demo.campay.net
+      # ── NotchPay Mobile Money (fallback si Campay absent) ──
       # Obtenir sur https://business.notchpay.co → Settings → API Keys
       - key: NOTCHPAY_PUBLIC_KEY
         sync: false

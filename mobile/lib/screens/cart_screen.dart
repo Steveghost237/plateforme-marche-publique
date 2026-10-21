@@ -266,15 +266,19 @@ class CartScreen extends StatelessWidget {
                               color: Colors.grey,
                             ),
                           ),
-                          if (cart.sousTotal >= 5000)
-                            const Text(
-                              'Livraison offerte',
+                          Builder(builder: (context) {
+                            const produitTestId = '88a2bd29-d234-4ec8-a35b-6470be95d328';
+                            final livraisonGratuite = cart.items.values.isNotEmpty &&
+                                cart.items.values.every((item) => item.produit.id == produitTestId);
+                            return Text(
+                              livraisonGratuite ? 'Livraison offerte' : 'Livraison à partir de 1000 F',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.green,
+                                color: livraisonGratuite ? Colors.green : Colors.grey[600],
                                 fontWeight: FontWeight.w600,
                               ),
-                            ),
+                            );
+                          }),
                         ],
                       ),
                       const SizedBox(height: 16),

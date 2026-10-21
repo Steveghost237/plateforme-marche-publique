@@ -46,7 +46,7 @@ class LangProvider extends ChangeNotifier {
     'subtotal': 'Sous-total',
     'delivery_fee': 'Frais de livraison',
     'total': 'Total',
-    'free_delivery': 'Livraison offerte',
+    'free_delivery': 'Livraison à partir de 1000 F',
     'order_success': 'Commande passée avec succès !',
     'mtn_momo': 'MTN Mobile Money',
     'orange_money': 'Orange Money',

@@ -54,11 +54,17 @@ class _MenuCustomizationScreenState extends State<MenuCustomizationScreen> {
   }
 
   double _calculerPrixCurseur(Ingredient ingredient, double quantite) {
-    if (quantite <= ingredient.quantiteMin) return 0.0;
-    if (quantite >= ingredient.quantiteMax) return ingredient.prixMaxFcfa.toDouble();
-    
-    final ratio = (quantite - ingredient.quantiteMin) / (ingredient.quantiteMax - ingredient.quantiteMin);
-    return ingredient.prixMinFcfa + (ratio * (ingredient.prixMaxFcfa - ingredient.prixMinFcfa));
+    double prix;
+    if (quantite <= ingredient.quantiteMin) {
+      prix = 0.0;
+    } else if (quantite >= ingredient.quantiteMax) {
+      prix = ingredient.prixMaxFcfa.toDouble();
+    } else {
+      final ratio = (quantite - ingredient.quantiteMin) / (ingredient.quantiteMax - ingredient.quantiteMin);
+      prix = ingredient.prixMinFcfa + (ratio * (ingredient.prixMaxFcfa - ingredient.prixMinFcfa));
+    }
+    // Prix personnalisable borné entre 50 et 100 000 FCFA
+    return prix.clamp(50.0, 100000.0);
   }
 
   void _updateCurseur(Ingredient ingredient, double valeur) {
