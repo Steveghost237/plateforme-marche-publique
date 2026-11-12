@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Search, CheckCircle, XCircle, Bike, Shield, ShieldOff, Star, TrendingUp, Eye, X, MapPin } from 'lucide-react'
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
+import { useConfirm } from '../components/common/useConfirm'
 
 const STATUT_STYLE = {
   disponible: 'bg-green-50 text-green-600',
@@ -45,7 +46,10 @@ export default function AdminLivreurs() {
     return matchSearch && matchStatut
   })
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const toggleVerif = async (livreurId) => {
+    if (!await confirm({ titre: 'Modifier la vérification ?', message: 'Le statut "vérifié" de ce livreur sera basculé.', confirmLabel: 'Confirmer' })) return
     try {
       await api.put(`/admin/livreurs/${livreurId}/verifier`)
       fetchLivreurs()
@@ -64,6 +68,7 @@ export default function AdminLivreurs() {
 
   return (
     <AdminLayout title="Gestion des Livreurs">
+      {ConfirmDialog}
       {erreur && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
           {erreur}

@@ -1,6 +1,8 @@
 {
+ "supermont-1-5l": "/static/images/produits/supermont-1-5l.jpg",
  "tangui-1-5l": "/static/images/produits/tangui-1-5l.jpg",
  "source-du-pays-1-5l": "/static/images/produits/source-du-pays-1-5l.jpg",
+ "vitale-1-5l": "/static/images/produits/vitale-1-5l.jpg",
  "eau-sachet-pure-water-x10": "/static/images/produits/eau-sachet-pure-water-x10.jpg",
  "coca-cola-50cl": "/static/images/produits/coca-cola-50cl.jpg",
  "goyave": "/static/images/produits/goyave.jpg",
@@ -27,6 +29,7 @@
  "beaufort-biere-65cl": "/static/images/produits/beaufort-biere-65cl.jpg",
  "ecrevisses-sechees-100g": "/static/images/produits/ecrevisses-sechees-100g.jpg",
  "kadji-beer-65cl": "/static/images/produits/kadji-beer-65cl.jpg",
+ "isenbeck-65cl": "/static/images/produits/isenbeck-65cl.jpg",
  "harp-lager-65cl": "/static/images/produits/harp-lager-65cl.jpg",
  "red-bull-25cl": "/static/images/produits/red-bull-25cl.jpg",
  "monster-energy-50cl": "/static/images/produits/monster-energy-50cl.jpg",

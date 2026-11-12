@@ -7,14 +7,12 @@ from uuid import UUID
 class DemandeOTPIn(BaseModel):
     telephone: str
     operateur: Optional[str] = None
-    email: Optional[str] = None  # Email pour envoi OTP par Gmail
+    email: str  # Obligatoire : le code OTP est envoyé par email
 
     @field_validator("email")
     @classmethod
     def validate_email(cls, v):
         import re
-        if v is None:
-            return v
         v = v.strip().lower()
         if not re.match(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", v):
             raise ValueError("Adresse email invalide")
@@ -29,6 +27,7 @@ class FinaliserInscriptionIn(BaseModel):
     nom_complet: str
     mot_de_passe: str
     email: Optional[str] = None
+    telephone_secondaire: Optional[str] = None
     role: Optional[str] = "client"
 
     @field_validator("mot_de_passe")
@@ -49,6 +48,7 @@ class RefreshIn(BaseModel):
 class UtilisateurOut(BaseModel):
     id: UUID
     telephone: str
+    telephone_secondaire: Optional[str] = None
     nom_complet: str
     email: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -67,6 +67,7 @@ class UtilisateurUpdateIn(BaseModel):
     nom_complet: Optional[str] = None
     email: Optional[str] = None
     avatar_url: Optional[str] = None
+    telephone_secondaire: Optional[str] = None
 
 # ── ADRESSES ──────────────────────────────────
 class AdresseIn(BaseModel):
@@ -185,6 +186,19 @@ class EvaluationIn(BaseModel):
     commande_id: UUID
     note: int
     commentaire: Optional[str] = None
+    @field_validator("note")
+    @classmethod
+    def check_note(cls, v):
+        if not 1 <= v <= 5: raise ValueError("Note entre 1 et 5")
+        return v
+
+class SondageIn(BaseModel):
+    heure: Optional[str] = None
+    lieu: Optional[str] = None
+    conformite: Optional[str] = None
+    note: int
+    commentaire: Optional[str] = None
+    publier_temoignage: bool = True
     @field_validator("note")
     @classmethod
     def check_note(cls, v):

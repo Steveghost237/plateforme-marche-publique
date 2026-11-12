@@ -36,8 +36,12 @@ export function getImageUrl(url) {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) return url
   // Encoder chaque segment du path (gère espaces et accents)
+  // decodeURIComponent d'abord : évite le double encodage si l'URL est déjà encodée (%20)
   const path = url.startsWith('/') ? url : '/' + url
-  const encoded = path.split('/').map(s => s ? encodeURIComponent(s) : s).join('/')
+  const encoded = path.split('/').map(s => {
+    if (!s) return s
+    try { return encodeURIComponent(decodeURIComponent(s)) } catch { return encodeURIComponent(s) }
+  }).join('/')
   return `${API_ORIGIN}${encoded}`
 }
 

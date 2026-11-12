@@ -35,9 +35,9 @@ def _send_otp_sms_sync(telephone: str, otp: str, contexte: str = "inscription"):
         # Appeler la coroutine asynchrone dans un nouvel event loop
         result = asyncio.run(envoyer_sms(tel, msg))
         if result.get("success"):
-            print(f"[SMS OTP ✓] {tel} - simulation={result.get('simulation', False)}")
+            print(f"[SMS OTP OK] {tel} - simulation={result.get('simulation', False)}")
         else:
-            print(f"[SMS OTP ✗] {tel} - erreur: {result.get('error')}")
+            print(f"[SMS OTP ERR] {tel} - erreur: {result.get('error')}")
         return result
     except Exception as e:
         print(f"[SMS OTP EXCEPTION] {e}")
@@ -78,7 +78,19 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
     if user and user.statut == "actif":
         raise HTTPException(409, "Numéro déjà enregistré")
-    
+
+    # Email déjà utilisé par un AUTRE numéro ?
+    email_owner = db.query(Utilisateur).filter(
+        Utilisateur.email == p.email,
+        Utilisateur.telephone != p.telephone
+    ).first()
+    if email_owner:
+        if email_owner.statut == "actif":
+            raise HTTPException(409, "Adresse email déjà utilisée par un autre compte")
+        # Compte en attente jamais finalisé : libérer l'email
+        email_owner.email = None
+        db.commit()
+
     # Générer un OTP unique qui n'a jamais été utilisé pour cet utilisateur
     max_attempts = 10
     otp = None
@@ -136,9 +148,13 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
         user.otp_tentatives = 0
         if p.email:
             user.email = p.email
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409, "Numéro ou adresse email déjà utilisé")
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
-    print(f"[OTP DEV] {p.telephone} → {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
+    print(f"[OTP DEV] {p.telephone} -> {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
 
     # ── Envoi OTP par EMAIL (prioritaire) ──
     email_result = {"success": False, "error": "Pas d'email fourni"}
@@ -153,10 +169,11 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
 
     delivery_ok   = email_result.get("success") or sms_result.get("success")
     canal         = "email" if email_result.get("success") else ("sms" if sms_result.get("success") else "none")
-    resp = {"message": f"OTP envoyé par {canal}" if delivery_ok else "OTP généré"}
-    # Exposer l'OTP si aucun canal de livraison n'a fonctionné (fallback MVP)
-    if not delivery_ok or debug:
-        resp["otp_dev"] = otp
+    if not delivery_ok:
+        # Le code ne doit JAMAIS être exposé dans l'interface : si aucun canal
+        # n'a fonctionné, on refuse et l'utilisateur réessaie (code en console serveur pour le dev)
+        raise HTTPException(503, "Impossible d'envoyer le code de vérification. Vérifiez votre adresse email et réessayez.")
+    resp = {"message": f"OTP envoyé par {canal}"}
     if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
@@ -227,7 +244,14 @@ def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
     user.nom_complet = p.nom_complet
     user.mot_de_passe_hash = hash_password(p.mot_de_passe)
     if p.email:
+        email_owner = db.query(Utilisateur).filter(
+            Utilisateur.email == p.email, Utilisateur.id != user.id
+        ).first()
+        if email_owner and email_owner.statut == "actif":
+            raise HTTPException(409, "Adresse email déjà utilisée par un autre compte")
         user.email = p.email
+    if p.telephone_secondaire:
+        user.telephone_secondaire = p.telephone_secondaire
     user.statut = "actif"
     # Assigner le rôle choisi (client ou livreur uniquement, pas admin)
     role = p.role if p.role in ("client", "livreur") else "client"
@@ -239,7 +263,11 @@ def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
         existing_livreur = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
         if not existing_livreur:
             db.add(Livreur(utilisateur_id=user.id, statut="disponible", niveau="debutant"))
-    db.commit(); db.refresh(user)
+    try:
+        db.commit(); db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Numéro ou adresse email déjà utilisé")
 
     # ── Email de bienvenue ──
     if user.email and is_valid_email(user.email):
@@ -290,7 +318,7 @@ def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)
     user.otp_tentatives = 0
     db.commit()
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
-    print(f"[RESET OTP] {telephone} → {otp}")
+    print(f"[RESET OTP] {telephone} -> {otp}")
 
     # ── Envoi OTP reset par EMAIL (prioritaire si email connu) ──
     email_result = {"success": False}
@@ -305,7 +333,6 @@ def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)
     canal = "email" if email_result.get("success") else "sms"
     resp = {"message": f"Code de réinitialisation envoyé par {canal}"}
     if debug:
-        resp["otp_dev"] = otp
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
     return resp

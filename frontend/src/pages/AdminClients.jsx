@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Search, Users, UserCheck, UserX, ChevronLeft, ChevronRight, Eye, X, Shield, ShieldOff, Mail, Phone, Calendar } from 'lucide-react'
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
+import { useConfirm } from '../components/common/useConfirm'
 
 export default function AdminClients() {
   const [data, setData] = useState({ total: 0, users: [] })
@@ -30,8 +31,16 @@ export default function AdminClients() {
       )
     : data.users
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const toggleStatut = async (userId, currentStatut) => {
     const newStatut = currentStatut === 'actif' ? 'suspendu' : 'actif'
+    if (!await confirm({
+      titre: newStatut === 'suspendu' ? 'Suspendre ce client ?' : 'Réactiver ce client ?',
+      message: newStatut === 'suspendu' ? "Le client ne pourra plus utiliser son compte." : "Le client retrouvera l'accès à son compte.",
+      confirmLabel: newStatut === 'suspendu' ? 'Suspendre' : 'Réactiver',
+      danger: newStatut === 'suspendu',
+    })) return
     try {
       await api.put(`/admin/utilisateurs/${userId}/statut`, { statut: newStatut })
       fetchClients()
@@ -49,6 +58,7 @@ export default function AdminClients() {
 
   return (
     <AdminLayout title="Gestion des Clients">
+      {ConfirmDialog}
       {erreur && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
           {erreur}

@@ -894,17 +894,39 @@ export function Recherche() {
   const [q, setQ]          = useState('')
   const [results, setRes]  = useState([])
   const [loading, setLoad] = useState(false)
+  const [filtre, setFiltre]   = useState('tous')
+  const [secFiltre, setSec]   = useState('tous')
+  const [prixMax, setPrixMax] = useState('')
 
   useEffect(() => {
     if (!q.trim()) { setRes([]); return }
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       setLoad(true)
-      api.get(`/catalogue/produits?q=${encodeURIComponent(q)}&limit=24`)
-        .then(r => setRes(r.data)).catch(() => {})
-        .finally(() => setLoad(false))
+      try {
+        let all = [], page = 1
+        while (true) {
+          const r = await api.get(`/catalogue/produits?q=${encodeURIComponent(q)}&page=${page}&limit=100`)
+          all = all.concat(r.data)
+          if (r.data.length < 100) break
+          page += 1
+        }
+        setRes(all)
+      } catch { /* silencieux */ }
+      finally { setLoad(false) }
     }, 380)
     return () => clearTimeout(t)
   }, [q])
+
+  const filtered = results.filter(p => {
+    if (secFiltre !== 'tous' && p.section?.code !== secFiltre) return false
+    if (filtre === 'populaire'  && !p.est_populaire) return false
+    if (filtre === 'nouveau'    && !p.est_nouveau)   return false
+    if (filtre === 'disponible' && !p.stock_dispo)   return false
+    if (prixMax && p.prix_base_fcfa > Number(prixMax)) return false
+    return true
+  })
+  // Sections présentes dans les résultats (pour le filtre)
+  const secs = [...new Map(results.map(p => [p.section?.code, p.section?.nom]).filter(([c]) => c)).entries()]
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
@@ -935,13 +957,49 @@ export function Recherche() {
         )}
         {!loading && results.length > 0 && (
           <>
-            <p className="text-sm text-gray-500 mb-5">{results.length} résultat{results.length>1?'s':''} pour « {q} »</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {results.map((p, i) => {
-                const m = SECTION_META[p.section?.code] || SECTION_META.menus_ingredients
-                return <ProduitCard key={p.id} produit={p} fallback={m.fallbacks[i % m.fallbacks.length]}/>
-              })}
+            {/* Barre de filtres */}
+            <div className="flex flex-wrap gap-3 mb-5 items-center">
+              {secs.length > 1 && (
+                <select value={secFiltre} onChange={e => setSec(e.target.value)}
+                  className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] min-h-[44px]">
+                  <option value="tous">Toutes les sections</option>
+                  {secs.map(([code, nom]) => <option key={code} value={code}>{nom}</option>)}
+                </select>
+              )}
+              <div className="flex gap-1.5 flex-wrap">
+                {[['tous','Tous'],['populaire','⭐ Populaires'],['nouveau','✨ Nouveaux'],['disponible','✅ Dispo']].map(([v,l]) => (
+                  <button key={v} onClick={() => setFiltre(v)}
+                    className={`text-xs font-semibold px-3 py-2.5 min-h-[44px] rounded-lg transition-colors ${filtre===v ? 'bg-[#0D2137] text-white' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div className="relative w-32">
+                <input type="number" inputMode="numeric" placeholder="Prix max"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-[#0D2137] min-h-[44px]"
+                  value={prixMax} onChange={e => setPrixMax(e.target.value)} min={0} step={500}/>
+                {prixMax && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">FCFA</span>}
+              </div>
             </div>
+
+            <p className="text-sm text-gray-500 mb-5">
+              {filtered.length} résultat{filtered.length>1?'s':''} pour « {q} »
+              {filtered.length !== results.length && ` (${results.length} au total)`}
+            </p>
+            {filtered.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filtered.map((p, i) => {
+                  const m = SECTION_META[p.section?.code] || SECTION_META.menus_ingredients
+                  return <ProduitCard key={p.id} produit={p} fallback={m.fallbacks[i % m.fallbacks.length]}/>
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-white rounded-2xl">
+                <p className="text-gray-500">Aucun résultat ne correspond aux filtres.</p>
+                <button onClick={() => { setFiltre('tous'); setSec('tous'); setPrixMax('') }}
+                  className="mt-3 text-sm font-semibold text-[#0D2137] underline">Réinitialiser les filtres</button>
+              </div>
+            )}
           </>
         )}
         {!q && (

@@ -35,7 +35,7 @@ def _marquer_payee(cmd: Commande, pmt: Paiement | None, db: Session, mode: str) 
         donnees_json={"commande_id": str(cmd.id)},
     ))
     db.commit()
-    print(f"[WEBHOOK] Commande {cmd.numero} → payee (via {mode})")
+    print(f"[WEBHOOK] Commande {cmd.numero} -> payee (via {mode})")
 
 
 # ══════════════════════════════════════════════════════════

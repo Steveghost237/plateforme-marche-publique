@@ -191,6 +191,7 @@ export function Checkout() {
   const [fraisLoading, setFraisLoading] = useState(false)
   const [cmdNumero, setCmdNumero]     = useState('')
   const [lignesSnap, setLignesSnap]   = useState([])
+  const [totauxSnap, setTotauxSnap]   = useState({ sous: 0, frais: 0, total: 0, points: 0 })
   const [loading, setLoading]         = useState(false)
   const [newAdr, setNewAdr]           = useState({ quartier:'', ville:'Yaoundé', libelle:'Domicile' })
   const [showNewAdr, setShowNewAdr]   = useState(false)
@@ -297,6 +298,7 @@ export function Checkout() {
       }
       setCmdNumero(cmd.numero)
       setLignesSnap(lignes)
+      setTotauxSnap({ sous: sousTotal, frais: fraisLiv, total, points })
       clear()
       setStep(4)
     } catch(err) {
@@ -346,7 +348,7 @@ export function Checkout() {
           <div className="border-t border-gray-100 pt-2 space-y-1.5">
             <div className="flex justify-between text-sm text-gray-500">
               <span>Sous-total produits</span>
-              <span>{sousTotal.toLocaleString()} F</span>
+              <span>{totauxSnap.sous.toLocaleString()} F</span>
             </div>
 
             {/* Détail livraison */}
@@ -380,19 +382,19 @@ export function Checkout() {
                 )}
                 <div className="flex justify-between text-xs font-bold text-[#0D2137] pt-1 border-t border-blue-200">
                   <span>Total livraison</span>
-                  <span>{fraisLiv.toLocaleString()} F</span>
+                  <span>{totauxSnap.frais.toLocaleString()} F</span>
                 </div>
               </div>
 
             {/* TOTAL */}
             <div className="flex justify-between font-bold text-[#0D2137] text-lg pt-2 border-t-2 border-[#0D2137]/10">
               <span>TOTAL</span>
-              <span className="text-amber-500">{total.toLocaleString()} F</span>
+              <span className="text-amber-500">{totauxSnap.total.toLocaleString()} F</span>
             </div>
           </div>
 
           <div className="mt-3 bg-amber-50 rounded-xl p-2.5 text-xs text-amber-700 text-center">
-            ⭐ +{points} points fidélité crédités à la livraison
+            ⭐ +{totauxSnap.points} points fidélité crédités à la livraison
           </div>
           <div className="mt-2 bg-blue-50 rounded-xl p-2.5 text-xs text-blue-700 text-center">
             🛵 Votre livreur se rend au marché — vous serez notifié à chaque étape

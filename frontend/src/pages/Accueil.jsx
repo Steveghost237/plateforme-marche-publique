@@ -66,9 +66,9 @@ const FALLBACK_PRODUCTS = [
 ]
 
 const TESTIMONIALS = [
-  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'/images/accueil/photo-1531746020798-e6953c6e8e04.jpg', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
-  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'/images/accueil/photo-1507003211169-0a1dd7228f2d.jpg', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
-  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'/images/accueil/photo-1592621385612-4d7129426394.jpg', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
+  { name:'Marie-Claire Fouda', role:'Cliente depuis 8 mois', city:'Yaoundé, Bastos',      note:5, avatar:'/images/accueil/temoignage-marie-claire.jpg', text:'Je commande chaque semaine mon ERU. Les ingrédients arrivent toujours frais, exactement comme je les aurais choisis moi-même au marché. Le service est impeccable.' },
+  { name:'Patrick Ngoumou',    role:'Client depuis 5 mois',  city:'Yaoundé, Centre-ville', note:5, avatar:'/images/accueil/temoignage-patrick.jpg', text:'En tant que professionnel chargé, cette plateforme m\'a changé la vie. Je commande le matin, je reçois avant midi. La qualité des produits est vraiment au rendez-vous.' },
+  { name:'Sylvie Mboumba',     role:'Cliente VIP',           city:'Douala, Akwa',          note:5, avatar:'/images/accueil/temoignage-sylvie.jpg', text:'Le programme de fidélité est excellent. En quelques mois j\'ai atteint le niveau Or et je bénéficie de réductions à chaque commande. Je recommande à tous.' },
 ]
 
 // ── Hook: Intersection Observer ───────────────────────────────
@@ -97,7 +97,8 @@ export default function Accueil() {
   const t = useT()
   const [slide, setSlide]       = useState(0)
   const [sliding, setSliding]   = useState(false)
-  const [products, setProducts] = useState(FALLBACK_PRODUCTS)
+  const [products, setProducts]       = useState(FALLBACK_PRODUCTS)
+  const [testimonials, setTestimonials] = useState(TESTIMONIALS)
   const timerRef = useRef(null)
 
   // Refs for scroll animations
@@ -110,7 +111,8 @@ export default function Accueil() {
   const [ctaRef, ctaVis]   = useInView()
 
   useEffect(() => {
-    api.get('/catalogue/produits?populaire=true&limit=6').then(r => { if (r.data?.length) setProducts(r.data) }).catch(() => {})
+    api.get('/catalogue/produits?tri=commandes&limit=6').then(r => { if (r.data?.length) setProducts(r.data) }).catch(() => {})
+    api.get('/temoignages').then(r => { if (r.data?.length) setTestimonials(r.data) }).catch(() => {})
   }, [])
 
   const startTimer = useCallback(() => {
@@ -477,7 +479,7 @@ export default function Accueil() {
             <p className="text-gray-500 text-sm">Plus de 2 500 familles nous font confiance à Yaoundé et Douala</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, i) => (
+            {testimonials.map((t, i) => (
               <div key={t.name}
                 className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-500
                   ${tesVis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}

@@ -209,6 +209,7 @@ export default function AdminCommandes() {
               {[
                 ['Client', modal.commande.client_nom],
                 ['Téléphone', modal.commande.client_telephone],
+                ['Tél. secours', modal.commande.client_telephone2],
                 ['Statut', modal.commande.statut?.replace(/_/g, ' ')],
                 ['Montant', `${modal.commande.total_fcfa?.toLocaleString()} FCFA`],
                 ['Sous-total', `${modal.commande.sous_total_fcfa?.toLocaleString()} FCFA`],

@@ -23,6 +23,19 @@ with engine.connect() as conn:
         print("Migration: colonne derniere_plateforme OK")
     except Exception as e:
         print(f"Migration info: {e}")
+    # Colonnes sondage post-livraison sur evaluations + 2e téléphone (idempotent)
+    for stmt in [
+        "ALTER TABLE utilisateurs ADD COLUMN telephone_secondaire VARCHAR(20)",
+        "ALTER TABLE evaluations ADD COLUMN heure VARCHAR(30)",
+        "ALTER TABLE evaluations ADD COLUMN lieu VARCHAR(30)",
+        "ALTER TABLE evaluations ADD COLUMN conformite VARCHAR(20)",
+        "ALTER TABLE evaluations ADD COLUMN publier_temoignage BOOLEAN DEFAULT TRUE",
+    ]:
+        try:
+            conn.execute(text(stmt))
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
 db = SessionLocal()
 

@@ -10,10 +10,12 @@ from app.core.database import get_db
 from app.core.security import get_current_user, get_current_admin, get_optional_user
 from app.models.models import (Section, Produit, Ingredient, Adresse, Commande, CommandeLigne,
     CommandeIngredient, Paiement, Livreur, FideliteCompte, FideliteTransaction, FideliteRecompense,
-    Notification, Evaluation, Utilisateur, Parametre, ListeFavorite, ListeFavoriteLigne, ZoneLivraison)
+    Notification, Evaluation, Utilisateur, Parametre, ListeFavorite, ListeFavoriteLigne, ZoneLivraison,
+    Temoignage)
 from app.api.routes_extra import calculer_frais_livraison, haversine, MARCHE_LAT, MARCHE_LON, est_heure_pointe
+from app.services.email_service import send_acceptation_emails, is_valid_email
 from app.schemas.schemas import (SectionOut, ProduitListOut, ProduitOut, ProduitCreateIn, AdresseIn,
-    AdresseOut, CommandeCreateIn, CommandeOut, EvaluationIn, PaiementOut, FideliteOut, FideliteTxOut,
+    AdresseOut, CommandeCreateIn, CommandeOut, EvaluationIn, SondageIn, PaiementOut, FideliteOut, FideliteTxOut,
     NotifOut, DashboardOut, UtilisateurOut)
 
 # ══════════════════════════════════════════════
@@ -30,6 +32,7 @@ def list_produits(
     section: Optional[str] = None,
     populaire: Optional[bool] = None,
     q: Optional[str] = None,
+    tri: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -43,6 +46,27 @@ def list_produits(
     if q:
         query = query.filter(or_(func.lower(Produit.nom).contains(q.lower()),
                                   func.lower(Produit.description).contains(q.lower())))
+    if tri == "commandes":
+        # Classement réel : nb de lignes de commande par produit (commandes payées ou plus)
+        nb = func.count(CommandeLigne.id)
+        ranked = (db.query(CommandeLigne.produit_id, nb.label("nb"))
+                  .join(Commande, CommandeLigne.commande_id == Commande.id)
+                  .filter(~Commande.statut.in_(["brouillon", "en_attente_paiement", "annulee"]))
+                  .group_by(CommandeLigne.produit_id)
+                  .order_by(nb.desc(), func.sum(CommandeLigne.quantite).desc())
+                  .offset((page-1)*limit).limit(limit).all())
+        ids = [r.produit_id for r in ranked]
+        produits = query.filter(Produit.id.in_(ids)).all() if ids else []
+        rank = {pid: i for i, pid in enumerate(ids)}
+        produits.sort(key=lambda p: rank.get(p.id, len(ids)))
+        if len(produits) < limit:
+            extra = (db.query(Produit).options(joinedload(Produit.section))
+                     .filter(Produit.est_actif == True, Produit.deleted_at.is_(None),
+                             Produit.est_populaire == True,
+                             ~Produit.id.in_(ids or [_uuid.UUID(int=0)]))
+                     .order_by(Produit.ordre, Produit.nom).limit(limit - len(produits)).all())
+            produits += extra
+        return produits
     return query.order_by(Produit.ordre, Produit.nom).offset((page-1)*limit).limit(limit).all()
 
 @cat_router.get("/produits/{slug}", response_model=ProduitOut)
@@ -112,6 +136,16 @@ def delete_produit(produit_id: UUID, db: Session = Depends(get_db), _=Depends(ge
 # ══════════════════════════════════════════════
 # ADRESSES
 # ══════════════════════════════════════════════
+# ── TÉMOIGNAGES (public) ──────────────────────────────────────
+tem_router = APIRouter(prefix="/temoignages", tags=["Témoignages"])
+
+@tem_router.get("/")
+def list_temoignages(db: Session = Depends(get_db)):
+    rows = (db.query(Temoignage).filter(Temoignage.est_publie == True)
+            .order_by(Temoignage.ordre, Temoignage.created_at.desc()).limit(12).all())
+    return [{"name": t.nom, "role": t.role, "city": t.ville, "note": t.note,
+             "avatar": t.avatar_url, "text": t.texte} for t in rows]
+
 adr_router = APIRouter(prefix="/adresses", tags=["Adresses"])
 
 @adr_router.get("/", response_model=List[AdresseOut])
@@ -225,11 +259,32 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
         frais = max(1000, frais)
 
     total = sous_total + frais
-    cmd = Commande(numero=_numero(db), client_id=user.id, adresse_id=p.adresse_id,
-                   creneau=p.creneau, date_livraison=p.date_livraison,
-                   sous_total_fcfa=sous_total, frais_livraison=frais, total_fcfa=total,
-                   points_gagnes=total//500, statut="en_attente_paiement", note_client=p.note_client)
-    db.add(cmd); db.flush()
+
+    # Réutiliser la commande en attente de paiement la plus récente pour éviter
+    # les doublons quand le client relance le checkout avant d'avoir payé.
+    pending = (db.query(Commande)
+               .filter(Commande.client_id == user.id, Commande.statut == "en_attente_paiement")
+               .order_by(Commande.created_at.desc()).all())
+    for old in pending[1:]:
+        old.statut = "annulee"; old.annulee_at = datetime.utcnow()
+    cmd = pending[0] if pending else None
+    if cmd:
+        ligne_ids = [l.id for l in db.query(CommandeLigne).filter(CommandeLigne.commande_id == cmd.id).all()]
+        if ligne_ids:
+            db.query(CommandeIngredient).filter(CommandeIngredient.ligne_id.in_(ligne_ids)).delete(synchronize_session=False)
+        db.query(CommandeLigne).filter(CommandeLigne.commande_id == cmd.id).delete(synchronize_session=False)
+        db.query(Paiement).filter(Paiement.commande_id == cmd.id).delete(synchronize_session=False)
+        cmd.adresse_id = p.adresse_id; cmd.creneau = p.creneau
+        cmd.date_livraison = p.date_livraison; cmd.note_client = p.note_client
+        cmd.sous_total_fcfa = sous_total; cmd.frais_livraison = frais
+        cmd.total_fcfa = total; cmd.points_gagnes = total//500
+        db.flush()
+    else:
+        cmd = Commande(numero=_numero(db), client_id=user.id, adresse_id=p.adresse_id,
+                       creneau=p.creneau, date_livraison=p.date_livraison,
+                       sous_total_fcfa=sous_total, frais_livraison=frais, total_fcfa=total,
+                       points_gagnes=total//500, statut="en_attente_paiement", note_client=p.note_client)
+        db.add(cmd); db.flush()
     for l in p.lignes:
         ligne = CommandeLigne(commande_id=cmd.id, produit_id=l.produit_id, section_id=l.section_id,
                               quantite=l.quantite, prix_unitaire=l.prix_unitaire, prix_total=l.prix_unitaire*l.quantite,
@@ -283,6 +338,7 @@ def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
         # ── Client (visible au livreur / admin seulement) ────────────
         "client_nom":       client.nom_complet if client else None,
         "client_telephone": client.telephone   if (client and user.role in ("livreur","admin","super_admin")) else None,
+        "client_telephone2": client.telephone_secondaire if (client and user.role in ("livreur","admin","super_admin")) else None,
         # ── Adresse ──────────────────────────────────────────────────
         "adresse": {
             "libelle":   cmd.adresse.libelle   if cmd.adresse else None,
@@ -490,23 +546,88 @@ def annuler(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_curren
     cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id).first()
     if not cmd: raise HTTPException(404)
     if cmd.statut in ("livree", "en_livraison"): raise HTTPException(400, "Déjà en livraison")
+    if cmd.statut == "annulee": raise HTTPException(400, "Commande déjà annulée")
+    # Libérer le livreur si la commande lui était assignée
+    if cmd.livreur_id:
+        liv = db.query(Livreur).filter(Livreur.id == cmd.livreur_id).first()
+        if liv:
+            liv.statut = "disponible"
+            db.add(Notification(destinataire_id=liv.utilisateur_id, type="commande_annulee",
+                                titre="Commande annulée", corps=f"La commande {cmd.numero} a été annulée par le client.",
+                                donnees_json={"commande_id": str(cmd_id)}))
     cmd.statut = "annulee"; cmd.annulee_at = datetime.utcnow(); db.commit()
     return {"message": "Annulée"}
+
+BONUS_SONDAGE = 50
+
+def _niveau_pour_points(pts: int) -> str:
+    if pts >= 10000: return "vip"
+    if pts >= 5000:  return "or"
+    if pts >= 1000:  return "argent"
+    return "bronze"
+
+def _crediter_points_livraison(cmd, db):
+    """Crédite les points de la commande à la livraison (idempotent)."""
+    if not (cmd.points_gagnes or 0) > 0:
+        return
+    fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == cmd.client_id).first()
+    if not fid:
+        return
+    deja = db.query(FideliteTransaction).filter(
+        FideliteTransaction.compte_id == fid.id,
+        FideliteTransaction.commande_id == cmd.id,
+        FideliteTransaction.type == "gain_commande").first()
+    if deja:
+        return
+    fid.points_actuels += cmd.points_gagnes; fid.points_totaux += cmd.points_gagnes
+    db.add(FideliteTransaction(compte_id=fid.id, type="gain_commande", points=cmd.points_gagnes,
+                               solde_apres=fid.points_actuels, commande_id=cmd.id,
+                               description=f"Points commande {cmd.numero}"))
+    fid.niveau = _niveau_pour_points(fid.points_totaux)
+
+
+def _evaluer_et_crediter(cmd, cmd_id, note, commentaire, extra, db, user):
+    if db.query(Evaluation).filter(Evaluation.commande_id == cmd_id).first():
+        raise HTTPException(409, "Déjà évaluée")
+    ev = Evaluation(commande_id=cmd_id, client_id=user.id, livreur_id=cmd.livreur_id,
+                    note=note, commentaire=commentaire, **extra)
+    db.add(ev); db.flush()
+    fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
+    if fid:
+        _crediter_points_livraison(cmd, db)
+        # Bonus fixe +50 pts pour le sondage post-livraison complété
+        fid.points_actuels += BONUS_SONDAGE; fid.points_totaux += BONUS_SONDAGE
+        db.add(FideliteTransaction(compte_id=fid.id, type="bonus_sondage", points=BONUS_SONDAGE,
+                                   solde_apres=fid.points_actuels, commande_id=cmd_id,
+                                   description="Bonus sondage post-livraison"))
+        fid.niveau = _niveau_pour_points(fid.points_totaux)
+    db.commit()
+    return ev
 
 @cmd_router.post("/{cmd_id}/evaluer")
 def evaluer(cmd_id: UUID, p: EvaluationIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
     cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id, Commande.statut == "livree").first()
     if not cmd: raise HTTPException(404, "Commande non trouvée ou non livrée")
-    if db.query(Evaluation).filter(Evaluation.commande_id == cmd_id).first(): raise HTTPException(409, "Déjà évaluée")
-    db.add(Evaluation(commande_id=cmd_id, client_id=user.id, livreur_id=cmd.livreur_id, note=p.note, commentaire=p.commentaire))
-    fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
-    if fid:
-        fid.points_actuels += cmd.points_gagnes; fid.points_totaux += cmd.points_gagnes
-        db.add(FideliteTransaction(compte_id=fid.id, type="gain_commande", points=cmd.points_gagnes,
-                                   solde_apres=fid.points_actuels, commande_id=cmd_id,
-                                   description=f"Points commande {cmd.numero}"))
-    db.commit()
+    _evaluer_et_crediter(cmd, cmd_id, p.note, p.commentaire, {}, db, user)
     return {"message": "Évaluation enregistrée", "points_gagnes": cmd.points_gagnes}
+
+@cmd_router.post("/{cmd_id}/sondage")
+def sondage(cmd_id: UUID, p: SondageIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    cmd = db.query(Commande).filter(Commande.id == cmd_id, Commande.client_id == user.id, Commande.statut == "livree").first()
+    if not cmd: raise HTTPException(404, "Commande non trouvée ou non livrée")
+    ev = _evaluer_et_crediter(cmd, cmd_id, p.note, p.commentaire,
+        {"heure": p.heure, "lieu": p.lieu, "conformite": p.conformite,
+         "publier_temoignage": p.publier_temoignage}, db, user)
+    # Publie un témoignage si le client y consent et laisse un avis positif
+    if p.publier_temoignage and p.commentaire and p.commentaire.strip() and p.note >= 4:
+        ville = None
+        if cmd.adresse:
+            ville = ", ".join(filter(None, [cmd.adresse.ville, cmd.adresse.quartier])) or None
+        db.add(Temoignage(nom=user.nom_complet or "Client", role="Client vérifié",
+                          ville=ville, note=p.note, texte=p.commentaire.strip(),
+                          avatar_url=user.avatar_url, evaluation_id=ev.id))
+        db.commit()
+    return {"message": "Sondage enregistré", "points_gagnes": cmd.points_gagnes}
 
 # Livreur routes
 @cmd_router.get("/livreur/disponibles")
@@ -521,6 +642,7 @@ def cmd_disponibles(db: Session = Depends(get_db), user=Depends(get_current_user
         "total_fcfa": c.total_fcfa, "creneau": c.creneau,
         "client_nom":       c.client.nom_complet if c.client else None,
         "client_telephone": c.client.telephone   if c.client else None,
+        "client_telephone2": c.client.telephone_secondaire if c.client else None,
         "adresse_quartier": c.adresse.quartier   if c.adresse else None,
         "adresse_ville":    c.adresse.ville       if c.adresse else None,
         "created_at": c.created_at.isoformat() if c.created_at else None,
@@ -543,6 +665,7 @@ def cmd_en_cours(db: Session = Depends(get_db), user=Depends(get_current_user)):
         "total_fcfa": c.total_fcfa, "creneau": c.creneau,
         "client_nom":       c.client.nom_complet if c.client else None,
         "client_telephone": c.client.telephone   if c.client else None,
+        "client_telephone2": c.client.telephone_secondaire if c.client else None,
         "adresse_quartier": c.adresse.quartier   if c.adresse else None,
         "adresse_ville":    c.adresse.ville       if c.adresse else None,
         "assignee_at": c.assignee_at.isoformat() if c.assignee_at else None,
@@ -559,7 +682,25 @@ def accepter(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_curre
     db.add(Notification(destinataire_id=cmd.client_id, type="livreur_assigne",
                         titre="Livreur en route !", corps=f"Votre livreur {user.nom_complet} est en route vers le marché.",
                         donnees_json={"commande_id": str(cmd_id)}))
-    db.commit(); return {"message": "Commande acceptée"}
+    db.commit()
+
+    # ── Emails : client (livreur assigné) + livreur (mission acceptée) ──
+    try:
+        client = cmd.client
+        adr = f"{cmd.adresse.quartier}, {cmd.adresse.ville}" if cmd.adresse else ""
+        send_acceptation_emails(
+            client_email=client.email if client else None,
+            client_nom=client.nom_complet if client else "",
+            livreur_email=user.email, livreur_nom=user.nom_complet,
+            livreur_tel=user.telephone,
+            client_tel=client.telephone if client else "",
+            client_tel2=client.telephone_secondaire if client else None,
+            numero=cmd.numero, adresse=adr,
+            creneau=cmd.creneau or "", total=cmd.total_fcfa or 0)
+    except Exception as e:
+        print(f"[ACCEPT EMAIL WARN] {e}")
+
+    return {"message": "Commande acceptée"}
 
 @cmd_router.post("/{cmd_id}/statut")
 def changer_statut(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
@@ -575,13 +716,14 @@ def changer_statut(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db
     elif nouveau == "livree":
         cmd.livree_at = datetime.utcnow(); livreur.statut = "disponible"
         livreur.total_livraisons = (livreur.total_livraisons or 0) + 1
+        _crediter_points_livraison(cmd, db)
     msgs = {"en_cours_marche": ("Livreur au marché 🛒","Vos courses sont en cours !"),
             "en_livraison": ("En route vers vous 🛵","Votre commande arrive !"),
             "livree": ("Commande livrée ✅","Profitez de votre commande !")}
     t, c = msgs[nouveau]
     db.add(Notification(destinataire_id=cmd.client_id, type=f"livreur_{nouveau}", titre=t, corps=c,
                         donnees_json={"commande_id": str(cmd_id)}))
-    db.commit(); return {"message": f"Statut → {nouveau}"}
+    db.commit(); return {"message": f"Statut -> {nouveau}"}
 
 # ══════════════════════════════════════════════
 # FIDÉLITÉ
@@ -592,6 +734,10 @@ fid_router = APIRouter(prefix="/fidelite", tags=["Fidélité"])
 def mon_compte(db: Session = Depends(get_db), user=Depends(get_current_user)):
     f = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
     if not f: raise HTTPException(404)
+    # Recalcule le niveau depuis les points totaux (corrige les comptes non synchronisés)
+    niv = _niveau_pour_points(f.points_totaux)
+    if f.niveau != niv:
+        f.niveau = niv; db.commit()
     return f
 
 @fid_router.get("/transactions", response_model=List[FideliteTxOut])
@@ -604,6 +750,25 @@ def transactions(page: int = 1, db: Session = Depends(get_db), user=Depends(get_
 @fid_router.get("/recompenses")
 def recompenses(db: Session = Depends(get_db)):
     return db.query(FideliteRecompense).filter(FideliteRecompense.actif == True).order_by(FideliteRecompense.cout_points).all()
+
+NIVEAUX_ORDRE = {"bronze": 0, "argent": 1, "or": 2, "vip": 3}
+
+@fid_router.post("/echanger/{recompense_id}")
+def echanger(recompense_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    rec = db.query(FideliteRecompense).filter(FideliteRecompense.id == recompense_id, FideliteRecompense.actif == True).first()
+    if not rec: raise HTTPException(404, "Récompense introuvable")
+    fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
+    if not fid: raise HTTPException(404, "Compte fidélité introuvable")
+    if NIVEAUX_ORDRE.get(fid.niveau, 0) < NIVEAUX_ORDRE.get(rec.niveau_requis, 0):
+        raise HTTPException(403, f"Niveau {rec.niveau_requis} requis")
+    if fid.points_actuels < rec.cout_points:
+        raise HTTPException(400, f"Points insuffisants ({rec.cout_points} pts requis)")
+    fid.points_actuels -= rec.cout_points
+    db.add(FideliteTransaction(compte_id=fid.id, type="echange_recompense", points=-rec.cout_points,
+                               solde_apres=fid.points_actuels,
+                               description=f"Échange : {rec.nom}"))
+    db.commit()
+    return {"message": f"Récompense « {rec.nom} » obtenue", "points_actuels": fid.points_actuels}
 
 # ══════════════════════════════════════════════
 # NOTIFICATIONS
@@ -664,6 +829,7 @@ def admin_commandes(page: int = 1, statut: str = None, db: Session = Depends(get
             "date_livraison": str(c.date_livraison) if c.date_livraison else None,
             "client_nom": c.client.nom_complet if c.client else None,
             "client_telephone": c.client.telephone if c.client else None,
+            "client_telephone2": c.client.telephone_secondaire if c.client else None,
             "livreur_nom": liv_user.nom_complet if liv_user else None,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         })
@@ -741,12 +907,14 @@ def admin_stats_commandes(db: Session = Depends(get_db), _=Depends(get_current_a
 
 @admin_router.get("/stats/revenus")
 def admin_stats_revenus(db: Session = Depends(get_db), _=Depends(get_current_admin)):
-    rows = db.execute(text("""
-        SELECT TO_CHAR(created_at, 'YYYY-MM') as mois,
+    mois_expr = ("TO_CHAR(created_at, 'YYYY-MM')" if db.bind.dialect.name == "postgresql"
+                 else "strftime('%Y-%m', created_at)")
+    rows = db.execute(text(f"""
+        SELECT {mois_expr} as mois,
                COUNT(*) as nb_commandes,
                COALESCE(SUM(total_fcfa),0) as ca
         FROM commandes WHERE statut NOT IN ('annulee','brouillon')
-        GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+        GROUP BY {mois_expr}
         ORDER BY mois DESC LIMIT 12
     """)).mappings().all()
     return [dict(r) for r in rows]
@@ -932,13 +1100,38 @@ def update_param(cle: str, body: dict = None, db: Session = Depends(get_db), _=D
 # ══════════════════════════════════════════════
 liv_router = APIRouter(prefix="/livreur", tags=["Livreur"])
 
+def _niveau_livreur(total_livraisons: int) -> str:
+    if total_livraisons >= 150: return "elite"
+    if total_livraisons >= 50:  return "expert"
+    if total_livraisons >= 20:  return "senior"
+    if total_livraisons >= 5:   return "junior"
+    return "debutant"
+
+def _stats_livreur(liv: Livreur, db: Session) -> dict:
+    """Stats calculées depuis les vraies données (livraisons, évaluations)."""
+    livrees = (db.query(Commande)
+               .filter(Commande.livreur_id == liv.id, Commande.statut == "livree").all())
+    total_livraisons = len(livrees)
+    # Le gain du livreur = les frais de livraison de chaque commande livrée
+    total_gains = sum(c.frais_livraison or 0 for c in livrees)
+    note = (db.query(func.avg(Evaluation.note))
+            .filter(Evaluation.livreur_id == liv.id).scalar())
+    niveau = _niveau_livreur(total_livraisons)
+    # Persiste les valeurs calculées
+    liv.total_livraisons = total_livraisons
+    liv.total_gains_fcfa = total_gains
+    liv.note_moyenne = round(float(note or 0), 2)
+    liv.niveau = niveau
+    db.commit()
+    return {"id": str(liv.id), "statut": liv.statut, "niveau": niveau,
+            "note_moyenne": round(float(note or 0), 2), "total_livraisons": total_livraisons,
+            "total_gains_fcfa": total_gains, "est_verifie": liv.est_verifie}
+
 @liv_router.get("/profil")
 def profil_livreur(db: Session = Depends(get_db), user=Depends(get_current_user)):
     liv = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
     if not liv: raise HTTPException(404)
-    return {"id": str(liv.id), "statut": liv.statut, "niveau": liv.niveau,
-            "note_moyenne": float(liv.note_moyenne or 0), "total_livraisons": liv.total_livraisons,
-            "total_gains_fcfa": liv.total_gains_fcfa, "est_verifie": liv.est_verifie}
+    return _stats_livreur(liv, db)
 
 @liv_router.put("/statut")
 def changer_statut_livreur(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
@@ -959,7 +1152,28 @@ def update_localisation(body: dict = None, db: Session = Depends(get_db), user=D
 def historique_livreur(db: Session = Depends(get_db), user=Depends(get_current_user)):
     liv = db.query(Livreur).filter(Livreur.utilisateur_id == user.id).first()
     if not liv: raise HTTPException(404)
-    cmds = (db.query(Commande).filter(Commande.livreur_id == liv.id, Commande.statut == "livree")
-            .order_by(Commande.livree_at.desc()).limit(20).all())
-    return [{"id": str(c.id), "numero": c.numero, "total_fcfa": c.total_fcfa,
-             "livree_at": c.livree_at.isoformat() if c.livree_at else None} for c in cmds]
+    cmds = (db.query(Commande)
+            .options(joinedload(Commande.client), joinedload(Commande.adresse),
+                     joinedload(Commande.lignes).joinedload(CommandeLigne.produit),
+                     joinedload(Commande.evaluation))
+            .filter(Commande.livreur_id == liv.id, Commande.statut == "livree")
+            .order_by(Commande.livree_at.desc()).limit(50).all())
+    return [{
+        "id": str(c.id), "numero": c.numero, "statut": c.statut,
+        "total_fcfa": c.total_fcfa, "sous_total_fcfa": c.sous_total_fcfa,
+        "frais_livraison": c.frais_livraison,
+        "gain_fcfa": c.frais_livraison or 0,
+        "creneau": c.creneau,
+        "date_livraison": c.date_livraison.isoformat() if c.date_livraison else None,
+        "livree_at": c.livree_at.isoformat() if c.livree_at else None,
+        "client_nom": c.client.nom_complet if c.client else None,
+        "client_telephone": c.client.telephone if c.client else None,
+        "client_telephone2": c.client.telephone_secondaire if c.client else None,
+        "adresse_quartier": c.adresse.quartier if c.adresse else None,
+        "adresse_ville": c.adresse.ville if c.adresse else None,
+        "lignes": [{"nom": l.produit.nom if l.produit else "Produit",
+                    "quantite": l.quantite, "prix_total": l.prix_total}
+                   for l in (c.lignes or [])],
+        "note_client": c.evaluation.note if c.evaluation else None,
+        "avis_client": c.evaluation.commentaire if c.evaluation else None,
+    } for c in cmds]

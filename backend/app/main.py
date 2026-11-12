@@ -6,7 +6,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.api.auth import router as auth_router, limiter
-from app.api.routes import cat_router, adr_router, fav_router, cmd_router, fid_router, notif_router, admin_router, liv_router
+from app.api.routes import cat_router, tem_router, adr_router, fav_router, cmd_router, fid_router, notif_router, admin_router, liv_router
 from app.api.routes_extra import (
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router, admin_seed_router
@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 for r in [
-    auth_router, cat_router, adr_router, fav_router, cmd_router,
+    auth_router, cat_router, tem_router, adr_router, fav_router, cmd_router,
     fid_router, notif_router, admin_router, liv_router,
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router, admin_seed_router,

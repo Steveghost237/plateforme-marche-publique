@@ -1,8 +1,26 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (Column, String, Boolean, Integer, SmallInteger, Text,
-    DateTime, Date, Numeric, ForeignKey, Enum as SAEnum)
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+    DateTime, Date, Numeric, ForeignKey, Enum as SAEnum, Uuid, JSON)
+from sqlalchemy.dialects.postgresql import JSONB as _PGJSONB
+
+class UUID(Uuid):
+    """Uuid tolérant aux str : convertit 'xxxx-...' en uuid.UUID avant binding
+    (le code compare parfois les id avec des strings, ex. JWT sub)."""
+    def bind_processor(self, dialect):
+        process = super().bind_processor(dialect)
+        if process is None:
+            return None
+        def wrapped(value):
+            if isinstance(value, str):
+                try:
+                    value = uuid.UUID(value)
+                except ValueError:
+                    pass
+            return process(value)
+        return wrapped
+
+JSONB = JSON().with_variant(_PGJSONB(), "postgresql")
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -11,6 +29,7 @@ class Utilisateur(Base):
     __tablename__ = "utilisateurs"
     id                 = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     telephone          = Column(String(20), unique=True, nullable=False)
+    telephone_secondaire = Column(String(20))
     operateur          = Column(String(20))
     nom_complet        = Column(String(120), nullable=False, default="")
     email              = Column(String(200), unique=True)
@@ -325,8 +344,28 @@ class Evaluation(Base):
     commentaire = Column(Text)
     signale     = Column(Boolean, default=False)
     created_at  = Column(DateTime(timezone=True), default=datetime.utcnow)
+    # Réponses du sondage post-livraison
+    heure                = Column(String(30))   # moment constaté de la livraison
+    lieu                 = Column(String(30))   # lieu de réception
+    conformite           = Column(String(20))   # oui | partiel | non
+    publier_temoignage   = Column(Boolean, default=True)
     commande    = relationship("Commande", back_populates="evaluation")
     livreur     = relationship("Livreur", back_populates="evaluations")
+
+# ── TÉMOIGNAGES CLIENTS ───────────────────────────────────────
+class Temoignage(Base):
+    __tablename__ = "temoignages"
+    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nom           = Column(String(120), nullable=False)
+    role          = Column(String(80))          # "Cliente depuis 8 mois", "Client vérifié"…
+    ville         = Column(String(120))         # "Yaoundé, Bastos"
+    note          = Column(SmallInteger, default=5)
+    texte         = Column(Text, nullable=False)
+    avatar_url    = Column(String(500))
+    evaluation_id = Column(UUID(as_uuid=True), ForeignKey("evaluations.id"), nullable=True)
+    est_publie    = Column(Boolean, default=True)
+    ordre         = Column(Integer, default=0)
+    created_at    = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 # ── NOTIFICATIONS ─────────────────────────────────────────────
 class Notification(Base):

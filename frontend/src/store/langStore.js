@@ -24,6 +24,9 @@ const fr = {
   sec_boissons: 'Boissons',
   sec_boulangerie: 'Boulangerie',
   sec_epices: 'Épices',
+  sec_entretien: 'Maison',
+  sec_cosmetique: 'Hygiène',
+  sec_ma_liste: 'Ma Liste',
 
   // ─── Accueil
   hero_tag: 'Composez votre repas',
@@ -240,6 +243,9 @@ const en = {
   sec_boissons: 'Drinks',
   sec_boulangerie: 'Bakery',
   sec_epices: 'Spices',
+  sec_entretien: 'Household',
+  sec_cosmetique: 'Hygiene',
+  sec_ma_liste: 'My List',
 
   // ─── Home
   hero_tag: 'Compose your meal',

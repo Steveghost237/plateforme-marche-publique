@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, Plus, Edit2, Trash2, X, Check, MapPin, Truck, Clock, Zap, Calculator } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useConfirm } from '../components/common/useConfirm'
 
 const COULEURS = [
   { hex: '#22C55E', label: 'Vert' },
@@ -110,8 +111,10 @@ export default function AdminLivraison() {
     finally { setSaving(false) }
   }
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const deleteZone = async (id) => {
-    if (!confirm('Supprimer cette zone ?')) return
+    if (!await confirm({ titre: 'Supprimer cette zone ?', message: 'Les clients de cette zone ne pourront plus commander.', confirmLabel: 'Supprimer', danger: true })) return
     setDeleting(id)
     try {
       await api.delete(`/admin/zones-livraison/${id}`)
@@ -136,6 +139,7 @@ export default function AdminLivraison() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {ConfirmDialog}
       {/* Header */}
       <div className="bg-[#0D2137] px-6 py-5">
         <div className="max-w-5xl mx-auto flex items-center gap-4">

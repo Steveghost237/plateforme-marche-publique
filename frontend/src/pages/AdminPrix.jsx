@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, Search, Save, TrendingUp, TrendingDown, BarChart2, RefreshCw, Edit2, X, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useConfirm } from '../components/common/useConfirm'
 
 const SECTIONS = [
   { code: '',                  label: 'Toutes les sections', emoji: '📦' },
@@ -73,8 +74,11 @@ export default function AdminPrix() {
     setHistModal(true)
   }
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const bulkUpdate = async () => {
     if (!bulk.valeur && bulk.valeur !== 0) { toast.error('Valeur requise'); return }
+    if (!await confirm({ titre: 'Mise à jour en masse ?', message: 'Les prix de tous les produits correspondant au filtre seront modifiés.', confirmLabel: 'Appliquer', danger: true })) return
     setBulkSaving(true)
     try {
       const { data } = await api.post('/admin/prix/bulk-update', bulk)
@@ -87,6 +91,7 @@ export default function AdminPrix() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {ConfirmDialog}
       {/* Header */}
       <div className="bg-[#0D2137] px-6 py-5">
         <div className="max-w-6xl mx-auto flex items-center gap-4">

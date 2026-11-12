@@ -17,15 +17,19 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
-MAILER_URL      = os.environ.get("CODINGMAILER_URL", "https://codingmailer.onrender.com/send-email")
-ADMIN_EMAIL     = os.environ.get("COMEBUY_ADMIN_EMAIL", "comebuy237@gmail.com")
-GMAIL_USER      = os.environ.get("GMAIL_USER", "comebuy237@gmail.com")
-GMAIL_PASSWORD  = os.environ.get("GMAIL_APP_PASSWORD", "")
-RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "")
+from app.core.config import settings
+
+# settings lit .env ET les variables d'environnement (Render) — contrairement à
+# os.environ, les valeurs du .env local sont donc bien prises en compte.
+MAILER_URL      = settings.CODINGMAILER_URL
+ADMIN_EMAIL     = settings.COMEBUY_ADMIN_EMAIL
+GMAIL_USER      = settings.GMAIL_USER
+GMAIL_PASSWORD  = settings.GMAIL_APP_PASSWORD
+RESEND_API_KEY  = settings.RESEND_API_KEY
 RESEND_URL      = "https://api.resend.com/emails"
-BREVO_API_KEY   = os.environ.get("BREVO_API_KEY", "")
+BREVO_API_KEY   = settings.BREVO_API_KEY
 BREVO_URL       = "https://api.brevo.com/v3/smtp/email"
-BREVO_SENDER    = os.environ.get("BREVO_SENDER_EMAIL", "comebuy237@gmail.com")
+BREVO_SENDER    = settings.BREVO_SENDER_EMAIL
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
@@ -203,6 +207,55 @@ def _html_invoice(nom: str, numero: str, lignes: list, sous_total: int,
 </div></body></html>"""
 
 
+def _html_livreur_assigne(client_nom: str, livreur_nom: str, livreur_tel: str,
+                          client_tel: str, client_tel2: str, numero: str,
+                          adresse: str, creneau: str, total: int,
+                          pour_livreur: bool) -> str:
+    """Email envoyé quand un livreur accepte une commande (2 versions)."""
+    num_safe    = _s(numero)
+    adr_safe    = _s(adresse)
+    cren_safe   = _s(creneau).replace("_", " ")
+
+    if pour_livreur:
+        titre = "Mission acceptée"
+        intro = (f"Vous avez accepté la livraison de la commande "
+                 f"<strong>#{num_safe}</strong>. Rendez-vous au marché, "
+                 f"puis confirmez chaque étape dans l'application.")
+        rows = f"""
+      <div class="info-row"><span class="info-label">N° Commande</span><span class="info-val">#{num_safe}</span></div>
+      <div class="info-row"><span class="info-label">Client</span><span class="info-val">{_s(client_nom)}</span></div>
+      <div class="info-row"><span class="info-label">Tél. client</span><span class="info-val">{_s(client_tel)}</span></div>
+      {f'<div class="info-row"><span class="info-label">Tél. secours</span><span class="info-val">{_s(client_tel2)}</span></div>' if client_tel2 else ''}
+      <div class="info-row"><span class="info-label">Adresse</span><span class="info-val">{adr_safe}</span></div>
+      <div class="info-row"><span class="info-label">Créneau</span><span class="info-val">{cren_safe}</span></div>
+      <div class="info-row" style="border:none"><span class="info-label">Montant</span><span class="info-val">{total:,} FCFA</span></div>"""
+        action = "🛵 Bonne course ! Contactez le client uniquement pour la livraison."
+    else:
+        titre = "Livreur assigné à votre commande"
+        intro = (f"Bonne nouvelle <strong>{_s(client_nom)}</strong> ! "
+                 f"Votre livreur <strong>{_s(livreur_nom)}</strong> a accepté votre commande "
+                 f"<strong>#{num_safe}</strong> et se rend au marché.")
+        rows = f"""
+      <div class="info-row"><span class="info-label">N° Commande</span><span class="info-val">#{num_safe}</span></div>
+      <div class="info-row"><span class="info-label">Livreur</span><span class="info-val">{_s(livreur_nom)}</span></div>
+      <div class="info-row"><span class="info-label">Tél. livreur</span><span class="info-val">{_s(livreur_tel)}</span></div>
+      <div class="info-row" style="border:none"><span class="info-label">Créneau</span><span class="info-val">{cren_safe}</span></div>"""
+        action = "Vous serez notifié(e) à chaque étape de la livraison."
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">{_BASE_STYLE}</head>
+<body><div class="wrap">
+  {_header(titre)}
+  <div class="body">
+    <p style="font-size:15px;color:#374151">{intro}</p>
+    <div style="background:#F9FAFB;border-radius:10px;padding:16px;margin:16px 0">{rows}
+    </div>
+    <p style="font-size:13px;color:#6B7280">{action}</p>
+    <a href="https://comebuy-frontend.vercel.app/commandes" class="btn">Suivre la commande \u2192</a>
+  </div>
+  {_footer()}
+</div></body></html>"""
+
+
 # ── Envoi HTTP (synchrone) ────────────────────────────────────
 def _send_email_brevo(to: str, subject: str, html_body: str) -> dict:
     """Envoi via Brevo API (HTTP, fonctionne sur Render free tier, tout destinataire)."""
@@ -225,12 +278,12 @@ def _send_email_brevo(to: str, subject: str, html_body: str) -> dict:
                 },
             )
         if resp.status_code in (200, 201):
-            print(f"[BREVO ✓] → {to} | {subject}")
+            print(f"[BREVO OK] -> {to} | {subject}")
             return {"success": True}
-        print(f"[BREVO ✗] {resp.status_code} → {resp.text[:300]}")
+        print(f"[BREVO ERR] {resp.status_code} -> {resp.text[:300]}")
         return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
     except Exception as e:
-        print(f"[BREVO ERROR] → {e}")
+        print(f"[BREVO ERROR] -> {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -254,12 +307,12 @@ def _send_email_resend(to: str, subject: str, html_body: str) -> dict:
                 },
             )
         if resp.status_code in (200, 201):
-            print(f"[RESEND ✓] → {to} | {subject}")
+            print(f"[RESEND OK] -> {to} | {subject}")
             return {"success": True}
-        print(f"[RESEND ✗] {resp.status_code} → {resp.text[:300]}")
+        print(f"[RESEND ERR] {resp.status_code} -> {resp.text[:300]}")
         return {"success": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
     except Exception as e:
-        print(f"[RESEND ERROR] → {e}")
+        print(f"[RESEND ERROR] -> {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -280,13 +333,13 @@ def _send_email_smtp(to: str, subject: str, html_body: str) -> dict:
             srv.login(GMAIL_USER, GMAIL_PASSWORD)
             srv.sendmail(GMAIL_USER, to, msg.as_string())
 
-        print(f"[SMTP ✓] → {to} | {subject}")
+        print(f"[SMTP OK] -> {to} | {subject}")
         return {"success": True}
     except smtplib.SMTPAuthenticationError:
-        print(f"[SMTP AUTH ✗] Vérifier GMAIL_USER / GMAIL_APP_PASSWORD")
+        print(f"[SMTP AUTH ERR] Vérifier GMAIL_USER / GMAIL_APP_PASSWORD")
         return {"success": False, "error": "Authentification Gmail échouée"}
     except Exception as e:
-        print(f"[SMTP ERROR] → {to} : {e}")
+        print(f"[SMTP ERROR] -> {to} : {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -301,22 +354,29 @@ def _send_email_codingmailer(to: str, subject: str, html_body: str) -> dict:
                 headers={"Content-Type": "application/json"},
             )
         if resp.status_code in (200, 201, 204):
-            print(f"[CODINGMAILER ✓] → {to}")
+            print(f"[CODINGMAILER OK] -> {to}")
             return {"success": True}
-        print(f"[CODINGMAILER ✗] {resp.status_code} → {resp.text[:200]}")
+        print(f"[CODINGMAILER ERR] {resp.status_code} -> {resp.text[:200]}")
         return {"success": False, "error": f"HTTP {resp.status_code}"}
     except Exception as e:
-        print(f"[CODINGMAILER ERROR] → {e}")
+        print(f"[CODINGMAILER ERROR] -> {e}")
         return {"success": False, "error": str(e)}
 
 
 def _send_email(to: str, subject: str, html_body: str) -> dict:
-    """Envoie un email avec cascade : Brevo → SMTP → Resend → CodingMailer."""
+    """Envoie un email avec cascade : Brevo -> SMTP -> Resend -> CodingMailer."""
     if not is_valid_email(to):
         print(f"[EMAIL] Adresse invalide ignorée : {to!r}")
         return {"success": False, "error": "Adresse email invalide"}
 
     subject_clean = _s(subject, 150)
+
+    # Simulation locale (EMAIL_SIMULATION=true dans le .env de dev uniquement) :
+    # l'email est "envoyé" dans la console serveur — évite les timeouts de la cascade.
+    # Ne s'applique que si aucun provider réel n'est configuré.
+    if settings.EMAIL_SIMULATION and not (BREVO_API_KEY or GMAIL_PASSWORD or RESEND_API_KEY):
+        print(f"[EMAIL SIMULATION] -> {to} | {subject_clean}")
+        return {"success": True, "simulation": True}
 
     # 1) Brevo API (principal — tout destinataire, Render free OK)
     result = _send_email_brevo(to, subject_clean, html_body)
@@ -360,6 +420,27 @@ def send_welcome_email(to_email: str, nom: str, telephone: str,
         "ComeBuy — Bienvenue ! Votre compte est actif",
         _html_welcome(nom, telephone, role),
     )
+
+
+def send_acceptation_emails(client_email: str, client_nom: str,
+                            livreur_email: str, livreur_nom: str, livreur_tel: str,
+                            client_tel: str, client_tel2: str, numero: str,
+                            adresse: str, creneau: str, total: int) -> dict:
+    """Envoie les 2 emails quand un livreur accepte une commande (client + livreur)."""
+    results = {"client": {"success": False}, "livreur": {"success": False}}
+    if client_email and is_valid_email(client_email):
+        results["client"] = _send_email(
+            client_email, f"ComeBuy — Livreur assigné à votre commande #{numero}",
+            _html_livreur_assigne(client_nom, livreur_nom, livreur_tel,
+                                  client_tel, client_tel2, numero,
+                                  adresse, creneau, total, pour_livreur=False))
+    if livreur_email and is_valid_email(livreur_email):
+        results["livreur"] = _send_email(
+            livreur_email, f"ComeBuy — Mission acceptée #{numero}",
+            _html_livreur_assigne(client_nom, livreur_nom, livreur_tel,
+                                  client_tel, client_tel2, numero,
+                                  adresse, creneau, total, pour_livreur=True))
+    return results
 
 
 def send_invoice_email(to_email: str, nom: str, numero: str, lignes: list,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, X, ChevronLeft, ChevronRight, ThumbsUp, Edit2, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useConfirm } from '../components/common/useConfirm'
 
 const STATUT_TABS = [
   { key: 'en_attente', label: 'En attente', color: 'text-amber-600 bg-amber-50 border-amber-200' },
@@ -52,7 +53,10 @@ export default function AdminSuggestions() {
     } catch (err) { toast.error(err.response?.data?.detail || 'Erreur') }
   }
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const handleRejeter = async () => {
+    if (!await confirm({ titre: 'Rejeter cette suggestion ?', message: "La suggestion ne sera pas ajoutée au catalogue.", confirmLabel: 'Rejeter', danger: true })) return
     try {
       await api.put(`/admin/suggestions/${selected.id}/rejeter`, { note_admin: rejNote })
       toast.success('Suggestion rejetée')
@@ -64,6 +68,7 @@ export default function AdminSuggestions() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {ConfirmDialog}
       {/* Header */}
       <div className="bg-[#0D2137] px-6 py-5">
         <div className="max-w-5xl mx-auto flex items-center gap-4">

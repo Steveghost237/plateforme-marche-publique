@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = "comebuy237@gmail.com"
+    EMAIL_SIMULATION: bool = False  # True en local : emails "envoyés" dans la console
 
     class Config:
         env_file = ".env"

@@ -52,7 +52,7 @@ def _resolve_via_google(hostname: str) -> Optional[str]:
                 if ans.get("type") == 1:
                     ip = ans["data"]
                     _dns_cache[hostname] = ip
-                    print(f"[DNS fallback] {hostname} → {ip} (via Cloudflare DoH)")
+                    print(f"[DNS fallback] {hostname} -> {ip} (via Cloudflare DoH)")
                     return ip
     except Exception as e:
         print(f"[DNS fallback error] {hostname}: {e}")
@@ -135,7 +135,7 @@ async def initier_paiement_campay(
     """Déclenche un push USSD MTN/Orange via Campay POST /api/collect/.
     Le client reçoit une demande de paiement sur son téléphone (code PIN)."""
     if not CAMPAY_TOKEN:
-        print(f"[CAMPAY SIMULATION] {reference} → {montant_fcfa} FCFA pour {telephone}")
+        print(f"[CAMPAY SIMULATION] {reference} -> {montant_fcfa} FCFA pour {telephone}")
         return {
             "success": True,
             "simulation": True,
@@ -163,7 +163,7 @@ async def initier_paiement_campay(
                 data = resp.json()
             except Exception:
                 data = {}
-            print(f"[CAMPAY COLLECT] ref={reference} tel={tel} → HTTP {resp.status_code}: {data}")
+            print(f"[CAMPAY COLLECT] ref={reference} tel={tel} -> HTTP {resp.status_code}: {data}")
 
             if resp.status_code in (200, 201, 202):
                 ref = data.get("reference") or reference
@@ -254,14 +254,14 @@ async def initier_paiement(
 ) -> dict:
     """
     Initie un paiement Mobile Money (MTN/Orange CM) via NotchPay en flux DIRECT :
-    1. /payments/initialize → crée la transaction, récupère la référence
-    2. /payments/{ref} (POST) avec channel cm.mtn/cm.orange + phone → déclenche le push USSD
-       → le client reçoit une notification sur son téléphone et confirme avec son code PIN.
+    1. /payments/initialize -> crée la transaction, récupère la référence
+    2. /payments/{ref} (POST) avec channel cm.mtn/cm.orange + phone -> déclenche le push USSD
+       -> le client reçoit une notification sur son téléphone et confirme avec son code PIN.
 
     Le client NE QUITTE PAS l'application, contrairement au flux hosted.
     """
     if not NOTCHPAY_PUBLIC_KEY:
-        print(f"[PAIEMENT SIMULATION] {reference} → {montant_fcfa} FCFA pour {telephone}")
+        print(f"[PAIEMENT SIMULATION] {reference} -> {montant_fcfa} FCFA pour {telephone}")
         return {
             "success": True,
             "simulation": True,
@@ -322,9 +322,9 @@ async def initier_paiement(
             tx_ref = (init_data.get("transaction") or {}).get("reference") or reference
             authorization_url = init_data.get("authorization_url") or ""
 
-            # ──── Étape 2 : Direct charge → push USSD ─────────────────
+            # ──── Étape 2 : Direct charge -> push USSD ─────────────────
             # Orange Money CM : le push USSD n'est pas toujours activé.
-            # Si l'échec est détecté → on bascule automatiquement sur la
+            # Si l'échec est détecté -> on bascule automatiquement sur la
             # page hébergée NotchPay (le client paye dans son navigateur).
             charge_payload = {
                 "channel": channel,
@@ -339,7 +339,7 @@ async def initier_paiement(
                 charge_data = charge_resp.json()
             except Exception:
                 charge_data = {}
-            print(f"[NOTCHPAY CHARGE {channel}] {tx_ref} → HTTP {charge_resp.status_code}: {charge_data}")
+            print(f"[NOTCHPAY CHARGE {channel}] {tx_ref} -> HTTP {charge_resp.status_code}: {charge_data}")
 
             charge_status = (
                 charge_data.get("status")
@@ -369,9 +369,9 @@ async def initier_paiement(
                     ),
                 }
             else:
-                # ── Push USSD échoué → basculement sur page hébergée ──
+                # ── Push USSD échoué -> basculement sur page hébergée ──
                 err_msg = charge_data.get("message") or charge_data.get("error") or "Push USSD indisponible"
-                # Cas spécial : compte sandbox avec vrai numéro → message lisible
+                # Cas spécial : compte sandbox avec vrai numéro -> message lisible
                 if "Invalid test phone number" in err_msg or is_sandbox:
                     err_msg = (
                         "Votre compte NotchPay est en mode TEST (sandbox). "
@@ -432,7 +432,7 @@ async def initier_paiement_stripe(
 ) -> dict:
     """Crée une session Stripe Checkout (redirige l'utilisateur vers Stripe)."""
     if not STRIPE_SECRET_KEY:
-        print(f"[STRIPE SIMULATION] {reference} → {montant_fcfa} FCFA")
+        print(f"[STRIPE SIMULATION] {reference} -> {montant_fcfa} FCFA")
         return {
             "success": True,
             "simulation": True,
@@ -519,7 +519,7 @@ async def initier_paiement_paypal(
 ) -> dict:
     """Crée une commande PayPal (redirige l'utilisateur vers PayPal)."""
     if not PAYPAL_CLIENT_ID or not PAYPAL_SECRET:
-        print(f"[PAYPAL SIMULATION] {reference} → {montant_fcfa} FCFA")
+        print(f"[PAYPAL SIMULATION] {reference} -> {montant_fcfa} FCFA")
         return {
             "success": True,
             "simulation": True,

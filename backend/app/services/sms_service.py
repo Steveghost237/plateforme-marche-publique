@@ -19,7 +19,7 @@ SMS_SENDER = os.environ.get("SMS_SENDER", "MarcheCM")
 async def envoyer_sms(telephone: str, message: str) -> dict:
     """Envoie un SMS via Infobip. Retourne le statut."""
     if not INFOBIP_API_KEY:
-        print(f"[SMS SIMULATION] → {telephone}: {message}")
+        print(f"[SMS SIMULATION] -> {telephone}: {message}")
         return {"success": True, "simulation": True}
 
     try:

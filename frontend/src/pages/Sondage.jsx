@@ -71,7 +71,7 @@ function StarRating({ value, onChange }) {
 export default function Sondage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [reponses, setReponses] = useState({ heure: '', lieu: '', conformite: '', note: 0, commentaire: '' })
+  const [reponses, setReponses] = useState({ heure: '', lieu: '', conformite: '', note: 0, commentaire: '', publier_temoignage: true })
   const [step, setStep] = useState(0) // index de la question en cours
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -205,13 +205,23 @@ export default function Sondage() {
 
           {/* Texte libre */}
           {currentQ.type === 'texte' && (
-            <textarea
-              rows={4}
-              className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#0D2137] resize-none transition-colors"
-              placeholder={currentQ.placeholder}
-              value={reponses.commentaire}
-              onChange={e => setReponses(r => ({ ...r, commentaire: e.target.value }))}
-            />
+            <>
+              <textarea
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#0D2137] resize-none transition-colors"
+                placeholder={currentQ.placeholder}
+                value={reponses.commentaire}
+                onChange={e => setReponses(r => ({ ...r, commentaire: e.target.value }))}
+              />
+              <label className="flex items-start gap-2.5 mt-3 cursor-pointer select-none">
+                <input type="checkbox" className="mt-0.5 accent-[#0D2137]"
+                  checked={reponses.publier_temoignage}
+                  onChange={e => setReponses(r => ({ ...r, publier_temoignage: e.target.checked }))} />
+                <span className="text-xs text-gray-500 leading-snug">
+                  J'accepte que mon avis soit publié sur la page d'accueil comme témoignage client
+                </span>
+              </label>
+            </>
           )}
         </div>
 

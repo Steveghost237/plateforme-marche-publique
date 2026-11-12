@@ -34,7 +34,7 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 def est_heure_pointe(now: datetime) -> bool:
     """Majoration en semaine (Lun–Ven) aux heures de pointe : 11h–14h et 18h–22h."""
     jour_semaine = now.weekday()  # 0=lun … 4=ven, 5=sam, 6=dim
-    if jour_semaine >= 5:          # weekend → pas de majoration
+    if jour_semaine >= 5:          # weekend -> pas de majoration
         return False
     return now.hour in range(11, 14) or now.hour in range(18, 22)
 

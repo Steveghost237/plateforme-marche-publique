@@ -37,6 +37,9 @@ export default function Navbar() {
     { label: t('sec_boissons'),    href:'/catalogue/boissons' },
     { label: t('sec_boulangerie'), href:'/catalogue/boulangerie' },
     { label: t('sec_epices'),      href:'/catalogue/epices' },
+    { label: t('sec_entretien'),   href:'/catalogue/entretien' },
+    { label: t('sec_cosmetique'),  href:'/catalogue/cosmetique' },
+    { label: t('sec_ma_liste'),    href:'/catalogue/ma_liste' },
   ]
   const handleLogout = () => { logout(); navigate('/') }
 
@@ -55,7 +58,7 @@ export default function Navbar() {
         </Link>
 
         {/* Nav desktop */}
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="hidden xl:flex items-center gap-1">
           {NAV_LINKS.map(n => (
             <Link key={n.href} to={n.href}
               className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors
@@ -161,7 +164,7 @@ export default function Navbar() {
             </Link>
           )}
 
-          <button onClick={() => setMenu(!menu)} className="lg:hidden p-2 text-white/55 hover:text-white">
+          <button onClick={() => setMenu(!menu)} className="xl:hidden p-2 text-white/55 hover:text-white">
             {menu ? <X size={20}/> : <Menu size={20}/>}
           </button>
         </div>
@@ -169,7 +172,7 @@ export default function Navbar() {
 
       {/* Menu mobile */}
       {menu && (
-        <div className="lg:hidden bg-[#071220] border-t border-white/8 px-4 pb-5 pt-3">
+        <div className="xl:hidden bg-[#071220] border-t border-white/8 px-4 pb-5 pt-3">
           {NAV_LINKS.map(n => (
             <Link key={n.href} to={n.href}
               className="block py-3 text-white/60 hover:text-white text-sm font-medium border-b border-white/5 transition-colors">

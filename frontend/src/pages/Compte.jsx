@@ -4,6 +4,7 @@ import { Package, Star, Bell, MapPin, LogOut, ChevronRight, Check, Clock, Truck,
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
+import { useConfirm } from '../components/common/useConfirm'
 
 const NIVEAUX_INFO = {
   bronze: { emoji:'🥉', label:'Bronze',  color:'text-amber-700 bg-amber-100', min:0,     max:999  },
@@ -16,7 +17,7 @@ const NIVEAUX_INFO = {
 export function Profil() {
   const { user, logout } = useAuth(s => ({ user:s.user, logout:s.logout }))
   const navigate = useNavigate()
-  const [form, setForm] = useState({ nom_complet: user?.nom_complet || '', email: user?.email || '' })
+  const [form, setForm] = useState({ nom_complet: user?.nom_complet || '', email: user?.email || '', telephone_secondaire: user?.telephone_secondaire || '' })
   const [loading, setLoading] = useState(false)
   const [fidelite, setFidelite] = useState(null)
   const [editMode, setEditMode] = useState(false)
@@ -81,6 +82,10 @@ export function Profil() {
             <div>
               <label className="text-xs font-bold text-gray-400 mb-1 block">Téléphone (non modifiable)</label>
               <input className="w-full border border-gray-100 rounded-xl px-3 py-2.5 text-sm bg-gray-50 text-gray-400" value={user?.telephone} disabled/>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 mb-1 block">Second numéro (optionnel)</label>
+              <input type="tel" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]" placeholder="+237 6XX XXX XXX" value={form.telephone_secondaire} onChange={e => setForm({...form, telephone_secondaire: e.target.value})}/>
             </div>
             <div className="flex gap-2">
               <button onClick={save} disabled={loading}
@@ -148,7 +153,10 @@ export function MesCommandes() {
       .finally(() => setLoading(false))
   }, [isAuth])
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const annuler = async (id) => {
+    if (!await confirm({ titre: 'Annuler la commande ?', message: 'Cette action est définitive : la commande ne pourra plus être payée ni livrée.', confirmLabel: 'Oui, annuler', danger: true })) return
     try {
       await api.post(`/commandes/${id}/annuler`)
       setCommandes(prev => prev.map(c => c.id === id ? {...c, statut:'annulee'} : c))
@@ -174,6 +182,7 @@ export function MesCommandes() {
       <div className="bg-[#0D2137] px-6 py-5">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <h1 className="font-serif text-white font-bold text-xl">📦 Mes Commandes</h1>
+          {ConfirmDialog}
           <Link to="/catalogue/menus_ingredients"
             className="text-amber-400 text-xs font-bold hover:text-amber-300 transition-colors">+ Commander</Link>
         </div>
@@ -230,7 +239,7 @@ export function MesCommandes() {
                         📋 Donner mon avis
                       </Link>
                     )}
-                    {['brouillon','en_attente_paiement','payee'].includes(c.statut) && (
+                    {!['livree','en_livraison','annulee'].includes(c.statut) && (
                       <button onClick={() => annuler(c.id)}
                         className="text-red-400 text-xs hover:text-red-600 transition-colors px-3">
                         Annuler
@@ -254,6 +263,7 @@ export function Fidelite() {
   const [recompenses, setRecompenses] = useState([])
   const { isAuth } = useAuth()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
 
   useEffect(() => {
     if (!isAuth) { navigate('/connexion'); return }
@@ -296,6 +306,20 @@ export function Fidelite() {
     : 100
 
   const recompsAffichees = recompenses.length > 0 ? recompenses : RECOMPENSES_DEFAUT
+
+  const NIVEAUX_ORDRE = { bronze: 0, argent: 1, or: 2, vip: 3 }
+  const echanger = async (r) => {
+    if (!r.id) return // récompenses de secours (non en base) non échangeables
+    if (!await confirm({ titre: `Échanger ${(r.cout_points || r.pts).toLocaleString()} pts ?`, message: r.nom, confirmLabel: 'Échanger' })) return
+    try {
+      const { data } = await api.post(`/fidelite/echanger/${r.id}`)
+      toast.success(data.message)
+      setCompte(c => ({ ...c, points_actuels: data.points_actuels }))
+      api.get('/fidelite/transactions').then(t => setTransactions(t.data || [])).catch(() => {})
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Échange impossible')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
@@ -340,18 +364,25 @@ export function Fidelite() {
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="font-bold text-[#0D2137] text-sm mb-3">Récompenses disponibles</h2>
           <div className="space-y-2">
-            {recompsAffichees.map((r, i) => (
-              <div key={r.id || i} className="flex items-center gap-3 p-3 bg-[#F5EFE6] rounded-xl">
-                <span className="text-2xl shrink-0">{r.emoji || r.icone || '🎁'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[#0D2137] text-xs">{r.nom}</p>
-                  <p className="text-gray-400 text-[10px]">{r.desc || r.description}</p>
-                </div>
-                <div className="text-amber-500 font-bold text-xs shrink-0">
-                  {(r.pts || r.cout_points || 0).toLocaleString()} pts
-                </div>
-              </div>
-            ))}
+            {recompsAffichees.map((r, i) => {
+              const cout = r.pts || r.cout_points || 0
+              const nivOk = NIVEAUX_ORDRE[compte.niveau || 'bronze'] >= NIVEAUX_ORDRE[r.niveau_requis || 'bronze']
+              const canRedeem = r.id && pts >= cout && nivOk
+              return (
+                <button key={r.id || i} onClick={() => canRedeem && echanger(r)} disabled={!canRedeem}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all
+                    ${canRedeem ? 'bg-[#F5EFE6] hover:bg-amber-100 cursor-pointer' : 'bg-[#F5EFE6] opacity-50 cursor-not-allowed'}`}>
+                  <span className="text-2xl shrink-0">{r.emoji || r.icone || '🎁'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#0D2137] text-xs">{r.nom}</p>
+                    <p className="text-gray-400 text-[10px]">{r.desc || r.description}</p>
+                  </div>
+                  <div className="text-amber-500 font-bold text-xs shrink-0">
+                    {cout.toLocaleString()} pts
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -389,6 +420,7 @@ export function Fidelite() {
 
         <div className="pb-4"/>
       </div>
+      {ConfirmDialog}
     </div>
   )
 }

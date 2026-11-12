@@ -35,6 +35,19 @@ else
   echo "   Catalogue deja present ($PRODUCT_COUNT produits) - seed ignore."
 fi
 
+# 2b. Témoignages page d'accueil (idempotent, insère uniquement si vide)
+echo "[2b/3] Vérification témoignages..."
+python seed_temoignages.py
+
+# 2c. Remplacer les ingrédients génériques des menus par de vraies recettes
+#     (n'agit que sur les menus encore 100% génériques — sûr en prod)
+echo "[2c/3] Vérification ingrédients menus..."
+python fix_ingredients_menus.py
+
+# 2d. Récompenses fidélité (idempotent, insère uniquement si vide)
+echo "[2d/3] Vérification récompenses fidélité..."
+python seed_recompenses.py
+
 # 3. Démarrer Uvicorn
 echo "[3/3] Demarrage du serveur Uvicorn..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

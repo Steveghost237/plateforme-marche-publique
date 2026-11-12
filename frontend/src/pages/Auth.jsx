@@ -77,8 +77,7 @@ export function Inscription() {
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
   const [otpCanal, setOtpCanal] = useState('email')
-  const [otpDev, setOtpDev] = useState(null)
-  const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client' })
+  const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client', tel2:'' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const { setAuth } = useAuth()
@@ -92,16 +91,14 @@ export function Inscription() {
     setLoading(true)
     try {
       const res = await api.post('/auth/inscription/otp', { telephone: tel, operateur: op, email: email.trim().toLowerCase() })
-      const canal = res.data?.message?.includes('email') ? 'email' : res.data?.message?.includes('sms') ? 'SMS' : 'none'
+      const canal = res.data?.message?.includes('email') ? 'email' : res.data?.message?.includes('sms') ? 'SMS' : 'email'
       setOtpCanal(canal)
-      if (res.data?.otp_dev) {
-        setOtpDev(res.data.otp_dev)
-        toast('Code disponible directement dans l\'app', { icon: '🔑' })
-      } else {
-        toast.success(`Code OTP envoyé sur votre ${canal === 'email' ? 'Gmail ✉️' : 'téléphone 📱'}`)
-      }
+      toast.success(`Code de vérification envoyé sur votre ${canal === 'email' ? 'adresse email ✉️' : 'téléphone 📱'}`)
       setStep(2)
-    } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
+    } catch(err) {
+      const d = err.response?.data?.detail
+      toast.error(Array.isArray(d) ? (d[0]?.msg || 'Erreur de validation') : (d || 'Erreur'))
+    }
     finally { setLoading(false) }
   }
 
@@ -115,9 +112,13 @@ export function Inscription() {
   }
 
   const step3 = async e => {
-    e.preventDefault(); setLoading(true)
+    e.preventDefault()
+    if (form.tel2 && !isValidCameroonPhone(form.tel2)) { toast.error('Second numéro invalide (ex: +237 6XX XXX XXX)'); return }
+    if (form.tel2 && normalizeCameroonPhone(form.tel2) === normalizeCameroonPhone(tel)) { toast.error('Le second numéro doit être différent du premier'); return }
+    setLoading(true)
     try {
-      const { data } = await api.post('/auth/inscription/finaliser', { telephone: tel, email: email || undefined, ...form })
+      const { tel2, ...rest } = form
+      const { data } = await api.post('/auth/inscription/finaliser', { telephone: tel, email: email || undefined, telephone_secondaire: tel2 ? normalizeCameroonPhone(tel2) : undefined, ...rest })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success('Compte créé ! Bienvenue 🎉')
       navigate(data.user.role === 'livreur' ? '/livreur' : '/')
@@ -183,22 +184,14 @@ export function Inscription() {
 
       {step === 2 && (
         <form onSubmit={step2} className="space-y-5 animate-fade-up">
-          {otpDev ? (
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
-              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Votre code de vérification</p>
-              <p className="text-3xl font-black text-amber-800 tracking-[0.3em]">{otpDev}</p>
-              <p className="text-xs text-amber-600 mt-1">Copiez et saisissez ce code ci-dessous</p>
-            </div>
-          ) : (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-              <p className="text-sm text-blue-800 font-semibold">
-                {otpCanal === 'email' ? '✉️ Code envoyé sur votre Gmail' : '📱 Code envoyé par SMS'}
-              </p>
-              <p className="text-xs text-blue-600 mt-0.5">
-                {otpCanal === 'email' ? email : tel}
-              </p>
-            </div>
-          )}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+            <p className="text-sm text-blue-800 font-semibold">
+              {otpCanal === 'email' ? '✉️ Code envoyé sur votre adresse email' : '📱 Code envoyé par SMS'}
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              {otpCanal === 'email' ? email : tel}
+            </p>
+          </div>
           <div className="flex gap-2 justify-center">
             {otp.map((d, i) => (
               <input key={i} id={`otp-${i}`} maxLength={1} value={d} onChange={e => handleOtp(i, e.target.value)}
@@ -237,6 +230,13 @@ export function Inscription() {
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Second numéro de téléphone <span className="text-gray-400 font-normal">(optionnel)</span></label>
+            <div className="relative"><Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input className="input pl-10" placeholder="+237 6XX XXX XXX" type="tel" inputMode="numeric" value={form.tel2} onChange={e => setForm({...form, tel2: e.target.value})}/>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Ex : un numéro Orange en plus de votre MTN</p>
           </div>
           <div>
             <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Mot de passe</label>

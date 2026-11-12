@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CheckCircle, MapPin, Package, Star, Clock, ToggleLeft, ToggleRight, Phone, MessageCircle, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useConfirm } from '../components/common/useConfirm'
 import { useAuth } from '../store'
 
 const STATUT_LABELS = {
@@ -30,6 +31,7 @@ export function LiveurDashboard() {
   const [disponibles, setDisponibles] = useState([])
   const [enCours, setEnCours]       = useState([])
   const [historique, setHistorique] = useState([])
+  const [detail, setDetail]         = useState(null)
   const [tab, setTab]               = useState('encours')
 
   useEffect(() => {
@@ -61,16 +63,25 @@ export function LiveurDashboard() {
     } catch { toast.error('Erreur') }
   }
 
-  const accepter = async (id) => {
+  const accepter = async (c) => {
+    const ok = await confirm({
+      titre: 'Accepter cette commande ?',
+      message: `${c.numero} — ${c.client_nom || 'Client'} · ${(c.total_fcfa || 0).toLocaleString()} F${c.adresse_quartier ? ` · ${[c.adresse_quartier, c.adresse_ville].filter(Boolean).join(', ')}` : ''}`,
+      confirmLabel: 'Accepter la course'
+    })
+    if (!ok) return
     try {
-      await api.post(`/commandes/${id}/accepter`)
+      await api.post(`/commandes/${c.id}/accepter`)
       toast.success('Commande acceptée ! Contactez le client si besoin.')
       loadData()
       setTab('encours')
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
   }
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const changerStatut = async (id, statut) => {
+    if (statut === 'livree' && !await confirm({ titre: 'Confirmer la livraison ?', message: 'Le client sera notifié que sa commande a été livrée.', confirmLabel: 'Confirmer la livraison' })) return
     try {
       await api.post(`/commandes/${id}/statut`, { statut })
       const msgs = { en_cours_marche: 'Vous êtes au marché 🛒', en_livraison: 'En route vers le client 🛵', livree: 'Livraison confirmée ✅' }
@@ -79,10 +90,11 @@ export function LiveurDashboard() {
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
   }
 
-  const NIVEAU_INFO = { junior:{ label:'Junior', emoji:'🟢' }, senior:{ label:'Senior', emoji:'🔵' }, expert:{ label:'Expert', emoji:'🟡' }, elite:{ label:'Élite', emoji:'🔴' } }
+  const NIVEAU_INFO = { debutant:{ label:'Débutant', emoji:'⚪' }, junior:{ label:'Junior', emoji:'🟢' }, senior:{ label:'Senior', emoji:'🔵' }, expert:{ label:'Expert', emoji:'🟡' }, elite:{ label:'Élite', emoji:'🔴' } }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {ConfirmDialog}
       {/* Header */}
       <div className="bg-navy px-6 py-6">
         <div className="max-w-2xl mx-auto">
@@ -106,7 +118,7 @@ export function LiveurDashboard() {
                 { val: profil.note_moyenne?.toFixed(1) || '0.0', label:'Note ⭐' },
                 { val: profil.total_livraisons || 0, label:'Livraisons' },
                 { val: `${(profil.total_gains_fcfa || 0).toLocaleString()} F`, label:'Gains totaux' },
-                { val: (NIVEAU_INFO[profil.niveau] || NIVEAU_INFO.junior).emoji + ' ' + (NIVEAU_INFO[profil.niveau]?.label || profil.niveau), label:'Niveau' },
+                { val: (NIVEAU_INFO[profil.niveau] || NIVEAU_INFO.debutant).emoji + ' ' + (NIVEAU_INFO[profil.niveau]?.label || profil.niveau), label:'Niveau' },
               ].map(k => (
                 <div key={k.label} className="bg-white/10 rounded-xl p-3 text-center">
                   <div className="text-white font-bold text-sm">{k.val}</div>
@@ -169,6 +181,11 @@ export function LiveurDashboard() {
                           <p className="font-bold text-gray-800 text-sm truncate">{c.client_nom || 'Client'}</p>
                           {c.client_telephone && (
                             <p className="text-gray-500 text-xs font-mono mt-0.5">{c.client_telephone}</p>
+                          )}
+                          {c.client_telephone2 && (
+                            <p className="text-gray-500 text-xs font-mono mt-0.5">
+                              <span className="text-amber-600 font-semibold">secours : </span>{c.client_telephone2}
+                            </p>
                           )}
                           {(c.adresse_quartier || c.adresse_ville) && (
                             <div className="flex items-center gap-1 mt-1">
@@ -246,7 +263,7 @@ export function LiveurDashboard() {
                   )}
                 </div>
                 <div className="p-4">
-                  <button onClick={() => accepter(c.id)} className="btn-primary w-full text-sm py-2.5">
+                  <button onClick={() => accepter(c)} className="btn-primary w-full text-sm py-2.5">
                     ✅ Accepter cette commande
                   </button>
                 </div>
@@ -264,7 +281,8 @@ export function LiveurDashboard() {
                 <p>Aucune livraison effectuée</p>
               </div>
             ) : historique.map(c => (
-              <div key={c.id} className="bg-white rounded-xl p-4 shadow-sm flex justify-between items-center">
+              <button key={c.id} onClick={() => setDetail(c)}
+                className="w-full bg-white rounded-xl p-4 shadow-sm flex justify-between items-center hover:ring-2 hover:ring-amber-300 transition-all text-left">
                 <div>
                   <p className="font-bold text-navy text-sm">{c.numero}</p>
                   <p className="text-gray-400 text-xs">{c.livree_at ? new Date(c.livree_at).toLocaleDateString('fr-FR') : '—'}</p>
@@ -273,11 +291,73 @@ export function LiveurDashboard() {
                   <p className="font-bold text-amber-500">{c.total_fcfa?.toLocaleString()} F</p>
                   <span className="text-xs text-green-600 font-semibold">✅ Livrée</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
+
+      {/* ── MODAL DÉTAIL LIVRAISON ── */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDetail(null)}/>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+            <div className="bg-navy px-5 py-4 sticky top-0">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-bold text-white">{detail.numero}</p>
+                  <p className="text-white/50 text-xs">Livrée le {detail.livree_at ? new Date(detail.livree_at).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '—'}</p>
+                </div>
+                <button onClick={() => setDetail(null)} className="text-white/60 hover:text-white text-xl leading-none">×</button>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Client */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Client</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+                  <p className="font-bold text-navy text-sm flex items-center gap-1.5"><User size={13}/> {detail.client_nom || '—'}</p>
+                  <p className="text-xs text-gray-600 flex items-center gap-1.5"><Phone size={12}/> {detail.client_telephone || '—'}</p>
+                  {detail.client_telephone2 && <p className="text-xs text-amber-700 flex items-center gap-1.5"><Phone size={12}/> secours : {detail.client_telephone2}</p>}
+                  {(detail.adresse_quartier || detail.adresse_ville) && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1.5"><MapPin size={12}/> {[detail.adresse_quartier, detail.adresse_ville].filter(Boolean).join(', ')}</p>
+                  )}
+                  {detail.creneau && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Clock size={12}/> {detail.creneau.replace(/_/g,' ')}{detail.date_livraison ? ` · ${new Date(detail.date_livraison).toLocaleDateString('fr-FR')}` : ''}</p>}
+                </div>
+              </div>
+              {/* Produits */}
+              {detail.lignes?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Produits ({detail.lignes.length})</p>
+                  <div className="space-y-1">
+                    {detail.lignes.map((l, i) => (
+                      <div key={i} className="flex justify-between text-xs text-gray-600">
+                        <span className="truncate flex-1">{l.nom} <span className="text-gray-400">×{l.quantite}</span></span>
+                        <span className="font-semibold ml-2 shrink-0">{(l.prix_total || 0).toLocaleString()} F</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Montants */}
+              <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                <div className="flex justify-between text-xs text-gray-500"><span>Sous-total produits</span><span>{(detail.sous_total_fcfa || 0).toLocaleString()} F</span></div>
+                <div className="flex justify-between text-xs text-gray-500"><span>Frais de livraison</span><span>{(detail.frais_livraison || 0).toLocaleString()} F</span></div>
+                <div className="flex justify-between font-bold text-navy text-sm pt-1 border-t border-gray-100"><span>Total encaissé</span><span className="text-amber-500">{(detail.total_fcfa || 0).toLocaleString()} F</span></div>
+                <div className="flex justify-between text-xs text-green-600 font-semibold"><span>Votre gain</span><span>+{(detail.gain_fcfa || 0).toLocaleString()} F</span></div>
+              </div>
+              {/* Avis client */}
+              {detail.note_client && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Avis du client</p>
+                  <p className="text-sm">{'⭐'.repeat(detail.note_client)}</p>
+                  {detail.avis_client && <p className="text-xs text-gray-600 mt-1 italic">« {detail.avis_client} »</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
