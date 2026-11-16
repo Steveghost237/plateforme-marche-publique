@@ -3,8 +3,9 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
 def _build_db_url(url: str) -> str:
-    """Ajoute sslmode=require pour les bases distantes (Neon, Supabase…)."""
-    if url.startswith("sqlite"):
+    """Ajoute sslmode=require pour les bases distantes (Neon, Supabase…).
+    Laisse passer SQLite tel quel pour le développement local."""
+    if url.startswith("sqlite:///"):
         return url
     is_local = "localhost" in url or "127.0.0.1" in url
     if not is_local and "sslmode" not in url:
@@ -12,17 +13,21 @@ def _build_db_url(url: str) -> str:
         url = url + sep + "sslmode=require"
     return url
 
-_db_url = _build_db_url(settings.DATABASE_URL)
-_connect_args = {"check_same_thread": False} if _db_url.startswith("sqlite") else {}
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "pool_size": 5,
+    "max_overflow": 10,
+    "pool_timeout": 30,
+    "pool_recycle": 300,
+}
+
+# SQLite ne supporte pas les pools de connexion de la même façon
+if settings.DATABASE_URL.startswith("sqlite:///"):
+    engine_kwargs = {"connect_args": {"check_same_thread": False}}
 
 engine = create_engine(
-    _db_url,
-    connect_args=_connect_args,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=300,
+    _build_db_url(settings.DATABASE_URL),
+    **engine_kwargs,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

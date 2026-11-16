@@ -8,6 +8,7 @@ from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address)
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user, valider_mot_de_passe_fort
 from app.models.models import Utilisateur, FideliteCompte
 from app.schemas.schemas import DemandeOTPIn, VerifOTPIn, FinaliserInscriptionIn, ConnexionIn, RefreshIn, TokenOut, UtilisateurOut, UtilisateurUpdateIn
@@ -71,17 +72,27 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     if user and user.statut == "actif":
         raise HTTPException(409, "Numéro déjà enregistré")
 
-    # Email déjà utilisé par un AUTRE numéro ?
-    email_owner = db.query(Utilisateur).filter(
-        Utilisateur.email == p.email,
-        Utilisateur.telephone != p.telephone
-    ).first()
-    if email_owner:
-        if email_owner.statut == "actif":
-            raise HTTPException(409, "Adresse email déjà utilisée par un autre compte")
-        # Compte en attente jamais finalisé : libérer l'email
-        email_owner.email = None
-        db.commit()
+    # Vérifier l'unicité de l'email avant toute modification
+    if p.email:
+        email_clean = p.email.strip().lower()
+        email_query = db.query(Utilisateur).filter(Utilisateur.email == email_clean)
+        if user:
+            email_query = email_query.filter(Utilisateur.id != user.id)
+        email_owner = email_query.first()
+        if email_owner:
+            if email_owner.statut == "actif":
+                raise HTTPException(409, "Cette adresse email est déjà utilisée")
+            # Compte en attente jamais finalisé : libérer l'email
+            email_owner.email = None
+            db.commit()
+
+    # Cooldown : empêcher les demandes successives trop rapides qui écrasent l'OTP en cours
+    if user and user.otp_derniere_demande:
+        derniere = user.otp_derniere_demande
+        if derniere.tzinfo is not None:
+            derniere = derniere.replace(tzinfo=None)
+        if (datetime.utcnow() - derniere).total_seconds() < 60:
+            raise HTTPException(429, "Veuillez attendre 60 secondes avant de redemander un code")
 
     # Générer un OTP unique qui n'a jamais été utilisé pour cet utilisateur
     max_attempts = 10
@@ -116,7 +127,8 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     if not user:
         user = Utilisateur(telephone=p.telephone, nom_complet="", operateur=p.operateur,
                            email=p.email,
-                           otp_code=otp, otp_expire_at=expire, otp_tentatives=0)
+                           otp_code=otp, otp_expire_at=expire, otp_tentatives=0,
+                           otp_derniere_demande=datetime.utcnow())
         db.add(user)
         try:
             db.commit()
@@ -131,6 +143,7 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
             user.otp_code = otp
             user.otp_expire_at = expire
             user.otp_tentatives = 0
+            user.otp_derniere_demande = datetime.utcnow()
             if p.email:
                 user.email = p.email
             db.commit()
@@ -138,6 +151,7 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
         user.otp_code = otp
         user.otp_expire_at = expire
         user.otp_tentatives = 0
+        user.otp_derniere_demande = datetime.utcnow()
         if p.email:
             user.email = p.email
         try:
@@ -145,7 +159,7 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
         except IntegrityError:
             db.rollback()
             raise HTTPException(409, "Numéro ou adresse email déjà utilisé")
-    debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
+    debug = settings.DEBUG
     print(f"[OTP DEV] {p.telephone} -> {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
 
     # ── Envoi OTP par EMAIL (canal principal) ──
@@ -162,13 +176,16 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
+    print(f"[DEBUG] settings.DEBUG={settings.DEBUG}, resp={resp}")
     return resp
 
 @router.post("/inscription/verifier")
 def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
     try:
-        print(f"[DEBUG] Vérification OTP pour {p.telephone} avec code {p.otp_code}")
-        
+        # Nettoyer le code saisi (espaces, tirets, etc.)
+        otp_code = p.otp_code.strip().replace(" ", "").replace("-", "")
+        print(f"[DEBUG] Vérification OTP pour {p.telephone} avec code {otp_code}")
+
         user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
         print(f"[DEBUG] Utilisateur trouvé: {user is not None}")
         
@@ -176,17 +193,17 @@ def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
             print(f"[DEBUG] Utilisateur non trouvé pour {p.telephone}")
             raise HTTPException(404, "Numéro introuvable")
         
-        print(f"[DEBUG] OTP stocké: {user.otp_code}, OTP reçu: {p.otp_code}")
+        print(f"[DEBUG] OTP stocké: {user.otp_code}, OTP reçu: {otp_code}")
         print(f"[DEBUG] Tentatives: {user.otp_tentatives or 0}")
         print(f"[DEBUG] Expiration: {user.otp_expire_at}")
-        
-        if (user.otp_tentatives or 0) >= 3: 
+
+        if (user.otp_tentatives or 0) >= 3:
             raise HTTPException(429, "Trop de tentatives")
-        
+
         # Vérification simplifiée de l'expiration
         if not user.otp_expire_at:
             raise HTTPException(400, "OTP expiré")
-            
+
         now = datetime.utcnow()
         expire = user.otp_expire_at
         if expire.tzinfo is not None:
@@ -194,9 +211,9 @@ def verifier_otp(p: VerifOTPIn, db: Session = Depends(get_db)):
         if now > expire:
             print(f"[DEBUG] OTP expiré: {now} > {expire}")
             raise HTTPException(400, "OTP expiré")
-            
-        if user.otp_code != p.otp_code:
-            print(f"[DEBUG] OTP incorrect: {user.otp_code} != {p.otp_code}")
+
+        if user.otp_code != otp_code:
+            print(f"[DEBUG] OTP incorrect: {user.otp_code} != {otp_code}")
             user.otp_tentatives = (user.otp_tentatives or 0) + 1
             db.commit()
             raise HTTPException(400, "OTP incorrect")

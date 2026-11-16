@@ -1,11 +1,15 @@
 class ApiConfig {
-  // URL du backend FastAPI
-  // Pour Android Emulator: 10.0.2.2
-  // Pour iOS Simulator: localhost
-  // Pour device physique: IP de votre machine
-  // Pour test local : utiliser l'IP WiFi du PC
-  // Pour production : 'https://comebuy-api.onrender.com/api'
-  static const String baseUrl = 'https://comebuy-api.onrender.com/api';
+  // Mode local : flutter run --dart-define=USE_LOCAL_API=true
+  // Mode local avec IP custom : --dart-define=LOCAL_API_URL=http://192.168.1.XX:10000/api
+  // Mode production (défaut) : flutter build apk --release
+  static const bool _isLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: false);
+
+  static const String _localDefaultUrl = 'http://10.0.2.2:8000/api'; // Android Emulator (port par défaut du backend local)
+  static const String _prodDefaultUrl = 'https://comebuy-api.onrender.com/api';
+
+  static const String baseUrl = _isLocal
+      ? String.fromEnvironment('LOCAL_API_URL', defaultValue: _localDefaultUrl)
+      : String.fromEnvironment('PROD_API_URL', defaultValue: _prodDefaultUrl);
 
   // Endpoints
   static const String auth = '/auth';

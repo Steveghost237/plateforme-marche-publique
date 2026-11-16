@@ -60,94 +60,61 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
 
       if (mounted) {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final canal = authProvider.otpCanal == 'email' ? 'Gmail' : 'SMS';
         final devOtp = authProvider.devOtp;
-
-        if (devOtp != null) {
-          // Afficher l'OTP de développement dans une boîte de dialogue
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('Code de Développement'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Column(
-                    children: [
-                      const Text(
-                        'Pour le développement, voici votre code OTP :',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Colors.green.withOpacity(0.3)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.security, size: 16, color: Colors.green),
-                            SizedBox(width: 8),
-                            Text(
-                              'Code unique et sécurisé',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        debugPrint('[REGISTER OTP] devOtp = $devOtp');
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Code de vérification'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (devOtp != null && devOtp.isNotEmpty) ...[
+                  const Text(
+                    'Votre code OTP :',
+                    style: TextStyle(fontSize: 16),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D2137),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green, width: 2),
                     ),
                     child: Text(
                       devOtp,
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 8,
+                        letterSpacing: 6,
+                        color: Colors.green,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'En production, ce code est envoyé sur votre Gmail.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                ] else
+                  Text(
+                    'Un code de vérification a été envoyé sur votre $canal.',
+                    style: const TextStyle(fontSize: 16),
                   ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Fermer la boîte de dialogue
-                  },
-                  child: const Text('J\'ai noté le code'),
+                const SizedBox(height: 16),
+                const Text(
+                  'Veuillez entrer le code ci-dessus. Il est valable 5 minutes.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
-          );
-        } else {
-          final canal = authProvider.otpCanal == 'email' ? 'Gmail' : 'SMS';
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Code OTP envoyé par $canal'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -170,10 +137,10 @@ class _RegisterScreenOtpState extends State<RegisterScreenOtp> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Vérifier l'OTP
+      // Vérifier l'OTP (nettoyage des espaces/tirets possibles)
       await authProvider.verifyOtp(
         telephone: _telephoneController.text.trim(),
-        otp: _otpController.text.trim(),
+        otp: _otpController.text.trim().replaceAll(' ', '').replaceAll('-', ''),
       );
 
       // Finaliser l'inscription
