@@ -459,6 +459,11 @@ export function Checkout() {
         })
         if (momoRes.simulation) {
           await api.post(`/commandes/${cmd.id}/payer`)
+        } else if (momoRes.fallback_to_hosted && momoRes.checkout_url) {
+          // Push USSD impossible (compte sandbox ou canal indisponible) → page NotchPay hébergée
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes: lignesSel, mode: 'momo'}))
+          window.location.href = momoRes.checkout_url
+          return
         } else if (momoRes.success) {
           // Flux natif : le USSD push a été envoyé → redirige vers page d'attente avec polling
           sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes: lignesSel, mode: 'momo'}))
