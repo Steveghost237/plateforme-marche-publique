@@ -2,10 +2,11 @@
 routes_extra.py — Suggestions, gestion prix, zones de livraison par distance
 """
 import math
+import os
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from uuid import UUID
@@ -176,6 +177,47 @@ def calculer_frais(body: dict, db: Session = Depends(get_db)):
     return d
 
 # ══════════════════════════════════════════════
+# UPLOADS D'IMAGES (utilisateurs authentifiés)
+# ══════════════════════════════════════════════
+upload_router = APIRouter(prefix="/uploads", tags=["Uploads"])
+UPLOADS_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+IMG_EXT = (".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp", ".png", ".webp", ".gif", ".avif", ".bmp")
+IMG_MAX = 5 * 1024 * 1024  # 5 Mo
+
+async def _save_image(file: UploadFile, sous_dossier: str) -> str:
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
+    if ext not in IMG_EXT:
+        raise HTTPException(400, f"Format image non supporté ({ext or 'aucun'}) — utilisez jpg, png, webp, gif, avif ou bmp")
+    contents = await file.read()
+    if len(contents) > IMG_MAX:
+        raise HTTPException(400, "Image trop lourde (max 5 Mo)")
+    dossier = os.path.join(UPLOADS_ROOT, sous_dossier)
+    os.makedirs(dossier, exist_ok=True)
+    fname = f"{uuid.uuid4().hex}{ext}"
+    with open(os.path.join(dossier, fname), "wb") as f:
+        f.write(contents)
+    return f"/uploads/{sous_dossier}/{fname}"
+
+@upload_router.post("/avatar")
+async def upload_avatar(file: UploadFile = File(...), db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Photo de profil — tous les rôles (client, livreur, agent, admin)."""
+    url = await _save_image(file, "avatars")
+    # Supprime l'ancienne photo locale
+    if user.avatar_url and user.avatar_url.startswith("/uploads/"):
+        old = os.path.join(UPLOADS_ROOT, *user.avatar_url.split("/")[2:])
+        if os.path.exists(old):
+            try: os.remove(old)
+            except OSError: pass
+    user.avatar_url = url
+    db.commit()
+    return {"ok": True, "avatar_url": url}
+
+@upload_router.post("/image-suggestion")
+async def upload_image_suggestion(file: UploadFile = File(...), _=Depends(get_current_user)):
+    """Photo d'une suggestion de produit (client ou admin qui ajuste)."""
+    return {"ok": True, "image_url": await _save_image(file, "suggestions")}
+
+# ══════════════════════════════════════════════
 # SUGGESTIONS PRODUITS (client)
 # ══════════════════════════════════════════════
 suggest_router = APIRouter(prefix="/suggestions", tags=["Suggestions"])
@@ -245,6 +287,8 @@ def creer_suggestion(body: dict, db: Session = Depends(get_db), user=Depends(get
         description=body.get("description"),
         prix_suggere_fcfa=body.get("prix_suggere_fcfa"),
         image_url=body.get("image_url"),
+        est_menu=bool(body.get("est_menu")),
+        ingredients_json=body.get("ingredients") or None,
     )
     db.add(s)
     db.commit()
@@ -269,6 +313,8 @@ def _fmt_suggestion(s: SuggestionProduit):
         "description": s.description,
         "prix_suggere_fcfa": s.prix_suggere_fcfa,
         "image_url": s.image_url,
+        "est_menu": bool(s.est_menu),
+        "ingredients": s.ingredients_json or [],
         "statut": s.statut,
         "votes": s.votes,
         "note_admin": s.note_admin,
@@ -318,32 +364,71 @@ def admin_approuver(sid: UUID, body: dict = None, db: Session = Depends(get_db),
     while db.query(Produit).filter(Produit.slug == slug).first():
         slug = f"{slug_base}-{cpt}"; cpt += 1
 
+    est_menu   = bool(body.get("est_menu", s.est_menu))
+    image_finale = body.get("image_url") or s.image_url
+    ingredients  = body.get("ingredients")
+    if ingredients is None:
+        ingredients = s.ingredients_json or []
+
     prod = Produit(
         section_id=s.section_id,
         nom=nom_final,
         slug=slug,
         description=desc_final,
         prix_base_fcfa=prix_final,
+        image_url=image_finale,
+        est_menu=est_menu,
         est_nouveau=True,
         est_actif=True,
     )
     db.add(prod)
     db.flush()
 
+    # Ingrédients du menu (suggérés par le client, ajustables par l'admin)
+    if est_menu:
+        for i, ing in enumerate(ingredients):
+            if not (ing.get("nom") or "").strip():
+                continue
+            db.add(Ingredient(
+                produit_id=prod.id,
+                nom=ing["nom"].strip()[:120],
+                description=(ing.get("description") or "")[:300] or None,
+                est_obligatoire=bool(ing.get("est_obligatoire")),
+                type_saisie=ing.get("type_saisie") or "quantite",
+                unite=ing.get("unite") or "unite",
+                quantite_defaut=ing.get("quantite_defaut") or 1,
+                quantite_min=ing.get("quantite_min") or 0,
+                quantite_max=ing.get("quantite_max"),
+                prix_min_fcfa=ing.get("prix_min_fcfa") or 0,
+                prix_max_fcfa=ing.get("prix_max_fcfa"),
+                prix_defaut_fcfa=ing.get("prix_defaut_fcfa") or 0,
+                ordre=ing.get("ordre", i),
+                actif=True,
+            ))
+
+    # Menu : le prix est calculé depuis la composition (Σ prix aux quantités
+    # par défaut), jamais saisi — cohérent avec la fiche qui facture Σ choix.
+    if est_menu:
+        from app.api.routes import _sync_prix_menu
+        _sync_prix_menu(db, prod.id)
+
     s.statut = "approuvee"
     s.note_admin = body.get("note_admin", "")
     s.produit_cree_id = prod.id
 
-    # +100 pts fidélité pour le client suggérant
+    # +100 pts fidélité pour le client suggérant — le compte est créé si absent
+    # (utilisateurs antérieurs à la fidélité ou créés par seed/admin)
     fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == s.client_id).first()
-    if fid:
-        fid.points_actuels += 100
-        fid.points_totaux  += 100
-        db.add(FideliteTransaction(
-            compte_id=fid.id, type="suggestion_approuvee", points=100,
-            solde_apres=fid.points_actuels,
-            description=f"Suggestion '{nom_final}' approuvée"
-        ))
+    if not fid:
+        fid = FideliteCompte(utilisateur_id=s.client_id)
+        db.add(fid); db.flush()
+    fid.points_actuels += 100
+    fid.points_totaux  += 100
+    db.add(FideliteTransaction(
+        compte_id=fid.id, type="suggestion_approuvee", points=100,
+        solde_apres=fid.points_actuels,
+        description=f"Suggestion '{nom_final}' approuvée"
+    ))
 
     db.add(Notification(
         destinataire_id=s.client_id, type="suggestion_approuvee",

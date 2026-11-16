@@ -5,6 +5,7 @@ import {
   Search, Filter, Clock, Eye, Shield, Bike, ChevronLeft
 } from 'lucide-react'
 import api from '../utils/api'
+import Avatar from '../components/common/Avatar'
 import { AdminLayout } from './Admin'
 
 const ROLE_LABELS = { client: 'Client', livreur: 'Livreur', admin: 'Admin', super_admin: 'Super Admin' }
@@ -321,10 +322,8 @@ export default function AdminMonitoring() {
             {(m?.utilisateurs_recents || []).map(u => (
               <div key={u.id} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
                 <div className="relative">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold
-                    ${u.role === 'admin' || u.role === 'super_admin' ? 'bg-purple-500' : u.role === 'livreur' ? 'bg-amber-500' : 'bg-blue-500'}`}>
-                    {u.nom_complet?.[0] || '?'}
-                  </div>
+                  <Avatar user={u} size="md" text="text-white"
+                    bg={u.role === 'admin' || u.role === 'super_admin' ? 'bg-purple-500' : u.role === 'livreur' ? 'bg-amber-500' : 'bg-blue-500'}/>
                   <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white
                     ${u.en_ligne ? 'bg-green-500' : 'bg-gray-300'}`} />
                 </div>
@@ -396,10 +395,8 @@ export default function AdminMonitoring() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <div className="relative">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold
-                            ${u.role === 'admin' || u.role === 'super_admin' ? 'bg-purple-500' : u.role === 'livreur' ? 'bg-amber-500' : 'bg-blue-500'}`}>
-                            {u.nom_complet?.[0] || '?'}
-                          </div>
+                          <Avatar user={u} size="sm" text="text-white"
+                            bg={u.role === 'admin' || u.role === 'super_admin' ? 'bg-purple-500' : u.role === 'livreur' ? 'bg-amber-500' : 'bg-blue-500'}/>
                           <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white
                             ${u.en_ligne ? 'bg-green-500' : 'bg-gray-300'}`} />
                         </div>

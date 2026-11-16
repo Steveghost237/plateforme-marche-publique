@@ -10,7 +10,7 @@ from app.api.routes import cat_router, tem_router, adr_router, fav_router, cmd_r
 from app.api.routes_extra import (
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router, admin_seed_router,
-    panier_router
+    panier_router, upload_router
 )
 from app.api.webhooks import webhook_router
 
@@ -31,7 +31,7 @@ for r in [
     fid_router, notif_router, admin_router, liv_router,
     zones_router, suggest_router,
     admin_suggest_router, admin_prix_router, admin_zones_router, admin_seed_router,
-    panier_router, webhook_router,
+    panier_router, webhook_router, upload_router,
 ]:
     app.include_router(r, prefix="/api")
 

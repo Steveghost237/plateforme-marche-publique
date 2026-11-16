@@ -4,6 +4,7 @@ import { ChevronLeft, Search, Save, TrendingUp, TrendingDown, BarChart2, Refresh
 import toast from 'react-hot-toast'
 import api, { getImageUrl } from '../utils/api'
 import { useConfirm } from '../components/common/useConfirm'
+import IngredientEditor from '../components/common/IngredientEditor'
 
 const SECTION_EMOJI = {
   menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞',
@@ -35,7 +36,7 @@ export default function AdminPrix() {
 
   // Création produit
   const [createModal, setCreateModal] = useState(false)
-  const [createVal, setCreateVal]     = useState({ nom:'', section_id:'', prix_base_fcfa:0, prix_max_fcfa:'', description:'', est_menu:false })
+  const [createVal, setCreateVal]     = useState({ nom:'', section_id:'', prix_base_fcfa:0, prix_max_fcfa:'', description:'', est_menu:false, ingredients:[] })
   const [createImg, setCreateImg]     = useState(null)
   const [creating, setCreating]       = useState(false)
 
@@ -152,21 +153,32 @@ export default function AdminPrix() {
 
   const createProduit = async () => {
     if (!createVal.nom.trim() || !createVal.section_id) { toast.error('Nom et section requis'); return }
+    if (createVal.est_menu && !(createVal.ingredients || []).some(i => (i.nom || '').trim())) {
+      toast.error('Ajoutez au moins un ingrédient au menu'); return
+    }
     setCreating(true)
     try {
       const slug = `${slugify(createVal.nom)}-${Date.now().toString(36)}`
+      const prixMenu = (createVal.ingredients || []).reduce((a, i) => a + (parseInt(i.prix_defaut_fcfa) || 0), 0)
       const { data: prod } = await api.post('/catalogue/produits', {
         ...createVal,
         slug,
-        prix_base_fcfa: parseInt(createVal.prix_base_fcfa) || 0,
+        prix_base_fcfa: createVal.est_menu ? prixMenu : parseInt(createVal.prix_base_fcfa) || 0,
         prix_max_fcfa: createVal.prix_max_fcfa === '' ? null : parseInt(createVal.prix_max_fcfa),
       })
       if (createImg && prod?.id) {
         const fd = new FormData(); fd.append('file', createImg)
         await api.post(`/catalogue/produits/${prod.id}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       }
+      // Menu : créer les ingrédients — le backend recalcule prix_base/max via _sync_prix_menu
+      if (createVal.est_menu && prod?.id) {
+        for (const ing of (createVal.ingredients || [])) {
+          if (!(ing.nom || '').trim()) continue
+          await api.post(`/catalogue/produits/${prod.id}/ingredients`, ing)
+        }
+      }
       toast.success('Produit créé !'); setCreateModal(false)
-      setCreateVal({ nom:'', section_id:'', prix_base_fcfa:0, prix_max_fcfa:'', description:'', est_menu:false })
+      setCreateVal({ nom:'', section_id:'', prix_base_fcfa:0, prix_max_fcfa:'', description:'', est_menu:false, ingredients:[] })
       setCreateImg(null)
       setPage(1); load()
     } catch (err) { toast.error(err.response?.data?.detail || 'Erreur création') }
@@ -494,7 +506,7 @@ export default function AdminPrix() {
       {/* Modal Nouveau produit */}
       {createModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="bg-[#0D2137] rounded-t-2xl p-5 flex items-center justify-between">
               <h2 className="text-white font-bold text-lg">➕ Nouveau produit</h2>
               <button onClick={() => setCreateModal(false)} className="text-white/50 hover:text-white"><X size={18}/></button>
@@ -509,23 +521,28 @@ export default function AdminPrix() {
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-1.5">Section *</label>
                 <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] bg-white"
-                  value={createVal.section_id} onChange={e => setCreateVal(v=>({...v, section_id:e.target.value}))}>
+                  value={createVal.section_id} onChange={e => {
+                    const sec = sections.find(s => s.id === e.target.value)
+                    setCreateVal(v => ({...v, section_id:e.target.value, est_menu: sec?.code === 'menus_ingredients' ? true : v.est_menu}))
+                  }}>
                   <option value="">— Choisir —</option>
                   {sections.filter(s => s.id).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.nom}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-400 block mb-1.5">Prix de base (FCFA)</label>
-                  <input type="number" min="0" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
-                    value={createVal.prix_base_fcfa} onChange={e => setCreateVal(v=>({...v, prix_base_fcfa:e.target.value}))}/>
+              {!createVal.est_menu && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 block mb-1.5">Prix de base (FCFA)</label>
+                    <input type="number" min="0" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+                      value={createVal.prix_base_fcfa} onChange={e => setCreateVal(v=>({...v, prix_base_fcfa:e.target.value}))}/>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 block mb-1.5">Prix max (optionnel)</label>
+                    <input type="number" min="0" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+                      placeholder="—" value={createVal.prix_max_fcfa} onChange={e => setCreateVal(v=>({...v, prix_max_fcfa:e.target.value}))}/>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-400 block mb-1.5">Prix max (optionnel)</label>
-                  <input type="number" min="0" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
-                    placeholder="—" value={createVal.prix_max_fcfa} onChange={e => setCreateVal(v=>({...v, prix_max_fcfa:e.target.value}))}/>
-                </div>
-              </div>
+              )}
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-1.5">Description (optionnel)</label>
                 <textarea rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] resize-none"
@@ -549,6 +566,18 @@ export default function AdminPrix() {
                   checked={createVal.est_menu} onChange={e => setCreateVal(v=>({...v, est_menu:e.target.checked}))}/>
                 C'est un menu à composer (avec ingrédients ajustables)
               </label>
+              {createVal.est_menu && (
+                <div>
+                  <label className="text-xs font-bold text-gray-400 block mb-1.5">Ingrédients du menu *</label>
+                  <IngredientEditor value={createVal.ingredients} onChange={v => setCreateVal(f=>({...f, ingredients:v}))}/>
+                  <div className="mt-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 flex items-center justify-between">
+                    <span className="text-[10px] text-purple-500">Prix du menu (calculé = Σ défauts ingrédients)</span>
+                    <span className="text-sm font-bold text-purple-700">
+                      {(createVal.ingredients || []).reduce((a, i) => a + (parseInt(i.prix_defaut_fcfa) || 0), 0).toLocaleString()} F
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={createProduit} disabled={creating}
                   className="flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40 flex items-center justify-center gap-2">

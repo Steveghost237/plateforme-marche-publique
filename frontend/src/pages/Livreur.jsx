@@ -6,6 +6,7 @@ import api from '../utils/api'
 import { useConfirm } from '../components/common/useConfirm'
 import BoutonLangue from '../components/common/BoutonLangue'
 import ChangerMotDePasse from '../components/common/ChangerMotDePasse'
+import AvatarUpload from '../components/common/AvatarUpload'
 import { useAuth } from '../store'
 
 const STATUT_LABELS = {
@@ -561,6 +562,9 @@ export function LiveurDashboard() {
               <button onClick={() => setShowProfil(false)} className="text-white/60 hover:text-white text-xl leading-none">×</button>
             </div>
             <div className="p-5 space-y-4">
+              <div className="flex justify-center">
+                <AvatarUpload size="lg"/>
+              </div>
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nom complet</label>
                 <input value={profilForm.nom_complet} onChange={e => setProfilForm({...profilForm, nom_complet: e.target.value})}

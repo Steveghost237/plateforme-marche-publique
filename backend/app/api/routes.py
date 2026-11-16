@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os, uuid as _uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, get_current_admin, get_current_staff, get_optional_user, hash_password, valider_mot_de_passe_fort
 from app.models.models import (Section, Produit, Ingredient, Adresse, Commande, CommandeLigne,
     CommandeIngredient, Paiement, Livreur, FideliteCompte, FideliteTransaction, FideliteRecompense,
+    FideliteAvantage,
     Notification, Evaluation, Utilisateur, Parametre, ListeFavorite, ListeFavoriteLigne, ZoneLivraison,
     Temoignage, PointAchat)
 from app.api.routes_extra import calculer_frais_livraison, haversine, MARCHE_LAT, MARCHE_LON, est_heure_pointe, heure_cameroun, geocoder_adresse
@@ -111,8 +112,8 @@ async def upload_produit_image(
     if not prod:
         raise HTTPException(404, "Produit introuvable")
     ext = os.path.splitext(file.filename or "")[1] or ".jpg"
-    if ext.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
-        raise HTTPException(400, "Format image non supporté (jpg, png, webp, gif)")
+    if ext.lower() not in (".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp", ".png", ".webp", ".gif", ".avif", ".bmp"):
+        raise HTTPException(400, f"Format image non supporté ({ext.lower() or 'aucun'}) — utilisez jpg, png, webp, gif, avif ou bmp")
     fname = f"{_uuid.uuid4().hex}{ext.lower()}"
     fpath = os.path.join(UPLOAD_DIR, fname)
     contents = await file.read()
@@ -170,7 +171,11 @@ def _sync_prix_menu(db: Session, produit_id):
     prod = db.query(Produit).filter(Produit.id == produit_id).first()
     if not prod or not prod.est_menu:
         return
-    ings = [i for i in prod.ingredients if i.actif]
+    # Requête directe — prod.ingredients serait une collection périmée
+    # quand le produit vient d'être créé dans cette session (ex : approbation)
+    ings = (db.query(Ingredient)
+              .filter(Ingredient.produit_id == produit_id, Ingredient.actif.is_(True))
+              .all())
     prod.prix_base_fcfa = sum(_prix_curseur_ing(i, float(i.quantite_defaut or 0)) for i in ings)
     prod.prix_max_fcfa  = sum(int(i.prix_max_fcfa or 0) for i in ings)
 
@@ -389,11 +394,36 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
     else:
         frais = max(1000, frais)
 
-    total = sous_total + frais
+    # Avantage fidélité (coupon échangé) — validé et appliqué côté serveur
+    avantage = None
+    if p.avantage_id:
+        _fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
+        avantage = (db.query(FideliteAvantage)
+                    .filter(FideliteAvantage.id == p.avantage_id,
+                            FideliteAvantage.statut == "active").first()) if _fid else None
+        if not avantage or avantage.compte_id != _fid.id:
+            raise HTTPException(400, "Avantage fidélité introuvable ou déjà utilisé")
+        if avantage.expire_at and avantage.expire_at.replace(tzinfo=None) < datetime.utcnow():
+            avantage.statut = "expiree"; db.commit()
+            raise HTTPException(400, "Cet avantage fidélité a expiré")
 
     # Articles « au marché » (Ma Liste sans prix) : la commande attend que
     # l'agent fixe les vrais prix AVANT que le client ne paie.
     prix_a_confirmer = any((l.prix_unitaire or 0) <= 0 for l in p.lignes)
+    if prix_a_confirmer:
+        avantage = None   # total non définitif — le coupon reste actif, non consommé
+
+    reduction = 0
+    if avantage:
+        if avantage.type_avantage == "livraison":
+            frais = 0
+        elif avantage.type_avantage == "reduction_pct":
+            reduction = round(sous_total * float(avantage.valeur_avantage or 0) / 100)
+        elif avantage.type_avantage == "produit":
+            reduction = int(avantage.valeur_avantage or 0)
+        reduction = min(reduction, sous_total)
+
+    total = max(0, sous_total + frais - reduction)
     statut_initial   = "prix_a_confirmer" if prix_a_confirmer else "en_attente_paiement"
 
     # Chaque checkout crée une NOUVELLE commande — aucune commande existante n'est
@@ -402,8 +432,12 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
                    point_achat_id=pa_cmd.id if pa_cmd else None,
                    creneau=p.creneau, date_livraison=p.date_livraison,
                    sous_total_fcfa=sous_total, frais_livraison=frais, total_fcfa=total,
+                   reduction_points=reduction,
                    points_gagnes=total//500, statut=statut_initial, note_client=p.note_client)
     db.add(cmd); db.flush()
+    if avantage:
+        avantage.statut = "utilisee"; avantage.commande_id = cmd.id
+        avantage.utilise_at = datetime.utcnow()
     for l in p.lignes:
         _prod = db.get(Produit, l.produit_id)
         if not _prod:
@@ -697,6 +731,12 @@ def annuler(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_curren
             db.add(Notification(destinataire_id=liv.utilisateur_id, type="commande_annulee",
                                 titre="Commande annulée", corps=f"La commande {cmd.numero} a été annulée par le client.",
                                 donnees_json={"commande_id": str(cmd_id)}))
+    # Avantage fidélité utilisé sur cette commande : il redevient actif
+    av = db.query(FideliteAvantage).filter(FideliteAvantage.commande_id == cmd.id,
+                                         FideliteAvantage.statut == "utilisee").first()
+    if av:
+        av.statut = "active" if (not av.expire_at or av.expire_at.replace(tzinfo=None) > datetime.utcnow()) else "expiree"
+        av.commande_id = None; av.utilise_at = None
     cmd.statut = "annulee"; cmd.annulee_at = datetime.utcnow(); db.commit()
     return {"message": "Annulée"}
 
@@ -958,8 +998,36 @@ def echanger(recompense_id: UUID, db: Session = Depends(get_db), user=Depends(ge
     db.add(FideliteTransaction(compte_id=fid.id, type="echange_recompense", points=-rec.cout_points,
                                solde_apres=fid.points_actuels,
                                description=f"Échange : {rec.nom}"))
+    # Coupon réellement utilisable à la prochaine commande (valable 30 jours)
+    av = FideliteAvantage(compte_id=fid.id, recompense_id=rec.id, nom=rec.nom,
+                          type_avantage=rec.type_avantage, valeur_avantage=rec.valeur_avantage,
+                          expire_at=datetime.utcnow() + timedelta(days=30))
+    db.add(av)
+    db.add(Notification(destinataire_id=user.id, type="fidelite",
+                        titre="Récompense débloquée 🎁",
+                        corps=f"« {rec.nom} » est disponible dans vos avantages — applicable à votre prochaine commande (valable 30 jours)."))
     db.commit()
-    return {"message": f"Récompense « {rec.nom} » obtenue", "points_actuels": fid.points_actuels}
+    return {"message": f"Récompense « {rec.nom} » obtenue — utilisable à votre prochaine commande",
+            "points_actuels": fid.points_actuels, "avantage_id": str(av.id)}
+
+@fid_router.get("/avantages")
+def mes_avantages(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Coupons du client — les « active » sont proposés au checkout."""
+    fid = db.query(FideliteCompte).filter(FideliteCompte.utilisateur_id == user.id).first()
+    if not fid: return []
+    now = datetime.utcnow()
+    avs = (db.query(FideliteAvantage).filter(FideliteAvantage.compte_id == fid.id)
+           .order_by(FideliteAvantage.created_at.desc()).limit(30).all())
+    changed = False
+    for a in avs:
+        if a.statut == "active" and a.expire_at and a.expire_at.replace(tzinfo=None) < now:
+            a.statut = "expiree"; changed = True
+    if changed: db.commit()
+    return [{"id": str(a.id), "nom": a.nom, "type_avantage": a.type_avantage,
+             "valeur_avantage": float(a.valeur_avantage) if a.valeur_avantage is not None else None,
+             "statut": a.statut,
+             "expire_at": a.expire_at.isoformat() if a.expire_at else None,
+             "created_at": a.created_at.isoformat() if a.created_at else None} for a in avs]
 
 # ══════════════════════════════════════════════
 # NOTIFICATIONS
@@ -1190,6 +1258,7 @@ def admin_livreurs(q: str = None, db: Session = Depends(get_db), user=Depends(ge
             "nom_complet": u.nom_complet if u else None,
             "telephone": u.telephone if u else None,
             "email": u.email if u else None,
+            "avatar_url": u.avatar_url if u else None,
             "type_vehicule": l.type_vehicule, "plaque": l.plaque,
             "numero_permis": l.numero_permis,
             "statut": l.statut, "statut_compte": u.statut if u else None, "niveau": l.niveau,
@@ -1532,6 +1601,7 @@ def admin_monitoring_users(
             "nom_complet": u.nom_complet,
             "telephone": u.telephone,
             "email": u.email,
+            "avatar_url": u.avatar_url,
             "role": u.role,
             "statut": u.statut,
             "plateforme": u.derniere_plateforme or "inconnu",
@@ -1722,6 +1792,7 @@ def _user_admin_dict(u: Utilisateur, db: Session) -> dict:
     return {
         "id": str(u.id), "nom_complet": u.nom_complet, "telephone": u.telephone,
         "email": u.email, "role": u.role, "statut": u.statut,
+        "avatar_url": u.avatar_url,
         "point_achat_id": str(u.point_achat_id) if u.point_achat_id else None,
         "point_achat_nom": u.point_achat.nom if u.point_achat else None,
         "created_at": u.created_at.isoformat() if u.created_at else None,

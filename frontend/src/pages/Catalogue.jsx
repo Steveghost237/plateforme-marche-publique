@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Search, ArrowLeft, ArrowRight, Plus, Minus, ShoppingCart, ChevronRight, Star, X, Lightbulb, Send, ThumbsUp } from 'lucide-react'
+import { Search, ArrowLeft, ArrowRight, Plus, Minus, ShoppingCart, ChevronRight, Star, X, Lightbulb, Send, ThumbsUp, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api, { getImageUrl } from '../utils/api'
+import api, { getImageUrl, apiErr } from '../utils/api'
 import { usePanier, useAuth } from '../store'
+import IngredientEditor from '../components/common/IngredientEditor'
 import SafeImg from '../components/common/SafeImg'
 import Breadcrumb from '../components/common/Breadcrumb'
 import SEO from '../components/common/SEO'
@@ -48,20 +49,45 @@ function SidebarNav({ current }) {
 // ── MODAL SUGGESTION PRODUIT ──────────────────────────────────
 function SuggestionModal({ isOpen, onClose, sectionCode }) {
   const { isAuth } = useAuth()
-  const [form, setForm] = useState({ nom:'', description:'', prix_suggere_fcfa:'', section_code: sectionCode })
+  const [form, setForm] = useState({ nom:'', description:'', prix_suggere_fcfa:'', section_code: sectionCode, est_menu:false, ingredients:[] })
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePrev, setImagePrev] = useState(null)
   const [loading, setLoading] = useState(false)
   const [done, setDone]       = useState(false)
   const [votes, setVotes]     = useState(null)
+  const imgRef = useRef(null)
 
-  useEffect(() => { if (isOpen) { setForm(f => ({...f, section_code: sectionCode})); setDone(false); setVotes(null) } }, [isOpen, sectionCode])
+  useEffect(() => {
+    if (isOpen) {
+      setForm(f => ({...f, section_code: sectionCode, est_menu: sectionCode === 'menus_ingredients'}))
+      setDone(false); setVotes(null); setImageFile(null); setImagePrev(null)
+    }
+  }, [isOpen, sectionCode])
+
+  const choisirImage = (e) => {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f) return
+    if (f.size > 5 * 1024 * 1024) { toast.error('Image trop lourde (max 5 Mo)'); return }
+    setImageFile(f); setImagePrev(URL.createObjectURL(f))
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     if (!form.nom.trim() || form.nom.trim().length < 2) { toast.error('Nom requis (min 2 caractères)'); return }
     if (!isAuth) { toast.error('Connectez-vous pour suggérer un produit'); return }
+    if (form.est_menu && form.ingredients.length === 0) { toast.error('Ajoutez au moins un ingrédient au menu'); return }
     setLoading(true)
     try {
-      const { data } = await api.post('/suggestions/', form)
+      let image_url = null
+      if (imageFile) {
+        const fd = new FormData(); fd.append('file', imageFile)
+        image_url = (await api.post('/uploads/image-suggestion', fd, { headers: { 'Content-Type': 'multipart/form-data' } })).data.image_url
+      }
+      // Menu : le prix est calculé (Σ prix défaut des ingrédients), pas saisi
+      const prix_suggere_fcfa = form.est_menu
+        ? (form.ingredients || []).reduce((a, i) => a + (parseInt(i.prix_defaut_fcfa) || 0), 0)
+        : form.prix_suggere_fcfa
+      const { data } = await api.post('/suggestions/', { ...form, prix_suggere_fcfa, image_url })
       if (data.is_doublon) {
         setVotes(data.votes)
         toast.success('Votre vote a été ajouté à cette suggestion !')
@@ -70,7 +96,7 @@ function SuggestionModal({ isOpen, onClose, sectionCode }) {
         toast.success('Suggestion envoyée ! +100 pts si approuvée')
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Erreur lors de l\'envoi')
+      toast.error(apiErr(err, 'Erreur lors de l\'envoi'))
     } finally { setLoading(false) }
   }
 
@@ -135,20 +161,36 @@ function SuggestionModal({ isOpen, onClose, sectionCode }) {
                   value={form.description} onChange={e => setForm(f=>({...f, description:e.target.value}))}
                 />
               </div>
+              {!form.est_menu && (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1.5">Prix estimé (FCFA)</label>
+                  <input
+                    type="number" min="0"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
+                    placeholder="Ex: 1500"
+                    value={form.prix_suggere_fcfa} onChange={e => setForm(f=>({...f, prix_suggere_fcfa: e.target.value ? parseInt(e.target.value) : ''}))}
+                  />
+                </div>
+              )}
               <div>
-                <label className="text-xs font-bold text-gray-500 block mb-1.5">Prix estimé (FCFA)</label>
-                <input
-                  type="number" min="0"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
-                  placeholder="Ex: 1500"
-                  value={form.prix_suggere_fcfa} onChange={e => setForm(f=>({...f, prix_suggere_fcfa: e.target.value ? parseInt(e.target.value) : ''}))}
-                />
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">Photo du produit</label>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => imgRef.current?.click()}
+                    className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 hover:border-[#0D2137] flex items-center justify-center overflow-hidden bg-gray-50 transition-colors shrink-0">
+                    {imagePrev ? <img src={imagePrev} alt="" className="w-full h-full object-cover"/> : <Camera size={18} className="text-gray-300"/>}
+                  </button>
+                  <div className="text-xs text-gray-400">
+                    <p className="font-medium text-gray-500">{imagePrev ? 'Photo sélectionnée ✓' : 'Ajoutez une photo (optionnel)'}</p>
+                    <p>JPG, PNG ou WebP — max 5 Mo</p>
+                  </div>
+                  <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={choisirImage}/>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500 block mb-1.5">Section</label>
                 <select
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] bg-white"
-                  value={form.section_code} onChange={e => setForm(f=>({...f, section_code:e.target.value}))}
+                  value={form.section_code} onChange={e => setForm(f=>({...f, section_code:e.target.value, est_menu: e.target.value === 'menus_ingredients' ? true : f.est_menu}))}
                 >
                   <option value="menus_ingredients">🥘 Menus & Ingrédients</option>
                   <option value="fruits">🍊 Fruits & Légumes</option>
@@ -160,6 +202,29 @@ function SuggestionModal({ isOpen, onClose, sectionCode }) {
                   <option value="cosmetique">🧴 Cosmétique & Hygiène</option>
                 </select>
               </div>
+
+              <label className="flex items-center gap-2.5 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-purple-600"
+                  checked={form.est_menu}
+                  onChange={e => setForm(f=>({...f, est_menu:e.target.checked}))}/>
+                <div>
+                  <p className="text-xs font-bold text-purple-700">🥘 C'est un menu personnalisable</p>
+                  <p className="text-[10px] text-purple-400">Le client composera son plat en choisissant les ingrédients</p>
+                </div>
+              </label>
+
+              {form.est_menu && (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1.5">Ingrédients du menu *</label>
+                  <IngredientEditor value={form.ingredients} onChange={v => setForm(f=>({...f, ingredients:v}))}/>
+                  <div className="mt-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 flex items-center justify-between">
+                    <span className="text-[10px] text-purple-500">Prix du menu (calculé automatiquement)</span>
+                    <span className="text-sm font-bold text-purple-700">
+                      {(form.ingredients || []).reduce((a, i) => a + (parseInt(i.prix_defaut_fcfa) || 0), 0).toLocaleString()} F
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                 <p className="text-amber-700 text-xs font-semibold">💡 Bon à savoir</p>
@@ -720,8 +785,9 @@ export function ProduitDetail() {
   const img      = getImageUrl(produit.image_url) || meta.fallbacks[0]
   const prixBase = produit.prix_base_fcfa || 0
   const prixIngs = Object.values(config).reduce((a, c) => a + (c.prix || 0), 0)
-  // Menu : le prix payé = somme des ingrédients choisis (prix_base = somme aux défauts, affichage carte)
-  const prixUnit = produit.est_menu ? prixIngs : prixBase
+  // Menu : le prix payé = somme des ingrédients choisis. Sans ingrédient tarifé
+  // (menu pas encore configuré), on retombe sur le prix de base — jamais 0 F.
+  const prixUnit = produit.est_menu && produit.ingredients?.length > 0 && prixIngs > 0 ? prixIngs : prixBase
   const total    = prixUnit * qty
   const points   = Math.floor(total / 500)
 
@@ -804,7 +870,10 @@ export function ProduitDetail() {
                 {produit.nom}
               </h1>
               <div className="flex items-center gap-3 mt-2">
-                <span className="text-amber-500 font-bold text-2xl">{prixBase.toLocaleString()} F</span>
+                <span className="text-amber-500 font-bold text-2xl">{prixUnit.toLocaleString()} F</span>
+                {produit.est_menu && prixUnit !== prixBase && (
+                  <span className="text-gray-400 text-sm">défaut {prixBase.toLocaleString()} F</span>
+                )}
                 {produit.prix_max_fcfa && produit.prix_max_fcfa !== prixBase && (
                   <span className="text-gray-400 text-sm">jusqu'à {produit.prix_max_fcfa.toLocaleString()} F</span>
                 )}
@@ -862,11 +931,14 @@ export function ProduitDetail() {
                         ) : (
                           <div>
                             <div className="relative">
-                              <input 
+                              <input
                                 type="range"
-                                min={qMin} 
+                                min={qMin}
                                 max={qMax}
-                                step={ing.unite === 'g' ? 50 : ing.unite === 'kg' ? 0.5 : ing.unite === 'cl' || ing.unite === 'ml' ? 5 : ing.unite === 'pcs' ? 1 : 10}
+                                step={ing.unite === 'g' ? Math.min(50, Math.max(10, Math.round((qMax - qMin) / 10)))
+                                     : ing.unite === 'kg' ? Math.min(0.5, Math.max(0.05, (qMax - qMin) / 4))
+                                     : (ing.unite === 'cl' || ing.unite === 'ml') ? Math.min(5, Math.max(1, Math.round((qMax - qMin) / 10)))
+                                     : 1}
                                 value={curQte}
                                 onChange={e => updateCurseur(ing, Number(e.target.value))}
                                 className="w-full h-2 rounded-full appearance-none cursor-pointer"

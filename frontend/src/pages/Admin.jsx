@@ -4,6 +4,7 @@ import { LayoutDashboard, Package, Users, Bike, TrendingUp, ShoppingBag, CheckCi
 import api from '../utils/api'
 import { useAuth } from '../store'
 import BoutonLangue from '../components/common/BoutonLangue'
+import AvatarUpload from '../components/common/AvatarUpload'
 
 const MENU = [
   { to:'/admin',                 icon:<LayoutDashboard size={16}/>, label:'Dashboard',      group:'principal' },
@@ -79,9 +80,7 @@ export function AdminLayout({ children, title }) {
         </nav>
         <div className="p-3 border-t border-white/10">
           <div className="flex items-center gap-2 px-3 py-2 text-white/60">
-            <div className="w-7 h-7 rounded-full bg-blue flex items-center justify-center text-white text-xs font-bold">
-              {user?.nom_complet?.[0]}
-            </div>
+            <AvatarUpload size="xs"/>
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-medium truncate">{user?.nom_complet}</p>
               <p className="text-white/40 text-[10px]">{user?.role}</p>

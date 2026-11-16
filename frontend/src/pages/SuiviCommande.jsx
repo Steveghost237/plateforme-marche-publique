@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Phone, MessageCircle, ArrowLeft, Check, Clock, Package, Truck, MapPin, Star, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api from '../utils/api'
+import api, { getImageUrl } from '../utils/api'
 
 const STATUTS_TIMELINE = [
   { key: 'payee',           label: 'Commande confirmée', emoji: '✅', desc: 'Votre commande a été validée' },
@@ -244,7 +244,7 @@ export default function SuiviCommande() {
               {/* Photo livreur */}
               <div className="relative shrink-0">
                 {commande.livreur_photo ? (
-                  <img src={commande.livreur_photo} alt={commande.livreur_nom}
+                  <img src={getImageUrl(commande.livreur_photo)} alt={commande.livreur_nom}
                     className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow"/>
                 ) : (
                   <div className="w-14 h-14 bg-[#0D2137] rounded-full flex items-center justify-center text-2xl border-2 border-amber-400 shadow">

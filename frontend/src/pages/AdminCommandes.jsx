@@ -4,6 +4,7 @@ import { Package, Search, ChevronLeft, ChevronRight, Eye, UserPlus, X, Clock, Tr
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
 import { useConfirm } from '../components/common/useConfirm'
+import Avatar from '../components/common/Avatar'
 
 const STATUTS = [
   { val: '', label: 'Tous' },
@@ -460,9 +461,7 @@ export default function AdminCommandes() {
                   onClick={() => assignerLivreur(modal.commande.id, l.id)}
                   title={l.statut === 'hors_ligne' ? 'Hors ligne — sera notifié à sa connexion' : missions > 0 ? `${missions} course(s) en cours — peut en cumuler` : 'Disponible'}
                   className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-gray-100 hover:border-blue-200 transition-colors text-left">
-                  <div className="w-9 h-9 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-sm">
-                    {l.nom_complet?.[0]}
-                  </div>
+                  <Avatar user={l} size="md" bg="bg-navy/10" text="text-navy"/>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-navy text-sm truncate">{l.nom_complet}</p>
                     <p className="text-gray-400 text-xs">{l.telephone} · ⭐ {Number(l.note_moyenne || 0).toFixed(1)} · {l.total_livraisons} livraisons</p>

@@ -3,6 +3,7 @@ import { Search, CheckCircle, XCircle, Bike, Shield, ShieldOff, Star, TrendingUp
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
 import { useConfirm } from '../components/common/useConfirm'
+import Avatar from '../components/common/Avatar'
 import { useAuth } from '../store'
 
 const STATUT_STYLE = {
@@ -221,9 +222,7 @@ export default function AdminLivreurs() {
                 <tr key={l.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-xs">
-                        {l.nom_complet?.[0]}
-                      </div>
+                      <Avatar user={l} size="sm" bg="bg-navy/10" text="text-navy"/>
                       <div>
                         <div className="font-semibold text-navy text-sm">{l.nom_complet}
                           {l.statut_compte === 'suspendu' && (
@@ -302,9 +301,7 @@ export default function AdminLivreurs() {
             </div>
             <div className="p-5">
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-14 h-14 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-xl">
-                  {detail.nom_complet?.[0]}
-                </div>
+                <Avatar user={detail} size="lg" bg="bg-navy/10" text="text-navy"/>
                 <div>
                   <h3 className="font-bold text-navy text-lg">{detail.nom_complet}</h3>
                   <p className="text-gray-400 text-sm">{detail.telephone}</p>

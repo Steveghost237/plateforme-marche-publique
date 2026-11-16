@@ -344,7 +344,9 @@ export function Checkout() {
   const [cmdNumero, setCmdNumero]     = useState('')
   const [lignesSnap, setLignesSnap]   = useState([])
   const [prixAConfirmer, setPrixAConfirmer] = useState(false)
-  const [totauxSnap, setTotauxSnap]   = useState({ sous: 0, frais: 0, total: 0, points: 0 })
+  const [totauxSnap, setTotauxSnap]   = useState({ sous: 0, frais: 0, total: 0, points: 0, reduction: 0 })
+  const [avantages, setAvantages]     = useState([])
+  const [avantageSel, setAvantageSel] = useState(null)
   const [loading, setLoading]         = useState(false)
   const [newAdr, setNewAdr]           = useState({ quartier:'', ville:'Yaoundé', libelle:'Domicile' })
   const [showNewAdr, setShowNewAdr]   = useState(false)
@@ -352,13 +354,23 @@ export function Checkout() {
   const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
   // Frais calculés dynamiquement (formule combinée distance + poids) — minimum 1000 F, gratuit pour le produit test
   const fraisLiv = lignesSel.length > 0 && lignesSel.every(l => l.produit.id === PRODUIT_TEST) ? 0 : Math.max(1000, fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
-  const total    = sousTotal + fraisLiv
+  // Coupon fidélité échangé — pas applicable aux paniers « au marché » (prix non définitifs)
+  const prixAConfirmerCart = lignesSel.some(l => (l.prixUnit || 0) <= 0)
+  const avActif = prixAConfirmerCart ? null : avantages.find(a => a.id === avantageSel) || null
+  const reductionAv = avActif
+    ? Math.min(avActif.type_avantage === 'reduction_pct'
+        ? Math.round(sousTotal * (parseFloat(avActif.valeur_avantage) || 0) / 100)
+        : avActif.type_avantage === 'produit' ? (parseInt(avActif.valeur_avantage) || 0) : 0, sousTotal)
+    : 0
+  const fraisEff = avActif?.type_avantage === 'livraison' ? 0 : fraisLiv
+  const total    = Math.max(0, sousTotal + fraisEff - reductionAv)
   const points   = Math.floor(total / 500)
 
   useEffect(() => {
     if (!isAuth) { navigate('/connexion'); return }
     if (lignesSel.length === 0) { navigate('/panier'); return }
     api.get('/adresses/').then(r => { setAdresses(r.data); if (r.data.length > 0) setSel(s => ({...s, adresseId: r.data[0].id})) }).catch(() => {})
+    api.get('/fidelite/avantages').then(r => setAvantages((r.data || []).filter(a => a.statut === 'active'))).catch(() => {})
   }, [isAuth])
 
   // Recalcul automatique à chaque changement d'adresse ou de poids
@@ -396,6 +408,7 @@ export function Checkout() {
         mode_paiement: sel.mode,
         telephone_paiement: sel.tel || user?.telephone,
         poids_estime_kg: poidsKg,
+        avantage_id: avActif?.id || null,
         lignes: lignesSel.map(l => ({
           produit_id: l.produit.id,
           section_id: l.produit.section?.id || l.produit.section_id,
@@ -410,7 +423,7 @@ export function Checkout() {
       // Articles « au marché » : pas de paiement tant que l'agent n'a pas fixé les prix
       if (cmd.statut === 'prix_a_confirmer') {
         setCmdNumero(cmd.numero); setLignesSnap(lignesSel)
-        setTotauxSnap({ sous: sousTotal, frais: fraisLiv, total, points })
+        setTotauxSnap({ sous: sousTotal, frais: fraisEff, total, points, reduction: reductionAv })
         setPrixAConfirmer(true)
         removeKeys(lignesSel.map(l => l.key || l.produit.id))
         setStep(4); return
@@ -460,7 +473,7 @@ export function Checkout() {
       }
       setCmdNumero(cmd.numero)
       setLignesSnap(lignesSel)
-      setTotauxSnap({ sous: sousTotal, frais: fraisLiv, total, points })
+      setTotauxSnap({ sous: sousTotal, frais: fraisEff, total, points, reduction: reductionAv })
       // Ne retirer que les articles commandés — les décochés restent au panier
       removeKeys(lignesSel.map(l => l.key || l.produit.id))
       setStep(4)
@@ -565,6 +578,13 @@ export function Checkout() {
                   <span>Total livraison</span>
                   <span>{totauxSnap.frais.toLocaleString()} F</span>
                 </div>
+              </div>
+            )}
+
+            {(totauxSnap.reduction || 0) > 0 && (
+              <div className="flex justify-between text-sm text-green-600 font-semibold">
+                <span>🎁 Avantage fidélité</span>
+                <span>−{totauxSnap.reduction.toLocaleString()} F</span>
               </div>
             )}
 
@@ -795,6 +815,23 @@ export function Checkout() {
               </div>
             ))}
           </div>
+          {/* Coupon fidélité échangé — applicable à cette commande */}
+          {avantages.length > 0 && !prixAConfirmerCart && (
+            <div className="border-t border-gray-100 pt-3 space-y-1.5">
+              <p className="text-[10px] font-bold text-[#0D2137] uppercase tracking-wide">🎁 Mes avantages fidélité</p>
+              {avantages.map(a => (
+                <button key={a.id} type="button"
+                  onClick={() => setAvantageSel(avantageSel === a.id ? null : a.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all
+                    ${avantageSel === a.id ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-[#F5EFE6] hover:border-amber-300'}`}>
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${avantageSel === a.id ? 'border-amber-500 bg-amber-500' : 'border-gray-300'}`}/>
+                  <span className="flex-1 text-xs font-semibold text-[#0D2137]">{a.nom}</span>
+                  {a.expire_at && <span className="text-[9px] text-gray-400">exp. {new Date(a.expire_at).toLocaleDateString('fr-FR')}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
             <div className="flex justify-between text-gray-500">
               <span>Sous-total</span><span>{sousTotal.toLocaleString()} F</span>
@@ -806,8 +843,17 @@ export function Checkout() {
                 Livraison
                 {fraisLoading && <div className="w-3 h-3 border border-gray-300 border-t-[#0D2137] rounded-full animate-spin"/>}
               </span>
-              <span className={fraisInfo ? 'text-[#0D2137] font-semibold' : ''}>{fraisLiv.toLocaleString()} F</span>
+              <span className={fraisInfo ? 'text-[#0D2137] font-semibold' : ''}>
+                {avActif?.type_avantage === 'livraison'
+                  ? <><span className="line-through text-gray-300 mr-1">{fraisLiv.toLocaleString()} F</span><span className="text-green-600 font-bold">Offerte 🎁</span></>
+                  : `${fraisLiv.toLocaleString()} F`}
+              </span>
             </div>
+            {reductionAv > 0 && (
+              <div className="flex justify-between text-green-600 font-semibold">
+                <span>🎁 {avActif.nom}</span><span>−{reductionAv.toLocaleString()} F</span>
+              </div>
+            )}
 
             {/* Facture livraison détaillée — uniquement si le total dépasse le minimum 1 000 F */}
             {fraisInfo && (fraisInfo.frais_total || fraisInfo.frais_fcfa || 0) > 1000 && (

@@ -488,7 +488,11 @@ export default function Accueil() {
                 <p className="text-gray-600 text-sm leading-relaxed mt-4 mb-5 italic">"{t.text}"</p>
                 <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
                   <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 ring-2 ring-amber-100">
-                    <SafeImg src={t.avatar} alt={t.name} className="w-full h-full object-cover" />
+                    {t.avatar
+                      ? <SafeImg src={getImageUrl(t.avatar)} alt={t.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full bg-[#0D2137] flex items-center justify-center text-white font-bold text-sm">
+                          {(t.name || '?').trim()[0].toUpperCase()}
+                        </div>}
                   </div>
                   <div>
                     <div className="font-bold text-[#0D2137] text-sm">{t.name}</div>

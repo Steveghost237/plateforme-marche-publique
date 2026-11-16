@@ -170,6 +170,7 @@ class CommandeCreateIn(BaseModel):
     lignes: List[LigneCmdIn]
     note_client: Optional[str] = None
     poids_estime_kg: Optional[float] = 0.0
+    avantage_id: Optional[UUID] = None
 
 class CommandeOut(BaseModel):
     id: UUID
