@@ -55,6 +55,20 @@ python migrate_points_achat.py
 python migrate_poids_produits.py
 python migrate_ingredients_bornes.py
 
+# 2f. Zones de livraison par défaut (idempotent — n'insère que les zones absentes)
+echo "[2f/3] Verification zones de livraison..."
+python seed_zones_livraison.py
+
+# 2g. Alignement des images produits sur l'état audité (idempotent,
+#     n'écrase jamais un upload admin /uploads/)
+echo "[2g/3] Alignement images produits..."
+python fix_produit_images.py
+
+# 2h. Resynchronisation des prix de menus depuis leurs ingrédients
+#     (base = Σ prix défaut, max = Σ prix max — valeurs dérivées)
+echo "[2h/3] Resynchronisation prix menus..."
+python sync_menus_prix.py
+
 # 3. Démarrer Uvicorn
 echo "[3/3] Demarrage du serveur Uvicorn..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
