@@ -32,6 +32,15 @@ api.interceptors.response.use(r => r, async err => {
 
 export const API_ORIGIN = API_BASE.replace('/api', '')
 
+// Extrait un message lisible depuis err.response.data.detail
+// (422 FastAPI renvoie un tableau d'objets — le passer à toast.error crashait React)
+export function apiErr(err, fallback = 'Erreur') {
+  const d = err?.response?.data?.detail
+  if (typeof d === 'string') return d
+  if (Array.isArray(d)) return d.map(e => e?.msg || e?.message || JSON.stringify(e)).join(' · ') || fallback
+  return fallback
+}
+
 export function getImageUrl(url) {
   if (!url) return null
   if (url.startsWith('http://') || url.startsWith('https://')) return url

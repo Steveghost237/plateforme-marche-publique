@@ -7,6 +7,7 @@ import { useAuth } from '../store'
 import { useConfirm } from '../components/common/useConfirm'
 import ChangerMotDePasse from '../components/common/ChangerMotDePasse'
 import BoutonGPS from '../components/common/BoutonGPS'
+import AvatarUpload from '../components/common/AvatarUpload'
 
 const NIVEAUX_INFO = {
   bronze: { emoji:'🥉', label:'Bronze',  color:'text-amber-700 bg-amber-100', min:0,     max:999  },
@@ -57,9 +58,7 @@ export function Profil() {
     <div className="min-h-screen bg-[#F5EFE6]">
       {/* Header profil */}
       <div className="bg-gradient-to-br from-[#0D2137] to-[#1B4A7A] px-6 py-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#1B6CA8] border-2 border-amber-400 flex items-center justify-center text-white font-bold text-2xl font-serif mx-auto mb-3">
-          {initials}
-        </div>
+        <AvatarUpload size="lg" className="mx-auto mb-3 inline-block ring-2 ring-amber-400 rounded-full"/>
         <p className="font-serif text-white font-bold text-lg">{user?.nom_complet}</p>
         <p className="text-white/50 text-xs mt-0.5">{user?.telephone}</p>
         {niv && (
@@ -387,6 +386,7 @@ export function Fidelite() {
   const [compte, setCompte] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [recompenses, setRecompenses] = useState([])
+  const [avantages, setAvantages]     = useState([])
   const { isAuth } = useAuth()
   const navigate = useNavigate()
   const { confirm, ConfirmDialog } = useConfirm()
@@ -397,10 +397,12 @@ export function Fidelite() {
       api.get('/fidelite/compte'),
       api.get('/fidelite/transactions').catch(() => ({ data: [] })),
       api.get('/fidelite/recompenses').catch(() => ({ data: [] })),
-    ]).then(([c, t, r]) => {
+      api.get('/fidelite/avantages').catch(() => ({ data: [] })),
+    ]).then(([c, t, r, a]) => {
       setCompte(c.data)
       setTransactions(t.data || [])
       setRecompenses(r.data || [])
+      setAvantages(a.data || [])
     }).catch(() => {})
   }, [isAuth])
 
@@ -442,6 +444,7 @@ export function Fidelite() {
       toast.success(data.message)
       setCompte(c => ({ ...c, points_actuels: data.points_actuels }))
       api.get('/fidelite/transactions').then(t => setTransactions(t.data || [])).catch(() => {})
+      api.get('/fidelite/avantages').then(a => setAvantages(a.data || [])).catch(() => {})
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Échange impossible')
     }
@@ -485,6 +488,27 @@ export function Fidelite() {
             })}
           </div>
         </div>
+
+        {/* Avantages échangés — utilisables au prochain checkout */}
+        {avantages.filter(a => a.statut === 'active').length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <h2 className="font-bold text-[#0D2137] text-sm mb-3">🎫 Mes avantages — à utiliser au checkout</h2>
+            <div className="space-y-2">
+              {avantages.filter(a => a.statut === 'active').map(a => (
+                <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
+                  <span className="text-2xl shrink-0">🎁</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#0D2137] text-xs">{a.nom}</p>
+                    {a.expire_at && (
+                      <p className="text-gray-400 text-[10px]">Expire le {new Date(a.expire_at).toLocaleDateString('fr-FR')} — sélectionnable à l'étape paiement</p>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full shrink-0">ACTIF</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Récompenses */}
         <div className="bg-white rounded-2xl shadow-sm p-4">

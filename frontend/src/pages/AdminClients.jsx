@@ -3,6 +3,7 @@ import { Search, Users, UserCheck, UserX, ChevronLeft, ChevronRight, Eye, X, Shi
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
 import { useConfirm } from '../components/common/useConfirm'
+import Avatar from '../components/common/Avatar'
 import { useAuth } from '../store'
 
 const ROLE_TABS = [
@@ -138,9 +139,7 @@ export default function AdminClients() {
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-xs">
-                        {u.nom_complet?.[0]?.toUpperCase()}
-                      </div>
+                      <Avatar user={u} size="sm" bg="bg-navy/10" text="text-navy"/>
                       <span className="font-semibold text-navy">{u.nom_complet}</span>
                     </div>
                   </td>
@@ -211,9 +210,7 @@ export default function AdminClients() {
             <div className="p-5">
               {/* Avatar + nom */}
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-14 h-14 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-xl">
-                  {detail.nom_complet?.[0]?.toUpperCase()}
-                </div>
+                <Avatar user={detail} size="lg" bg="bg-navy/10" text="text-navy"/>
                 <div>
                   <h3 className="font-bold text-navy text-lg">{detail.nom_complet}</h3>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full

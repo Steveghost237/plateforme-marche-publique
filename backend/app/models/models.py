@@ -347,6 +347,7 @@ class FideliteCompte(Base):
     updated_at     = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     utilisateur    = relationship("Utilisateur", back_populates="fidelite")
     transactions   = relationship("FideliteTransaction", back_populates="compte")
+    avantages      = relationship("FideliteAvantage", back_populates="compte")
 
 class FideliteTransaction(Base):
     __tablename__ = "fidelite_transactions"
@@ -373,6 +374,23 @@ class FideliteRecompense(Base):
     icone           = Column(String(10))
     actif           = Column(Boolean, default=True)
     created_at      = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+class FideliteAvantage(Base):
+    """Récompense échangée contre des points — « coupon » réellement
+    utilisable à la prochaine commande (livraison offerte, -15%, produit offert)."""
+    __tablename__ = "fidelite_avantages"
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    compte_id       = Column(UUID(as_uuid=True), ForeignKey("fidelite_comptes.id", ondelete="CASCADE"), nullable=False)
+    recompense_id   = Column(UUID(as_uuid=True), ForeignKey("fidelite_recompenses.id"))
+    commande_id     = Column(UUID(as_uuid=True), ForeignKey("commandes.id"))
+    nom             = Column(String(120), nullable=False)
+    type_avantage   = Column(String(50), nullable=False)   # livraison | reduction_pct | produit
+    valeur_avantage = Column(Numeric(8,2))
+    statut          = Column(String(20), default="active")  # active | utilisee | expiree
+    expire_at       = Column(DateTime(timezone=True))
+    utilise_at      = Column(DateTime(timezone=True))
+    created_at      = Column(DateTime(timezone=True), default=datetime.utcnow)
+    compte          = relationship("FideliteCompte", back_populates="avantages")
 
 # ── ÉVALUATIONS ───────────────────────────────────────────────
 class Evaluation(Base):
@@ -445,6 +463,8 @@ class SuggestionProduit(Base):
     description      = Column(Text)
     prix_suggere_fcfa= Column(Integer)
     image_url        = Column(Text)
+    est_menu         = Column(Boolean, default=False)            # suggestion d'un menu personnalisable
+    ingredients_json = Column(JSONB)                             # [{nom, unite, quantite_defaut/min/max, prix_defaut/min/max, est_obligatoire}]
     statut           = Column(String(20), default="en_attente")  # en_attente, approuvee, rejetee
     note_admin       = Column(Text)
     produit_cree_id  = Column(UUID(as_uuid=True), ForeignKey("produits.id"), nullable=True)

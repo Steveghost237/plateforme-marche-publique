@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth, usePanier } from '../../store'
 import { useT } from '../../store/langStore'
 import BoutonLangue from './BoutonLangue'
+import Avatar from './Avatar'
 import api from '../../utils/api'
 
 export default function Navbar() {
@@ -104,9 +105,7 @@ export default function Navbar() {
             <div className="relative">
               <button onClick={() => setDrop(!drop)}
                 className="flex items-center gap-2 bg-white/8 hover:bg-white/15 rounded-xl px-3 py-1.5 transition-colors border border-white/10">
-                <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-gray-900 text-xs font-bold overflow-hidden">
-                  {user?.nom_complet?.[0]?.toUpperCase() || 'U'}
-                </div>
+                <Avatar user={user} size="xs"/>
                 <span className="text-white text-sm font-medium hidden sm:block max-w-24 truncate">
                   {user?.nom_complet?.split(' ')[0]}
                 </span>
@@ -115,13 +114,16 @@ export default function Navbar() {
 
               {drop && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50">
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="text-sm font-bold text-[#0D2137]">{user?.nom_complet}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{user?.telephone}</p>
-                    <span className={`mt-1.5 inline-block text-xs font-bold px-2 py-0.5 rounded-full capitalize
-                      ${user?.role==='admin'||user?.role==='super_admin' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {user?.role}
-                    </span>
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2.5">
+                    <Avatar user={user} size="sm"/>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#0D2137] truncate">{user?.nom_complet}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">{user?.telephone}</p>
+                      <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full capitalize
+                        ${user?.role==='admin'||user?.role==='super_admin' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {user?.role}
+                      </span>
+                    </div>
                   </div>
 
                   {[

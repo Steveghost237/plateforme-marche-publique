@@ -3,6 +3,7 @@ import { Search, UserCog, Plus, Pencil, Trash2, X, Store, Phone, Mail } from 'lu
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
 import { useConfirm } from '../components/common/useConfirm'
+import Avatar from '../components/common/Avatar'
 
 const VIDE = { nom_complet: '', telephone: '', email: '', mot_de_passe: '', point_achat_id: '' }
 
@@ -110,9 +111,7 @@ export default function AdminAgents() {
                 <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue/10 flex items-center justify-center text-blue font-bold text-xs">
-                        {a.nom_complet?.[0]?.toUpperCase()}
-                      </div>
+                      <Avatar user={a} size="sm" bg="bg-blue/10" text="text-blue"/>
                       <span className="font-semibold text-navy">{a.nom_complet}</span>
                     </div>
                   </td>
