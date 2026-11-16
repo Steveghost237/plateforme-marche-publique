@@ -22,6 +22,7 @@ export function Panier() {
     lignes: s.lignes, setQty: s.setQty, remove: s.remove,
     toggleSelect: s.toggleSelect, setAllSelected: s.setAllSelected
   }))
+>>>>>>> 4cef1ac (chore: reorganisation des scripts backend + mises a jour frontend/mobile)
 
   // Le client choisit quels articles commander — les décochés restent au panier
   const selectionnes = lignes.filter(l => l.selected !== false)
