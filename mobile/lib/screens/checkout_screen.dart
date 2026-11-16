@@ -26,6 +26,8 @@ class _CheckoutScreenState extends State<CheckoutScreen>
   String _modePaiement = 'mtn_momo';
   String? _selectedAdresseId;
   List<Map<String, dynamic>> _adresses = [];
+  List<Map<String, dynamic>> _avantages = [];
+  String? _selectedAvantageId;
   final TextEditingController _telPaiementCtrl = TextEditingController();
   late AnimationController _btnAnim;
 
@@ -103,6 +105,19 @@ class _CheckoutScreenState extends State<CheckoutScreen>
     super.initState();
     _btnAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
     _loadAdresses();
+    _loadAvantages();
+  }
+
+  Future<void> _loadAvantages() async {
+    try {
+      final data = await _api.get('/fidelite/avantages');
+      setState(() {
+        _avantages = (data as List)
+            .map((a) => Map<String, dynamic>.from(a))
+            .where((a) => a['statut'] == 'active')
+            .toList();
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadAdresses() async {
@@ -186,6 +201,16 @@ class _CheckoutScreenState extends State<CheckoutScreen>
         );
   }
 
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final d = DateTime.parse(iso);
+      return '${d.day}/${d.month}/${d.year}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   bool get _besoinTelephone =>
       _modePaiement == 'mtn_momo' || _modePaiement == 'orange_money';
 
@@ -242,6 +267,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
         'lignes': cart.toCommandeData(),
         'note_client': null,
         'poids_estime_kg': 0.0,
+        if (_selectedAvantageId != null) 'avantage_id': _selectedAvantageId,
       };
 
       final response = await _api.post('/commandes/', commandeData);
@@ -641,6 +667,96 @@ class _CheckoutScreenState extends State<CheckoutScreen>
             ),
 
             const SizedBox(height: 24),
+
+            // ── AVANTAGE FIDÉLITÉ ──────────────────────────────
+            if (_avantages.isNotEmpty) ...[
+              _sectionTitle('Avantage fidélité', Icons.card_giftcard_rounded),
+              ..._avantages.map((av) {
+                final selected = _selectedAvantageId == av['id'];
+                final type = av['type_avantage'];
+                final valeur = av['valeur_avantage'];
+                String label;
+                switch (type) {
+                  case 'livraison':
+                    label = 'Livraison offerte';
+                    break;
+                  case 'reduction_pct':
+                    label = '-${valeur?.toStringAsFixed(0) ?? '15'}% sur la commande';
+                    break;
+                  case 'produit':
+                    label = 'Produit offert (jusqu\'à ${valeur?.toStringAsFixed(0) ?? '0'} F)';
+                    break;
+                  default:
+                    label = av['nom'] ?? 'Avantage';
+                }
+                return GestureDetector(
+                  onTap: () => setState(() =>
+                      _selectedAvantageId = selected ? null : av['id']),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFFF0FDF4)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selected
+                            ? const Color(0xFF16A34A)
+                            : Colors.grey.shade200,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked,
+                          color: selected
+                              ? const Color(0xFF16A34A)
+                              : Colors.grey.shade400,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                av['nom'] ?? 'Avantage',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color(0xFF0D2137),
+                                ),
+                              ),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (av['expire_at'] != null)
+                          Text(
+                            'Expire ${_formatDate(av['expire_at'])}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+            ],
 
             // ── MODE DE PAIEMENT ───────────────────────────────
             _sectionTitle('Mode de paiement', Icons.payment_rounded),
