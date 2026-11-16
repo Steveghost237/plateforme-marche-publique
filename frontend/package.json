@@ -15,8 +15,7 @@
     "zustand": "^4.5.2",
     "axios": "^1.7.2",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.383.0",
-    "date-fns": "^3.6.0"
+    "lucide-react": "^0.383.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",

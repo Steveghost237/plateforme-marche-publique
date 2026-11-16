@@ -13,6 +13,7 @@ export const useAuth = create(persist((set, get) => ({
     localStorage.setItem('refresh_token', refresh)
     set({ user, isAuth: true })
   },
+  setUser: (user) => set({ user }),
   logout: () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')

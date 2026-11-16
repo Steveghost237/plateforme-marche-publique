@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, ChevronRight, Star, Weight, RefreshCw, Zap } from 'lucide-react'
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, Star, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
@@ -15,9 +15,25 @@ const SECTION_ICONS = {
 // ── PANIER ────────────────────────────────────────────────────
 export function Panier() {
   const t = useT()
-  const { lignes, setQty, remove } = usePanier(s => ({
-    lignes: s.lignes, setQty: s.setQty, remove: s.remove
-  }))
+  const lignes = usePanier(s => s.lignes)
+  const setQty = usePanier(s => s.setQty)
+  const remove = usePanier(s => s.remove)
+  const { isAuth } = useAuth()
+  const navigate = useNavigate()
+  const [savingFav, setSavingFav] = useState(false)
+
+  const saveAsFavorite = async () => {
+    if (!isAuth) { navigate('/connexion'); return }
+    setSavingFav(true)
+    try {
+      const { data: liste } = await api.post('/favoris/', { nom: `Panier du ${new Date().toLocaleDateString('fr-FR')}` })
+      await Promise.all(lignes.map(l =>
+        api.post(`/favoris/${liste.id}/produits`, { produit_id: l.produit.id, quantite: l.quantite })
+      ))
+      toast.success('Panier enregistré en liste favorite')
+    } catch { toast.error('Impossible d\'enregistrer la liste') }
+    finally { setSavingFav(false) }
+  }
 
   const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
   const sousTotal = lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
@@ -121,8 +137,9 @@ export function Panier() {
           ))}
 
           {/* Enregistrer le panier */}
-          <button className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-gray-400 text-sm font-medium hover:border-[#0D2137] hover:text-[#0D2137] transition-colors flex items-center justify-center gap-2">
-            <Heart size={15}/> Enregistrer ce panier comme liste favorite
+          <button onClick={saveAsFavorite} disabled={savingFav}
+            className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-gray-400 text-sm font-medium hover:border-[#0D2137] hover:text-[#0D2137] transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+            <Heart size={15}/> {savingFav ? 'Enregistrement…' : 'Enregistrer ce panier comme liste favorite'}
           </button>
         </div>
 
@@ -178,7 +195,8 @@ export function Panier() {
 // ── CHECKOUT ─────────────────────────────────────────────────
 export function Checkout() {
   const t = useT()
-  const { lignes, clear } = usePanier(s => ({ lignes: s.lignes, clear: s.clear }))
+  const lignes = usePanier(s => s.lignes)
+  const clear  = usePanier(s => s.clear)
   const sousTotal = lignes.reduce((a,l)=>a+l.prixUnit*l.quantite,0)
   const { isAuth, user } = useAuth()
   const navigate = useNavigate()
@@ -319,7 +337,9 @@ export function Checkout() {
     { val:'especes',          label:t('payment_cash'), emoji:'💵' },
   ]
 
-  if (step === 4) return (
+  if (step === 4) {
+    const fact = factureSnap || { sousTotal, fraisLiv, total, points }
+    return (
     <div className="min-h-screen bg-[#F5EFE6] flex items-center justify-center px-4 py-10">
       <div className="bg-white rounded-2xl shadow-sm w-full max-w-sm">
         {/* En-tête confirmation */}
@@ -411,7 +431,8 @@ export function Checkout() {
         </div>
       </div>
     </div>
-  )
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
@@ -538,7 +559,7 @@ export function Checkout() {
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm hover:border-[#0D2137] transition-colors">← Retour</button>
                 <button onClick={() => setStep(3)} disabled={!sel.creneau || !sel.date}
-                  className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+                  className="flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
                   Paiement <ArrowRight size={14}/>
                 </button>
               </div>
@@ -586,7 +607,7 @@ export function Checkout() {
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm">← {t('checkout_back')}</button>
                 <button onClick={passer} disabled={loading}
-                  className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+                  className="flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
                   {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>✅ {t('checkout_confirm')}</>}
                 </button>
               </div>
@@ -599,7 +620,7 @@ export function Checkout() {
           <h3 className="font-bold text-[#0D2137] text-sm mb-3 pb-3 border-b border-gray-100">Votre commande</h3>
           <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
             {lignes.map(l => (
-              <div key={l.produit.id} className="flex justify-between text-xs">
+              <div key={l.key || l.produit.id} className="flex justify-between text-xs">
                 <span className="text-gray-500 truncate flex-1">{l.produit.nom} ×{l.quantite}</span>
                 <span className="font-semibold text-[#0D2137] ml-2 shrink-0">{(l.prixUnit*l.quantite).toLocaleString()} F</span>
               </div>

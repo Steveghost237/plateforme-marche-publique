@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Package, Star, Bell, MapPin, LogOut, ChevronRight, Check, Clock, Truck, XCircle, Heart, HelpCircle, Settings } from 'lucide-react'
+import { Package, Star, Bell, MapPin, LogOut, ChevronRight, HelpCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
@@ -15,7 +15,9 @@ const NIVEAUX_INFO = {
 
 // ── PROFIL ─────────────────────────────────────────────────────
 export function Profil() {
-  const { user, logout } = useAuth(s => ({ user:s.user, logout:s.logout }))
+  const user    = useAuth(s => s.user)
+  const logout  = useAuth(s => s.logout)
+  const setUser = useAuth(s => s.setUser)
   const navigate = useNavigate()
   const [form, setForm] = useState({ nom_complet: user?.nom_complet || '', email: user?.email || '', telephone_secondaire: user?.telephone_secondaire || '' })
   const [loading, setLoading] = useState(false)
@@ -23,6 +25,10 @@ export function Profil() {
   const [editMode, setEditMode] = useState(false)
   const [nbCommandes, setNbCommandes] = useState(0)
   const [nbAdresses, setNbAdresses] = useState(0)
+
+  useEffect(() => {
+    setForm({ nom_complet: user?.nom_complet || '', email: user?.email || '' })
+  }, [user])
 
   useEffect(() => {
     api.get('/fidelite/compte').then(r => setFidelite(r.data)).catch(() => {})
@@ -33,7 +39,8 @@ export function Profil() {
   const save = async () => {
     setLoading(true)
     try {
-      await api.put('/auth/me', form)
+      const { data } = await api.put('/auth/me', form)
+      if (data?.id) setUser(data)
       toast.success('Profil mis à jour')
       setEditMode(false)
     } catch { toast.error('Erreur') } finally { setLoading(false) }
@@ -168,7 +175,7 @@ export function MesCommandes() {
     brouillon:           { label:'Brouillon',   emoji:'📝', bg:'bg-gray-100',  text:'text-gray-600' },
     en_attente_paiement: { label:'En attente',  emoji:'⏳',  bg:'bg-amber-50', text:'text-amber-600' },
     payee:               { label:'Payée',       emoji:'✅',  bg:'bg-blue-50',  text:'text-blue-600'  },
-    assignee:            { label:'Assignée',    emoji:'🛕',  bg:'bg-blue-50',  text:'text-blue-600'  },
+    assignee:            { label:'Assignée',    emoji:'�',  bg:'bg-blue-50',  text:'text-blue-600'  },
     en_cours_marche:     { label:'Au marché',   emoji:'🛍️',  bg:'bg-blue-50',  text:'text-blue-600'  },
     en_livraison:        { label:'En route',    emoji:'🚀',  bg:'bg-amber-50', text:'text-amber-600' },
     livree:              { label:'Livrée',      emoji:'🎉',  bg:'bg-green-50', text:'text-green-600' },

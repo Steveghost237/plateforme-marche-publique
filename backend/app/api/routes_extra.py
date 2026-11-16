@@ -448,13 +448,18 @@ def admin_get_zones(db: Session = Depends(get_db), _=Depends(get_current_admin))
 
 @admin_zones_router.post("/")
 def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    if not body.get("nom"):
+        raise HTTPException(422, "Le nom de la zone est requis")
     z = ZoneLivraison(
         nom=body["nom"],
         ville=body.get("ville", "Yaoundé"),
         distance_min_km=body.get("distance_min_km", 0),
         distance_max_km=body.get("distance_max_km"),
-        frais_fcfa=body["frais_fcfa"],
-        frais_pointe_fcfa=body.get("frais_pointe_fcfa"),
+        frais_base_fcfa=body.get("frais_base_fcfa", body.get("frais_fcfa", 200)),
+        prix_par_km_fcfa=body.get("prix_par_km_fcfa", 50),
+        prix_par_kg_fcfa=body.get("prix_par_kg_fcfa", 100),
+        majoration_pointe_pct=body.get("majoration_pointe_pct", 20),
+        frais_fcfa=body.get("frais_base_fcfa", body.get("frais_fcfa", 1000)),
         delai_min=body.get("delai_min", 30),
         delai_max=body.get("delai_max", 60),
         couleur_hex=body.get("couleur_hex", "#6B7280"),

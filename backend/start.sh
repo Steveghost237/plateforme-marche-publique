@@ -5,7 +5,7 @@ echo "=== Demarrage ComeBuy API ==="
 
 # 1. Créer les tables + comptes de base (idempotent)
 echo "[1/3] Initialisation tables et comptes..."
-python create_tables_and_seed.py
+python scripts/seed/create_tables_and_seed.py
 
 # 2. Seeder le catalogue uniquement si la table produits est vide
 echo "[2/3] Verification catalogue produits..."
@@ -21,15 +21,17 @@ try:
 finally:
     db.close()
 " 2>/dev/null || echo "0")
+PRODUCT_COUNT=${PRODUCT_COUNT:-0}
 
 if [ "$PRODUCT_COUNT" -eq "0" ]; then
   echo "   Catalogue vide - chargement initial des produits..."
-  python seed_produits.py
-  python update_boissons_images.py
-  python update_menus_images_v2.py
-  python update_fruits_epices_images.py
-  python update_boulangerie_images.py
-  python fix_menus_ingredients_and_images.py
+  python scripts/seed/seed_produits.py
+  python scripts/images/update_boissons_images.py
+  python scripts/images/update_menus_images_v2.py
+  python scripts/images/update_fruits_epices_images.py
+  python scripts/images/update_boulangerie_images.py
+  python scripts/maintenance/fix_menus_ingredients_and_images.py
+  python scripts/maintenance/migrate_extras.py
   echo "   Catalogue charge avec succes."
 else
   echo "   Catalogue deja present ($PRODUCT_COUNT produits) - seed ignore."
