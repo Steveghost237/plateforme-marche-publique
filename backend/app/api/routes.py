@@ -12,7 +12,7 @@ from app.models.models import (Section, Produit, Ingredient, Adresse, Commande, 
     CommandeIngredient, Paiement, Livreur, FideliteCompte, FideliteTransaction, FideliteRecompense,
     Notification, Evaluation, Utilisateur, Parametre, ListeFavorite, ListeFavoriteLigne, ZoneLivraison,
     Temoignage, PointAchat)
-from app.api.routes_extra import calculer_frais_livraison, haversine, MARCHE_LAT, MARCHE_LON, est_heure_pointe, heure_cameroun
+from app.api.routes_extra import calculer_frais_livraison, haversine, MARCHE_LAT, MARCHE_LON, est_heure_pointe, heure_cameroun, geocoder_adresse
 from app.services.email_service import send_acceptation_emails, is_valid_email, send_welcome_email
 from app.schemas.schemas import (SectionOut, ProduitListOut, ProduitOut, ProduitCreateIn, AdresseIn,
     AdresseOut, CommandeCreateIn, CommandeOut, EvaluationIn, SondageIn, PaiementOut, FideliteOut, FideliteTxOut,
@@ -262,6 +262,8 @@ def mes_favoris(db: Session = Depends(get_db), user=Depends(get_current_user)):
                     "ligne_id": str(lg.id), "produit_id": str(p.id),
                     "nom": p.nom, "slug": p.slug, "image_url": p.image_url,
                     "prix_base_fcfa": p.prix_base_fcfa, "quantite": lg.quantite,
+                    "est_menu": bool(p.est_menu),
+                    "configuration": lg.configuration_json,
                 })
         result.append({
             "id": str(l.id), "nom": l.nom,
@@ -284,10 +286,14 @@ def ajouter_favori(liste_id: UUID, body: dict = None, db: Session = Depends(get_
     if not liste: raise HTTPException(404, "Liste introuvable")
     produit_id = body.get("produit_id")
     if not produit_id: raise HTTPException(400, "produit_id requis")
+    cfg = body.get("configuration")
+    # déduplique par produit + configuration : 2 articles perso / 2 recettes du même menu = lignes distinctes
     existing = db.query(ListeFavoriteLigne).filter(
-        ListeFavoriteLigne.liste_id == liste_id, ListeFavoriteLigne.produit_id == produit_id).first()
-    if existing: return {"ok": True, "message": "Déjà dans la liste"}
-    lg = ListeFavoriteLigne(liste_id=liste_id, produit_id=produit_id, quantite=body.get("quantite", 1))
+        ListeFavoriteLigne.liste_id == liste_id, ListeFavoriteLigne.produit_id == produit_id).all()
+    if any(l.configuration_json == cfg for l in existing):
+        return {"ok": True, "message": "Déjà dans la liste"}
+    lg = ListeFavoriteLigne(liste_id=liste_id, produit_id=produit_id, quantite=body.get("quantite", 1),
+                            configuration_json=body.get("configuration"))
     db.add(lg); db.commit()
     return {"ok": True}
 
@@ -317,24 +323,8 @@ def _numero(db):
     return f"MKT-{n:05d}"
 
 def _geocoder_adresse(adr, db):
-    """Remplit latitude/longitude de l'adresse via Nominatim (OpenStreetMap).
-    Best-effort : silencieux si le service est indisponible. Persiste pour
-    ne géocoder qu'une seule fois par adresse."""
-    if adr.latitude is not None and adr.longitude is not None:
-        return
-    try:
-        import urllib.request, urllib.parse, json as _json
-        q = urllib.parse.quote(f"{adr.quartier or ''}, {adr.ville or ''}, Cameroun".strip(", "))
-        req = urllib.request.Request(
-            f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&countrycodes=cm",
-            headers={"User-Agent": "marche-en-ligne/2.0 (geocodage adresse livraison)"})
-        data = _json.loads(urllib.request.urlopen(req, timeout=4).read())
-        if data:
-            adr.latitude = float(data[0]["lat"])
-            adr.longitude = float(data[0]["lon"])
-            db.flush()
-    except Exception:
-        pass
+    """Alias vers geocoder_adresse (routes_extra) — géocodage Nominatim best-effort."""
+    geocoder_adresse(adr, db)
 
 def _choisir_point_achat(db, adr):
     """Marché actif le plus proche de l'adresse de livraison (distance GPS réelle).
@@ -401,35 +391,25 @@ def creer_commande(p: CommandeCreateIn, db: Session = Depends(get_db), user=Depe
 
     total = sous_total + frais
 
-    # Réutiliser la commande en attente de paiement la plus récente pour éviter
-    # les doublons quand le client relance le checkout avant d'avoir payé.
-    pending = (db.query(Commande)
-               .filter(Commande.client_id == user.id, Commande.statut == "en_attente_paiement")
-               .order_by(Commande.created_at.desc()).all())
-    for old in pending[1:]:
-        old.statut = "annulee"; old.annulee_at = datetime.utcnow()
-    cmd = pending[0] if pending else None
-    if cmd:
-        ligne_ids = [l.id for l in db.query(CommandeLigne).filter(CommandeLigne.commande_id == cmd.id).all()]
-        if ligne_ids:
-            db.query(CommandeIngredient).filter(CommandeIngredient.ligne_id.in_(ligne_ids)).delete(synchronize_session=False)
-        db.query(CommandeLigne).filter(CommandeLigne.commande_id == cmd.id).delete(synchronize_session=False)
-        db.query(Paiement).filter(Paiement.commande_id == cmd.id).delete(synchronize_session=False)
-        cmd.adresse_id = p.adresse_id; cmd.creneau = p.creneau
-        cmd.date_livraison = p.date_livraison; cmd.note_client = p.note_client
-        cmd.point_achat_id = pa_cmd.id if pa_cmd else None
-        cmd.sous_total_fcfa = sous_total; cmd.frais_livraison = frais
-        cmd.total_fcfa = total; cmd.points_gagnes = total//500
-        db.flush()
-    else:
-        cmd = Commande(numero=_numero(db), client_id=user.id, adresse_id=p.adresse_id,
-                       point_achat_id=pa_cmd.id if pa_cmd else None,
-                       creneau=p.creneau, date_livraison=p.date_livraison,
-                       sous_total_fcfa=sous_total, frais_livraison=frais, total_fcfa=total,
-                       points_gagnes=total//500, statut="en_attente_paiement", note_client=p.note_client)
-        db.add(cmd); db.flush()
+    # Articles « au marché » (Ma Liste sans prix) : la commande attend que
+    # l'agent fixe les vrais prix AVANT que le client ne paie.
+    prix_a_confirmer = any((l.prix_unitaire or 0) <= 0 for l in p.lignes)
+    statut_initial   = "prix_a_confirmer" if prix_a_confirmer else "en_attente_paiement"
+
+    # Chaque checkout crée une NOUVELLE commande — aucune commande existante n'est
+    # jamais réutilisée ni écrasée (les « en attente » restent payables/annulables par le client).
+    cmd = Commande(numero=_numero(db), client_id=user.id, adresse_id=p.adresse_id,
+                   point_achat_id=pa_cmd.id if pa_cmd else None,
+                   creneau=p.creneau, date_livraison=p.date_livraison,
+                   sous_total_fcfa=sous_total, frais_livraison=frais, total_fcfa=total,
+                   points_gagnes=total//500, statut=statut_initial, note_client=p.note_client)
+    db.add(cmd); db.flush()
     for l in p.lignes:
-        ligne = CommandeLigne(commande_id=cmd.id, produit_id=l.produit_id, section_id=l.section_id,
+        _prod = db.get(Produit, l.produit_id)
+        if not _prod:
+            raise HTTPException(400, f"Produit inconnu : {l.produit_id}")
+        sid = l.section_id or _prod.section_id
+        ligne = CommandeLigne(commande_id=cmd.id, produit_id=l.produit_id, section_id=sid,
                               quantite=l.quantite, prix_unitaire=l.prix_unitaire, prix_total=l.prix_unitaire*l.quantite,
                               note_ligne=l.note_ligne)
         db.add(ligne); db.flush()
@@ -468,6 +448,9 @@ def get_commande(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
         "reduction_points": cmd.reduction_points, "total_fcfa": cmd.total_fcfa,
         "points_gagnes": cmd.points_gagnes,
         "note_client": cmd.note_client,
+        # ── Paiement enregistré au checkout (pour reprendre le paiement) ─
+        "mode_paiement":       (cmd.paiements[0].mode               if cmd.paiements else None),
+        "telephone_paiement":  (cmd.paiements[0].telephone_paiement if cmd.paiements else None),
         "created_at": cmd.created_at.isoformat() if cmd.created_at else None,
         "livree_at":  cmd.livree_at.isoformat()  if cmd.livree_at  else None,
         "assignee_at": cmd.assignee_at.isoformat() if cmd.assignee_at else None,
@@ -1091,7 +1074,8 @@ def admin_commande_detail(cmd_id: UUID, db: Session = Depends(get_db), user=Depe
         "preparee_par_nom": c.preparee_par.nom_complet if c.preparee_par else None,
         "livreur_nom": liv_user.nom_complet if liv_user else None,
         "livreur_telephone": liv_user.telephone if liv_user else None,
-        "lignes": [{"nom": l.produit.nom if l.produit else "Produit",
+        "lignes": [{"id": str(l.id),
+                    "nom": l.produit.nom if l.produit else "Produit",
                     "quantite": l.quantite or 0, "note": l.note_ligne,
                     "prix_unitaire": l.prix_unitaire, "prix_total": l.prix_total}
                    for l in (c.lignes or [])],
@@ -1100,6 +1084,40 @@ def admin_commande_detail(cmd_id: UUID, db: Session = Depends(get_db), user=Depe
         "livree_at": c.livree_at.isoformat() if c.livree_at else None,
         "created_at": c.created_at.isoformat() if c.created_at else None,
     }
+
+@admin_router.put("/commandes/{cmd_id}/confirmer-prix")
+def admin_confirmer_prix(cmd_id: UUID, body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_staff)):
+    """L'agent/admin fixe les vrais prix des lignes « au marché » (Ma Liste).
+    La commande passe ensuite en attente de paiement et le client est notifié."""
+    c = _scope_cmd(db.query(Commande), user).filter(Commande.id == cmd_id).first()
+    if not c: raise HTTPException(404, "Commande introuvable")
+    if c.statut != "prix_a_confirmer":
+        raise HTTPException(409, f"Impossible : la commande est au statut « {c.statut} »")
+    body = body or {}
+    prix_map = body.get("prix") or {}
+    lignes = db.query(CommandeLigne).filter(CommandeLigne.commande_id == c.id).all()
+    a_fixer = [l for l in lignes if (l.prix_unitaire or 0) <= 0]
+    if not a_fixer:
+        raise HTTPException(400, "Aucune ligne en attente de prix")
+    for l in a_fixer:
+        v = prix_map.get(str(l.id))
+        try: v = int(v)
+        except (TypeError, ValueError): v = 0
+        if v <= 0:
+            raise HTTPException(400, f"Prix manquant ou invalide pour « {l.note_ligne or 'un article'} »")
+        l.prix_unitaire = v; l.prix_total = v * l.quantite
+    c.sous_total_fcfa = sum(l.prix_total or 0 for l in lignes)
+    c.total_fcfa      = c.sous_total_fcfa + (c.frais_livraison or 0) - (c.reduction_points or 0)
+    c.points_gagnes   = c.total_fcfa // 500
+    c.statut          = "en_attente_paiement"
+    pmt = db.query(Paiement).filter(Paiement.commande_id == c.id).first()
+    if pmt: pmt.montant_fcfa = c.total_fcfa
+    db.add(Notification(destinataire_id=c.client_id, type="prix_confirmes",
+        titre=f"💰 Prix confirmés — {c.numero}",
+        corps=f"Le prix de vos articles du marché a été confirmé. Total : {c.total_fcfa:,} FCFA. Vous pouvez maintenant payer votre commande.",
+        donnees_json={"commande_id": str(c.id)}))
+    db.commit()
+    return {"ok": True, "total_fcfa": c.total_fcfa}
 
 @admin_router.post("/commandes/{cmd_id}/prete")
 def marquer_commande_prete(cmd_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_staff)):

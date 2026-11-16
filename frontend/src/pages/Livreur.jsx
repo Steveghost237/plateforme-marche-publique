@@ -4,6 +4,7 @@ import { CheckCircle, MapPin, Package, Star, Clock, ToggleLeft, ToggleRight, Pho
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useConfirm } from '../components/common/useConfirm'
+import BoutonLangue from '../components/common/BoutonLangue'
 import ChangerMotDePasse from '../components/common/ChangerMotDePasse'
 import { useAuth } from '../store'
 
@@ -192,6 +193,7 @@ export function LiveurDashboard() {
                 </div>
               )}
               <div className="flex gap-2">
+                <BoutonLangue variant="icone"/>
                 <button onClick={ouvrirProfil} title="Mon profil"
                   className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                   <Settings size={15}/>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Package, Users, Bike, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity, RefreshCw, ArrowUpRight, AlertCircle, UserCog, ShieldCheck, Store } from 'lucide-react'
 import api from '../utils/api'
 import { useAuth } from '../store'
+import BoutonLangue from '../components/common/BoutonLangue'
 
 const MENU = [
   { to:'/admin',                 icon:<LayoutDashboard size={16}/>, label:'Dashboard',      group:'principal' },
@@ -85,6 +86,9 @@ export function AdminLayout({ children, title }) {
               <p className="text-white text-xs font-medium truncate">{user?.nom_complet}</p>
               <p className="text-white/40 text-[10px]">{user?.role}</p>
             </div>
+          </div>
+          <div className="flex items-center justify-between px-3 mt-1">
+            <BoutonLangue/>
           </div>
           <button onClick={() => { logout(); navigate('/') }}
             className="flex items-center gap-2 px-3 py-2 text-white/40 hover:text-white text-xs w-full transition-colors mt-1">

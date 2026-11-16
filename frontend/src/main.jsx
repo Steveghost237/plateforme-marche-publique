@@ -5,6 +5,22 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/globals.css'
 
+
+// Google Translate réécrit les noeuds du DOM ; sans ce patch, React plante
+// (« removeChild / insertBefore ») quand il re-render sur du texte traduit.
+if (typeof Node === 'function' && Node.prototype) {
+  const origRemove = Node.prototype.removeChild
+  Node.prototype.removeChild = function (child) {
+    if (child.parentNode !== this) return child
+    return origRemove.apply(this, arguments)
+  }
+  const origInsert = Node.prototype.insertBefore
+  Node.prototype.insertBefore = function (newNode, refNode) {
+    if (refNode && refNode.parentNode !== this) return refNode
+    return origInsert.apply(this, arguments)
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -7,6 +7,7 @@ import { useConfirm } from '../components/common/useConfirm'
 
 const STATUTS = [
   { val: '', label: 'Tous' },
+  { val: 'prix_a_confirmer', label: 'Prix à fixer' },
   { val: 'en_attente_paiement', label: 'En attente' },
   { val: 'payee', label: 'Payée' },
   { val: 'prete', label: 'Prête' },
@@ -18,6 +19,7 @@ const STATUTS = [
 ]
 
 const STATUT_STYLE = {
+  prix_a_confirmer: 'bg-purple-50 text-purple-700',
   en_attente_paiement: 'bg-yellow-50 text-yellow-700',
   payee: 'bg-blue-50 text-blue-700',
   prete: 'bg-emerald-50 text-emerald-700',
@@ -30,12 +32,14 @@ const STATUT_STYLE = {
 }
 
 const STATUT_LABEL = {
+  prix_a_confirmer: 'prix à fixer',
   en_attente_paiement: 'en attente paiement', payee: 'payée', prete: 'prête',
   assignee: 'assignée', en_cours_marche: 'au marché', en_livraison: 'en livraison',
   livree: 'livrée', annulee: 'annulée', brouillon: 'brouillon',
 }
 
 const STATUT_ICON = {
+  prix_a_confirmer: <Package size={14} />,
   en_attente_paiement: <CreditCard size={14} />,
   payee: <CheckCircle size={14} />,
   prete: <ShoppingBasket size={14} />,
@@ -56,6 +60,7 @@ export default function AdminCommandes() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { type: 'detail' | 'assign', commande }
   const [detailFull, setDetailFull] = useState(null)
+  const [detailErreur, setDetailErreur] = useState(null)
   const [erreur, setErreur] = useState('')
   const [ok, setOk] = useState('')
   const { confirm, ConfirmDialog } = useConfirm()
@@ -95,8 +100,11 @@ export default function AdminCommandes() {
 
   const ouvrirDetail = (c) => {
     setModal({ type: 'detail', commande: c })
-    setDetailFull(null)
-    api.get(`/admin/commandes/${c.id}`).then(r => setDetailFull(r.data)).catch(() => {})
+    setDetailFull(null); setDetailErreur(null)
+    api.get(`/admin/commandes/${c.id}`).then(r => setDetailFull(r.data))
+      .catch(e => setDetailErreur(e?.response?.status === 404
+        ? "Cette commande relève d'un autre marché."
+        : (e?.response?.data?.detail || 'Impossible de charger le détail')))
   }
 
   const marquerPrete = async (c) => {
@@ -111,6 +119,36 @@ export default function AdminCommandes() {
       fetchCommandes()
     } catch (e) {
       setErreur(e?.response?.data?.detail || 'Erreur')
+    }
+  }
+
+  // ── Fixer les prix « au marché » (Ma Liste) ──
+  const [prixModal, setPrixModal] = useState(null) // {commande, detail, saisie:{ligneId:prix}, saving}
+  const ouvrirPrix = (c) => {
+    setPrixModal({ commande: c, detail: null, saisie: {}, saving: false, erreur: null })
+    api.get(`/admin/commandes/${c.id}`)
+      .then(r => setPrixModal(m => m && ({ ...m, detail: r.data })))
+      .catch(e => setPrixModal(m => m && ({ ...m, erreur: e?.response?.status === 404
+        ? "Cette commande relève d'un autre marché — seul l'agent de ce point d'achat peut fixer les prix."
+        : (e?.response?.data?.detail || 'Impossible de charger la commande') })))
+  }
+  const confirmerPrix = async () => {
+    const aFixer = (prixModal.detail?.lignes || []).filter(l => (l.prix_unitaire || 0) <= 0)
+    const prix = {}
+    for (const l of aFixer) {
+      const v = parseInt(prixModal.saisie[l.id])
+      if (!v || v <= 0) { setErreur(`Prix manquant pour « ${l.note || l.nom} »`); return }
+      prix[l.id] = v
+    }
+    setPrixModal(m => ({ ...m, saving: true })); setErreur('')
+    try {
+      const r = await api.put(`/admin/commandes/${prixModal.commande.id}/confirmer-prix`, { prix })
+      setPrixModal(null)
+      setOk(`Prix confirmés — nouveau total : ${r.data.total_fcfa?.toLocaleString()} F. Le client est notifié et peut payer.`)
+      fetchCommandes()
+    } catch (e) {
+      setErreur(e?.response?.data?.detail || 'Erreur')
+      setPrixModal(m => m && ({ ...m, saving: false }))
     }
   }
 
@@ -214,6 +252,12 @@ export default function AdminCommandes() {
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-navy transition-colors" title="Détails">
                         <Eye size={15} />
                       </button>
+                      {c.statut === 'prix_a_confirmer' && (
+                        <button onClick={() => ouvrirPrix(c)}
+                          className="p-1.5 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600 transition-colors" title="Fixer les prix du marché">
+                          <Store size={15} />
+                        </button>
+                      )}
                       {c.statut === 'payee' && (
                         <button onClick={() => marquerPrete(c)}
                           className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors" title="Marquer prête (commande préparée)">
@@ -251,6 +295,71 @@ export default function AdminCommandes() {
         </div>
       </div>
 
+      {/* ── MODAL FIXER LES PRIX ─────────────── */}
+      {prixModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !prixModal.saving && setPrixModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div>
+                <h2 className="font-serif text-navy text-xl">Fixer les prix — {prixModal.commande.numero}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Vrais prix constatés au marché — le client paiera ensuite</p>
+              </div>
+              <button onClick={() => setPrixModal(null)} className="p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-3 max-h-[50vh] overflow-y-auto">
+              {prixModal.erreur ? (
+                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 text-center">
+                  ⛔ {prixModal.erreur}
+                </div>
+              ) : !prixModal.detail ? <p className="text-center text-gray-400 py-6 text-sm">Chargement…</p> : (
+                <>
+                  {(prixModal.detail.lignes || []).map(l => {
+                    const aFixer = (l.prix_unitaire || 0) <= 0
+                    return (
+                      <div key={l.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${aFixer ? 'bg-purple-50 border border-purple-100' : 'bg-gray-50'}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-navy truncate">{l.note || l.nom}</p>
+                          <p className="text-[10px] text-gray-400">×{l.quantite}</p>
+                        </div>
+                        {aFixer ? (
+                          <div className="flex items-center gap-1.5">
+                            <input type="number" min="1" placeholder="Prix réel"
+                              value={prixModal.saisie[l.id] || ''}
+                              onChange={e => setPrixModal(m => ({ ...m, saisie: { ...m.saisie, [l.id]: e.target.value } }))}
+                              className="w-24 border border-purple-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-300"/>
+                            <span className="text-xs text-gray-400">F</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-500">{l.prix_unitaire?.toLocaleString()} F</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between text-sm font-bold text-navy pt-2 border-t border-gray-100">
+                    <span>Nouveau total (hors livraison)</span>
+                    <span>{(
+                      (prixModal.detail.lignes || []).reduce((a, l) =>
+                        a + ((l.prix_unitaire || 0) > 0 ? l.prix_unitaire * l.quantite
+                             : (parseInt(prixModal.saisie[l.id]) || 0) * l.quantite), 0)
+                    ).toLocaleString()} F</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setPrixModal(null)} disabled={prixModal.saving}
+                className="flex-1 border border-gray-200 text-gray-600 font-medium py-2.5 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50">
+                Annuler
+              </button>
+              <button onClick={confirmerPrix} disabled={prixModal.saving || !prixModal.detail || prixModal.erreur}
+                className="flex-1 bg-purple-600 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-purple-700 disabled:opacity-50">
+                {prixModal.saving ? 'Confirmation…' : 'Confirmer les prix'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL DÉTAIL ─────────────── */}
       {modal?.type === 'detail' && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setModal(null)}>
@@ -284,14 +393,25 @@ export default function AdminCommandes() {
               ))}
 
               {/* Produits */}
+              {detailErreur && (
+                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600 text-center">
+                  ⛔ {detailErreur}
+                </div>
+              )}
               {detailFull?.lignes?.length > 0 && (
                 <div>
                   <p className="text-gray-400 text-sm mb-2 flex items-center gap-1.5"><ShoppingBag size={13} /> Produits à préparer</p>
                   <div className="bg-gray-50 rounded-xl divide-y divide-gray-100">
                     {detailFull.lignes.map((l, i) => (
                       <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
-                        <span className="text-navy font-medium">{l.nom} <span className="text-gray-400 font-normal">× {l.quantite}{l.unite ? ` ${l.unite}` : ''}</span></span>
-                        <span className="text-amber-600 font-semibold">{l.prix_total?.toLocaleString()} F</span>
+                        <span className="text-navy font-medium">
+                          {l.note || l.nom}
+                          {l.note && l.nom !== l.note && <span className="text-gray-400 font-normal"> ({l.nom})</span>}
+                          <span className="text-gray-400 font-normal"> × {l.quantite}{l.unite ? ` ${l.unite}` : ''}</span>
+                        </span>
+                        <span className="text-amber-600 font-semibold">
+                          {(l.prix_unitaire || 0) <= 0 ? 'au marché' : `${l.prix_total?.toLocaleString()} F`}
+                        </span>
                       </div>
                     ))}
                   </div>

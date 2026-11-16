@@ -92,6 +92,22 @@ class Adresse(Base):
     updated_at     = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     utilisateur    = relationship("Utilisateur", back_populates="adresses")
 
+# ── PANIER PERSISTÉ (par utilisateur) ─────────────────────────
+class PanierItem(Base):
+    __tablename__ = "panier_items"
+    id             = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    utilisateur_id = Column(UUID(as_uuid=True), ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    item_key       = Column(String(80), nullable=False)   # clé unique de la ligne (produit.id ou clé custom)
+    produit_id     = Column(UUID(as_uuid=True), ForeignKey("produits.id", ondelete="CASCADE"), nullable=False)
+    quantite       = Column(Integer, default=1)
+    prix_unitaire  = Column(Integer, default=0)           # FCFA — prix figé au moment de l'ajout
+    ingredients    = Column(JSONB, default=list)          # choix ingrédients des menus
+    note           = Column(Text)
+    selected       = Column(Boolean, default=True)
+    created_at     = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at     = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    produit        = relationship("Produit")
+
 # ── ZONES ──────────────────────────────────────────────────────
 class ZoneLivraison(Base):
     __tablename__ = "zones_livraison"

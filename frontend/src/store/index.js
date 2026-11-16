@@ -12,16 +12,21 @@ export const useAuth = create(persist((set, get) => ({
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
     set({ user, isAuth: true })
+    hydraterPanier()   // restaure le panier sauvegardé en base (multi-appareils)
   },
   logout: () => {
+    // Tokens retirés AVANT de vider le panier local : la sync serveur est
+    // désactivée sans token → le panier persisté en base reste intact.
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    usePanier.getState().clear()   // panier local vidé (vie privée, appareil partagé)
     set({ user: null, isAuth: false })
   },
   fetchMe: async () => {
     try {
       const { data } = await api.get('/auth/me')
       set({ user: data, isAuth: true })
+      hydraterPanier()
     } catch { get().logout() }
   },
 }), { name: 'auth', partialize: s => ({ user: s.user, isAuth: s.isAuth }) }))
@@ -72,3 +77,45 @@ export const usePanier = create(persist((set, get) => ({
   },
   get total() { return get().sousTotal + get().fraisLivraison },
 }), { name: 'panier' }))
+
+// ── SYNC PANIER SERVEUR ───────────────────────────────────────
+// Le panier est persisté en base (table panier_items) pour l'utilisateur
+// connecté : retrouvé sur tout appareil et toute session.
+let _panierSyncTimer = null
+function pushPanierToServer() {
+  clearTimeout(_panierSyncTimer)
+  _panierSyncTimer = setTimeout(() => {
+    if (!localStorage.getItem('access_token')) return
+    const lignes = usePanier.getState().lignes.map(l => ({
+      key:         l.key || l.produit.id,
+      produit_id:  l.produit.id,
+      quantite:    l.quantite,
+      prixUnit:    l.prixUnit,
+      ingredients: l.ingredients || [],
+      note:        l.note || null,
+      selected:    l.selected !== false,
+    }))
+    api.put('/panier/', { lignes }).catch(() => {})
+  }, 600)
+}
+
+// Toute modification du panier (ajout, retrait, quantité, sélection,
+// vidage) déclenche la sync — débouncée pour absorber les clics rapides.
+usePanier.subscribe((state, prev) => {
+  if (state.lignes !== prev.lignes) pushPanierToServer()
+})
+
+// À la connexion : fusionne le panier serveur dans le panier local
+// (les lignes locales absentes du serveur sont remontées ensuite).
+export async function hydraterPanier() {
+  if (!localStorage.getItem('access_token')) return
+  try {
+    const { data } = await api.get('/panier/')
+    const cles = new Set(usePanier.getState().lignes.map(l => l.key || l.produit.id))
+    const manquantes = (data || []).filter(l => !cles.has(l.key))
+    if (manquantes.length) {
+      usePanier.setState(s => ({ lignes: [...s.lignes, ...manquantes] }))
+      // setState déclenche le subscribe → le panier fusionné est repoussé
+    }
+  } catch {}
+}

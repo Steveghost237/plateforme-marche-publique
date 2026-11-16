@@ -1,8 +1,9 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Search, Bell, Menu, X, ChevronDown, LogOut, User, Package, Star, Shield, Bike, Globe } from 'lucide-react'
+import { ShoppingCart, Search, Bell, Menu, X, ChevronDown, LogOut, User, Package, Star, Shield, Bike } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth, usePanier } from '../../store'
-import { useLang, useT } from '../../store/langStore'
+import { useT } from '../../store/langStore'
+import BoutonLangue from './BoutonLangue'
 import api from '../../utils/api'
 
 export default function Navbar() {
@@ -29,7 +30,6 @@ export default function Navbar() {
     api.get('/notifications/?non_lues=true').then(r => setNotifN(r.data.length)).catch(() => {})
   }, [isAuth, pathname])
 
-  const { lang, toggle: toggleLang } = useLang()
   const t = useT()
   const NAV_LINKS = [
     { label: t('sec_menus'),       href:'/catalogue/menus_ingredients' },
@@ -71,12 +71,7 @@ export default function Navbar() {
         {/* Actions droite */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Language toggle */}
-          <button onClick={toggleLang}
-            className="flex items-center gap-1 px-2 py-1.5 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10 text-xs font-bold border border-white/15"
-            title={t('lang_switch_tooltip')}>
-            <Globe size={14}/>
-            {lang === 'fr' ? 'EN' : 'FR'}
-          </button>
+          <BoutonLangue/>
 
           <Link to="/recherche"
             className="p-2 text-white/55 hover:text-white transition-colors rounded-lg hover:bg-white/10">

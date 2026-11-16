@@ -16,6 +16,8 @@ const SECTION_ICONS = {
 // ── PANIER ────────────────────────────────────────────────────
 export function Panier() {
   const t = useT()
+  const { isAuth } = useAuth()
+  const navigate = useNavigate()
   const { lignes, setQty, remove, toggleSelect, setAllSelected } = usePanier(s => ({
     lignes: s.lignes, setQty: s.setQty, remove: s.remove,
     toggleSelect: s.toggleSelect, setAllSelected: s.setAllSelected
@@ -27,7 +29,36 @@ export function Panier() {
 
   const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
   const sousTotal = selectionnes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
-  const fraisLiv  = selectionnes.length > 0 && selectionnes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : 1000
+
+  // Poids du panier (même formule que le checkout)
+  const POIDS_ING = { g: 0.001, cl: 0.01, pcs: 0.15 }
+  const poidsKg = Math.round(selectionnes.reduce((a, l) => {
+    if (l.ingredients?.length > 0) {
+      const p = l.ingredients.reduce((x, i) => x + (parseFloat(i.quantite) || 0) * (POIDS_ING[i.unite] ?? 0.15), 0)
+      return a + p * l.quantite
+    }
+    return a + l.quantite * (parseFloat(l.produit?.poids_kg) || 0.5)
+  }, 0) * 10) / 10
+
+  // Estimation livraison depuis l'adresse par défaut (ou 1ère) du client
+  const [fraisInfo, setFraisInfo] = useState(null)
+  useEffect(() => {
+    if (!isAuth || selectionnes.length === 0) { setFraisInfo(null); return }
+    let annule = false
+    api.get('/adresses/').then(async r => {
+      const list = r.data || []
+      const def = list.find(a => a.est_par_defaut) || list[0]
+      if (!def || annule) return
+      try {
+        const { data } = await api.post('/zones-livraison/calcul', { adresse_id: def.id, poids_kg: poidsKg })
+        if (!annule) setFraisInfo(data)
+      } catch { /* garde le tarif par défaut */ }
+    }).catch(() => {})
+    return () => { annule = true }
+  }, [isAuth, poidsKg, selectionnes.length])
+
+  const fraisLiv  = selectionnes.length > 0 && selectionnes.every(l => l.produit.id === PRODUIT_TEST)
+    ? 0 : Math.max(1000, fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
   const total     = sousTotal + fraisLiv
   const points    = Math.floor(total / 500)
 
@@ -38,6 +69,37 @@ export function Panier() {
     acc[sec].lignes.push(l)
     return acc
   }, {})
+
+  // Enregistre le panier courant comme liste favorite réutilisable
+  const [favModal, setFavModal] = useState(false)
+  const [favNom, setFavNom]     = useState('Ma liste')
+  const [favSaving, setFavSaving] = useState(false)
+
+  const ouvrirListe = () => {
+    if (!isAuth) { toast.error('Connectez-vous pour enregistrer une liste'); return }
+    if (lignes.length === 0) { toast.error('Votre panier est vide'); return }
+    setFavNom('Ma liste'); setFavModal(true)
+  }
+  const enregistrerListe = async () => {
+    const nom = favNom.trim()
+    if (!nom) { toast.error('Donnez un nom à la liste'); return }
+    setFavSaving(true)
+    try {
+      const { data: liste } = await api.post('/favoris/', { nom })
+      // dédoublonne produit + config + note (les articles perso partagent le même produit_id, la note les distingue)
+      const produits = [...new Map(lignes.map(l => [`${l.produit.id}|${JSON.stringify(l.ingredients || [])}|${l.note || ''}`, l])).values()]
+      await Promise.all(produits.map(l =>
+        api.post(`/favoris/${liste.id}/produits`, {
+          produit_id: l.produit.id, quantite: l.quantite,
+          configuration: { ingredients: l.ingredients || [], prix_unitaire: l.prixUnit, note: l.note || null, custom: !!l.custom },
+        })
+      ))
+      setFavModal(false)
+      toast.success(`Liste « ${nom} » enregistrée (${produits.length} produit${produits.length > 1 ? 's' : ''})`)
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Impossible d'enregistrer la liste")
+    } finally { setFavSaving(false) }
+  }
 
   if (lignes.length === 0) return (
     <div className="min-h-screen bg-[#F5EFE6] flex flex-col items-center justify-center gap-5 px-6">
@@ -144,7 +206,8 @@ export function Panier() {
           ))}
 
           {/* Enregistrer le panier */}
-          <button className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-gray-400 text-sm font-medium hover:border-[#0D2137] hover:text-[#0D2137] transition-colors flex items-center justify-center gap-2">
+          <button onClick={ouvrirListe}
+            className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-gray-400 text-sm font-medium hover:border-[#0D2137] hover:text-[#0D2137] transition-colors flex items-center justify-center gap-2">
             <Heart size={15}/> Enregistrer ce panier comme liste favorite
           </button>
         </div>
@@ -173,7 +236,11 @@ export function Panier() {
                 <span>{sousTotal.toLocaleString()} F</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Frais de livraison</span>
+                <span>Frais de livraison
+                  <span className="block text-[9px] text-gray-400 font-normal">
+                    {fraisInfo ? 'estimé — adresse par défaut' : 'dès'}
+                  </span>
+                </span>
                 <span>{fraisLiv.toLocaleString()} F</span>
               </div>
               {/* Points */}
@@ -204,6 +271,41 @@ export function Panier() {
           </div>
         </div>
       </div>
+
+      {/* Modale : nom de la liste favorite */}
+      {favModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !favSaving && setFavModal(false)}/>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="w-12 h-12 rounded-full bg-pink-50 text-pink-500 flex items-center justify-center mx-auto mb-4">
+              <Heart size={24}/>
+            </div>
+            <h3 className="text-lg font-bold text-[#0D2137] text-center">Enregistrer comme liste</h3>
+            <p className="text-sm text-gray-500 text-center mt-1">
+              {lignes.length} article{lignes.length > 1 ? 's' : ''} du panier seront enregistrés
+            </p>
+            <input
+              autoFocus
+              value={favNom}
+              onChange={e => setFavNom(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') enregistrerListe() }}
+              placeholder="Ex : Courses de la semaine"
+              maxLength={60}
+              className="w-full mt-4 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D2137]/20 focus:border-[#0D2137]"/>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setFavModal(false)} disabled={favSaving}
+                className="flex-1 border border-gray-200 text-gray-600 font-medium py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+                Annuler
+              </button>
+              <button onClick={enregistrerListe} disabled={favSaving || !favNom.trim()}
+                className="flex-1 bg-[#0D2137] text-white font-bold py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {favSaving ? <RefreshCw size={14} className="animate-spin"/> : <Heart size={14}/>}
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -214,6 +316,7 @@ export function Checkout() {
   const { lignes, removeKeys } = usePanier(s => ({ lignes: s.lignes, removeKeys: s.removeKeys }))
   // Ne commander que les articles cochés au panier — les autres y restent
   const lignesSel = lignes.filter(l => l.selected !== false)
+  const aPrixMarche = lignesSel.some(l => (l.prixUnit || 0) <= 0)  // articles « au marché » sans prix
   const sousTotal = lignesSel.reduce((a,l)=>a+l.prixUnit*l.quantite,0)
   const { isAuth, user } = useAuth()
   const navigate = useNavigate()
@@ -239,6 +342,7 @@ export function Checkout() {
   const [fraisLoading, setFraisLoading] = useState(false)
   const [cmdNumero, setCmdNumero]     = useState('')
   const [lignesSnap, setLignesSnap]   = useState([])
+  const [prixAConfirmer, setPrixAConfirmer] = useState(false)
   const [totauxSnap, setTotauxSnap]   = useState({ sous: 0, frais: 0, total: 0, points: 0 })
   const [loading, setLoading]         = useState(false)
   const [newAdr, setNewAdr]           = useState({ quartier:'', ville:'Yaoundé', libelle:'Domicile' })
@@ -301,6 +405,15 @@ export function Checkout() {
         }))
       }
       const { data: cmd } = await api.post('/commandes/', payload)
+
+      // Articles « au marché » : pas de paiement tant que l'agent n'a pas fixé les prix
+      if (cmd.statut === 'prix_a_confirmer') {
+        setCmdNumero(cmd.numero); setLignesSnap(lignesSel)
+        setTotauxSnap({ sous: sousTotal, frais: fraisLiv, total, points })
+        setPrixAConfirmer(true)
+        removeKeys(lignesSel.map(l => l.key || l.produit.id))
+        setStep(4); return
+      }
 
       // Initier le paiement selon le mode choisi
       if (sel.mode === 'stripe') {
@@ -376,9 +489,19 @@ export function Checkout() {
           <div className="w-16 h-16 bg-green-400 rounded-full flex items-center justify-center mx-auto mb-3">
             <Check size={30} className="text-white"/>
           </div>
-          <h2 className="text-white font-bold text-xl">Commande confirmée !</h2>
+          <h2 className="text-white font-bold text-xl">{prixAConfirmer ? 'Commande enregistrée !' : 'Commande confirmée !'}</h2>
           <p className="text-amber-400 font-bold text-lg mt-1">{cmdNumero}</p>
         </div>
+
+        {prixAConfirmer && (
+          <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <p className="text-xs font-bold text-amber-700">💰 Prix en cours de confirmation</p>
+            <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
+              Notre agent vérifie le prix réel de vos articles au marché.
+              Vous serez notifié dès que votre total est confirmé — vous paierez ensuite.
+            </p>
+          </div>
+        )}
 
         {/* FACTURE */}
         <div className="px-5 py-4">
@@ -389,7 +512,7 @@ export function Checkout() {
             {lignesSnap.map(l => (
               <div key={l.key || l.produit?.id || Math.random()} className="flex justify-between text-xs text-gray-600">
                 <span className="truncate flex-1">{l.note || l.produit?.nom} <span className="text-gray-400">×{l.quantite}</span></span>
-                <span className="font-semibold ml-2 shrink-0">{(l.prixUnit * l.quantite).toLocaleString()} F</span>
+                <span className="font-semibold ml-2 shrink-0">{l.prixUnit > 0 ? `${(l.prixUnit * l.quantite).toLocaleString()} F` : 'au marché'}</span>
               </div>
             ))}
           </div>
@@ -400,7 +523,13 @@ export function Checkout() {
               <span>{totauxSnap.sous.toLocaleString()} F</span>
             </div>
 
-            {/* Détail livraison */}
+            {/* Détail livraison — masqué quand le calcul est plafonné au minimum (≤ 1 000 F) */}
+            {(totauxSnap.frais || 0) <= 1000 ? (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Livraison</span>
+                <span className="font-semibold text-[#0D2137]">{(totauxSnap.frais || 0).toLocaleString()} F</span>
+              </div>
+            ) : (
             <div className="bg-blue-50 rounded-xl p-2.5 space-y-1">
                 <p className="text-[10px] font-bold text-blue-600 mb-1">
                   Livraison {fraisInfo?.zone_nom ? `— ${fraisInfo.zone_nom}` : ''}
@@ -434,19 +563,25 @@ export function Checkout() {
                   <span>{totauxSnap.frais.toLocaleString()} F</span>
                 </div>
               </div>
+            )}
 
             {/* TOTAL */}
             <div className="flex justify-between font-bold text-[#0D2137] text-lg pt-2 border-t-2 border-[#0D2137]/10">
-              <span>TOTAL</span>
+              <span>{prixAConfirmer ? 'TOTAL PROVISOIRE' : 'TOTAL'}</span>
               <span className="text-amber-500">{totauxSnap.total.toLocaleString()} F</span>
             </div>
+            {prixAConfirmer && (
+              <p className="text-[10px] text-gray-400 text-right">sera recalculé après confirmation des prix au marché</p>
+            )}
           </div>
 
           <div className="mt-3 bg-amber-50 rounded-xl p-2.5 text-xs text-amber-700 text-center">
             ⭐ +{totauxSnap.points} points fidélité crédités à la livraison
           </div>
           <div className="mt-2 bg-blue-50 rounded-xl p-2.5 text-xs text-blue-700 text-center">
-            🛵 Votre livreur se rend au marché — vous serez notifié à chaque étape
+            {prixAConfirmer
+              ? '💰 Rien à payer maintenant — vous serez notifié quand l\'agent confirme les prix'
+              : '🛵 Votre livreur se rend au marché — vous serez notifié à chaque étape'}
           </div>
         </div>
 
@@ -594,6 +729,12 @@ export function Checkout() {
           {step === 3 && (
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <h2 className="font-bold text-[#0D2137] text-base mb-4 flex items-center gap-2"><CreditCard size={16} className="text-amber-500"/> {t('checkout_payment')}</h2>
+              {aPrixMarche && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-xs text-amber-700 leading-relaxed">
+                  💰 <strong>Vous ne paierez pas maintenant.</strong> Des articles « au marché » n'ont pas de prix :
+                  notre agent confirmera le montant réel, puis vous serez notifié pour payer avec le mode choisi ci-dessous.
+                </div>
+              )}
               <div className="space-y-3 mb-5">
                 {MODES.map(m => (
                   <button key={m.val} onClick={() => setSel(s => ({...s, mode: m.val}))}
@@ -632,7 +773,7 @@ export function Checkout() {
                 <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm">← {t('checkout_back')}</button>
                 <button onClick={passer} disabled={loading}
                   className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>✅ {t('checkout_confirm')}</>}
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>{aPrixMarche ? '📋 Enregistrer la commande' : <>✅ {t('checkout_confirm')}</>}</>}
                 </button>
               </div>
             </div>
@@ -664,20 +805,25 @@ export function Checkout() {
               <span className={fraisInfo ? 'text-[#0D2137] font-semibold' : ''}>{fraisLiv.toLocaleString()} F</span>
             </div>
 
-            {/* Facture livraison détaillée */}
-            {fraisInfo && (
+            {/* Facture livraison détaillée — uniquement si le total dépasse le minimum 1 000 F */}
+            {fraisInfo && (fraisInfo.frais_total || fraisInfo.frais_fcfa || 0) > 1000 && (
               <div className="border border-blue-100 rounded-xl overflow-hidden">
                 <div className="bg-blue-600 px-3 py-1.5 flex items-center justify-between">
                   <span className="text-white text-[10px] font-bold">
-                    {fraisInfo.zone_nom || 'Livraison'}
+                    {fraisInfo.zone_nom || (fraisInfo.message ? 'Livraison — forfait' : 'Livraison')}
                   </span>
                   {fraisInfo.distance_km && (
                     <span className="text-white/70 text-[10px]">{fraisInfo.distance_km} km · {fraisInfo.delai_min}–{fraisInfo.delai_max} min</span>
                   )}
                 </div>
                 <div className="bg-blue-50 px-3 py-2 space-y-1">
+                  {fraisInfo.message && (
+                    <p className="text-[9px] text-amber-600 bg-amber-50 rounded px-1.5 py-1">
+                      📍 {fraisInfo.message} — localisez l'adresse pour un tarif précis
+                    </p>
+                  )}
                   <div className="flex justify-between text-[10px] text-gray-500">
-                    <span>Prise en charge</span>
+                    <span>{fraisInfo.message ? 'Forfait' : 'Prise en charge'}</span>
                     <span>{(fraisInfo.frais_base||0).toLocaleString()} F</span>
                   </div>
                   {fraisInfo.distance_km > 0 && (

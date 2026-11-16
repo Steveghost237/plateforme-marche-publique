@@ -188,8 +188,71 @@ export function MesCommandes() {
     } catch(err) { toast.error(err.response?.data?.detail || 'Impossible d\'annuler') }
   }
 
+  // ── Reprise du paiement (commande en attente / prix confirmés) ──
+  const [payCmd, setPayCmd]     = useState(null)   // commande en cours de paiement
+  const [payMode, setPayMode]   = useState('especes')
+  const [payTel, setPayTel]     = useState('')
+  const [paying, setPaying]     = useState(false)
+
+  const MODES_PAIEMENT = [
+    { val:'mtn_mobile_money', label:'MTN Mobile Money',            emoji:'🟡' },
+    { val:'orange_money',     label:'Orange Money',                emoji:'🟠' },
+    { val:'stripe',           label:'Carte bancaire (Visa/MC)',    emoji:'💳' },
+    { val:'paypal',           label:'PayPal',                      emoji:'🅿️' },
+    { val:'especes',          label:'Espèces à la livraison',      emoji:'💵' },
+  ]
+
+  const ouvrirPaiement = async (c) => {
+    try {
+      const { data: det } = await api.get(`/commandes/${c.id}`)
+      setPayMode(det.mode_paiement || 'especes')
+      setPayTel(det.telephone_paiement || '')
+    } catch { setPayMode('especes'); setPayTel('') }
+    setPayCmd(c)
+  }
+
+  const payer = async () => {
+    if (!payCmd) return
+    setPaying(true)
+    try {
+      if (payMode === 'stripe') {
+        const { data: r } = await api.post(`/commandes/${payCmd.id}/initier-paiement-stripe`, {
+          success_url: `${window.location.origin}/commande/succes?cmd=${payCmd.id}&mode=stripe`,
+          cancel_url: `${window.location.origin}/commandes`,
+        })
+        if (r.checkout_url) { sessionStorage.setItem('pending_order', JSON.stringify({ id: payCmd.id, numero: payCmd.numero, mode: 'stripe' })); window.location.href = r.checkout_url; return }
+        throw new Error(r.error || 'Échec initiation Stripe')
+      }
+      if (payMode === 'paypal') {
+        const { data: r } = await api.post(`/commandes/${payCmd.id}/initier-paiement-paypal`, {
+          return_url: `${window.location.origin}/commande/succes?cmd=${payCmd.id}&mode=paypal`,
+          cancel_url: `${window.location.origin}/commandes`,
+        })
+        if (r.checkout_url) { sessionStorage.setItem('pending_order', JSON.stringify({ id: payCmd.id, numero: payCmd.numero, mode: 'paypal' })); window.location.href = r.checkout_url; return }
+        throw new Error(r.error || 'Échec initiation PayPal')
+      }
+      if (payMode === 'mtn_mobile_money' || payMode === 'orange_money') {
+        const { data: r } = await api.post(`/commandes/${payCmd.id}/initier-paiement`, { telephone_paiement: payTel || undefined })
+        if (r.simulation) { await api.post(`/commandes/${payCmd.id}/payer`) }
+        else if (r.success) {
+          sessionStorage.setItem('pending_order', JSON.stringify({ id: payCmd.id, numero: payCmd.numero, mode: 'momo' }))
+          navigate(`/commande/succes?cmd=${payCmd.id}&mode=momo&operator=${r.operator || ''}&tel=${encodeURIComponent(payTel)}`)
+          return
+        } else throw new Error(r.error || 'Échec initiation Mobile Money')
+      } else {
+        await api.post(`/commandes/${payCmd.id}/payer`)
+      }
+      setPayCmd(null)
+      setCommandes(prev => prev.map(c => c.id === payCmd.id ? { ...c, statut: 'payee' } : c))
+      toast.success('Paiement confirmé !')
+    } catch(err) {
+      toast.error(err.message || err.response?.data?.detail || 'Paiement impossible')
+    } finally { setPaying(false) }
+  }
+
   const STATUT_CONFIG = {
     brouillon:           { label:'Brouillon',   emoji:'📝', bg:'bg-gray-100',  text:'text-gray-600' },
+    prix_a_confirmer:    { label:'Prix en cours', emoji:'💰', bg:'bg-purple-50', text:'text-purple-600' },
     en_attente_paiement: { label:'En attente',  emoji:'⏳',  bg:'bg-amber-50', text:'text-amber-600' },
     payee:               { label:'Payée',       emoji:'✅',  bg:'bg-blue-50',  text:'text-blue-600'  },
     prete:               { label:'Prête',       emoji:'🛍️',  bg:'bg-emerald-50', text:'text-emerald-600' },
@@ -208,6 +271,38 @@ export function MesCommandes() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <h1 className="font-serif text-white font-bold text-xl">📦 Mes Commandes</h1>
           {ConfirmDialog}
+          {payCmd && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50" onClick={() => !paying && setPayCmd(null)}/>
+              <div className="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+                <h3 className="font-bold text-[#0D2137] text-base mb-1">💳 Payer {payCmd.numero}</h3>
+                <p className="text-xs text-gray-400 mb-4">Total : <span className="font-bold text-amber-500">{payCmd.total_fcfa?.toLocaleString()} F</span></p>
+                <div className="space-y-2 mb-4">
+                  {MODES_PAIEMENT.map(m => (
+                    <button key={m.val} onClick={() => setPayMode(m.val)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border-2 flex items-center gap-2.5 transition-all text-sm
+                        ${payMode === m.val ? 'border-[#0D2137] bg-[#0D2137]/5' : 'border-gray-200 hover:border-[#0D2137]/30'}`}>
+                      <span className="text-lg">{m.emoji}</span>
+                      <span className="font-medium text-[#0D2137] flex-1">{m.label}</span>
+                      {payMode === m.val && <Check size={15} className="text-[#0D2137]"/>}
+                    </button>
+                  ))}
+                </div>
+                {(payMode === 'mtn_mobile_money' || payMode === 'orange_money') && (
+                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-4 focus:outline-none focus:border-[#0D2137]"
+                    placeholder="Numéro Mobile Money (ex : 6XX XX XX XX)" value={payTel} onChange={e => setPayTel(e.target.value)}/>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => setPayCmd(null)} disabled={paying}
+                    className="flex-1 border border-gray-200 text-gray-500 font-medium py-2.5 rounded-xl text-sm">Annuler</button>
+                  <button onClick={payer} disabled={paying}
+                    className="flex-1 bg-[#0D2137] text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+                    {paying ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : '✅ Payer'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <Link to="/catalogue/menus_ingredients"
             className="text-amber-400 text-xs font-bold hover:text-amber-300 transition-colors">+ Commander</Link>
         </div>
@@ -252,6 +347,12 @@ export function MesCommandes() {
                     <p className="font-bold text-amber-500 text-base">{c.total_fcfa?.toLocaleString()} F</p>
                   </div>
                   <div className="px-4 pb-3 flex gap-2">
+                    {c.statut === 'en_attente_paiement' && (
+                      <button onClick={() => ouvrirPaiement(c)}
+                        className="flex-1 bg-amber-400 text-gray-900 font-bold py-2 rounded-xl text-xs hover:bg-amber-500 transition-all">
+                        💳 Payer {c.total_fcfa?.toLocaleString()} F
+                      </button>
+                    )}
                     {isActive(c.statut) && (
                       <Link to={`/suivi/${c.id}`}
                         className="flex-1 bg-[#0D2137] text-white font-bold py-2 rounded-xl text-xs text-center hover:bg-amber-400 hover:text-gray-900 transition-all">

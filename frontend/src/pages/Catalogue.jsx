@@ -189,7 +189,7 @@ function MaListeBuilder() {
   const [produit, setProduit] = useState(null)
   const [checking, setChecking] = useState(true)
   const [items, setItems]   = useState([])
-  const [form, setForm]     = useState({ nom: '', quantite: 1, prix: '' })
+  const [form, setForm]     = useState({ nom: '', quantite: 1 })
 
   useEffect(() => {
     api.get('/catalogue/produits?section=ma_liste&limit=10')
@@ -202,11 +202,11 @@ function MaListeBuilder() {
     e?.preventDefault()
     const nom = form.nom.trim()
     if (nom.length < 2) { toast.error('Décrivez l\'article (ex: Sardine 125g, Riz parfumé 5kg…)'); return }
-    setItems(it => [...it, { nom, quantite: Math.max(1, parseInt(form.quantite) || 1), prix: parseInt(form.prix) || 0 }])
-    setForm({ nom: '', quantite: 1, prix: '' })
+    setItems(it => [...it, { nom, quantite: Math.max(1, parseInt(form.quantite) || 1), prix: 0 }])
+    setForm({ nom: '', quantite: 1 })
   }
 
-  const totalEstime = items.reduce((a, i) => a + i.prix * i.quantite, 0)
+  const totalEstime = 0
 
   const addAllToCart = () => {
     if (!produit) { toast.error('Fonctionnalité en cours d\'activation — réessayez bientôt'); return }
@@ -224,14 +224,14 @@ function MaListeBuilder() {
           <h3 className="font-bold text-base mb-1.5">📝 Votre liste, vos produits</h3>
           <p className="text-white/70 text-sm leading-relaxed max-w-2xl">
             Un produit n'est pas au catalogue ? Écrivez-le ici : notre livreur le trouvera au marché.
-            Le <strong className="text-amber-400">prix est estimatif</strong> — le montant exact est confirmé à l'achat.
+            <strong className="text-amber-400">Pas besoin de prix</strong> — notre agent confirme le vrai prix au marché avant votre paiement.
           </p>
         </div>
       </div>
 
       {/* Formulaire d'ajout */}
       <form onSubmit={addItem} className="bg-white rounded-2xl shadow-sm p-5">
-        <div className="grid sm:grid-cols-[1fr_110px_140px_auto] gap-3 items-end">
+        <div className="grid sm:grid-cols-[1fr_110px_auto] gap-3 items-end">
           <div>
             <label className="text-xs font-bold text-gray-500 block mb-1.5">Article *</label>
             <input
@@ -247,14 +247,6 @@ function MaListeBuilder() {
               value={form.quantite} onChange={e => setForm(f => ({ ...f, quantite: e.target.value }))}
             />
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1.5">Prix estimé (F)</label>
-            <input type="number" min="0" step="25"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
-              placeholder="Optionnel"
-              value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))}
-            />
-          </div>
           <button type="submit"
             className="bg-[#0D2137] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all flex items-center justify-center gap-2 min-h-[42px]">
             <Plus size={15}/> Ajouter
@@ -267,7 +259,7 @@ function MaListeBuilder() {
         <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <span className="text-xs font-bold text-[#0D2137] uppercase tracking-wide">Ma liste ({items.length} article{items.length > 1 ? 's' : ''})</span>
           {items.length > 0 && (
-            <span className="text-xs text-amber-600 font-semibold">≈ {totalEstime.toLocaleString()} F estimés</span>
+            <span className="text-xs text-amber-600 font-semibold">💰 Prix confirmés par l'agent au marché</span>
           )}
         </div>
         {items.length === 0 ? (
@@ -305,6 +297,88 @@ function MaListeBuilder() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Listes favorites sauvegardées depuis le panier */}
+      <ListesFavorites/>
+    </div>
+  )
+}
+
+// ── LISTES FAVORITES (panier enregistré) ──────────────────────
+function ListesFavorites() {
+  const { isAuth } = useAuth()
+  const { add, addCustom } = usePanier()
+  const navigate   = useNavigate()
+  const [listes, setListes] = useState(null)
+
+  const charger = () => api.get('/favoris/').then(r => setListes(r.data || [])).catch(() => setListes([]))
+  useEffect(() => { isAuth ? charger() : setListes(null) }, [isAuth])
+
+  if (!listes || listes.length === 0) return null
+
+  const ajouterTout = (liste) => {
+    liste.produits.forEach(p => {
+      const cfg   = p.configuration || {}
+      const ings  = cfg.ingredients || []
+      const prixU = cfg.prix_unitaire != null ? cfg.prix_unitaire : (p.prix_base_fcfa || 0)
+      const note  = cfg.note || null
+      const prod  = { id: p.produit_id, nom: p.nom, slug: p.slug, image_url: p.image_url, prix_base_fcfa: p.prix_base_fcfa, est_menu: p.est_menu }
+      if (cfg.custom && note) {
+        // article « au marché » : son vrai nom est dans la note, pas le produit
+        addCustom(prod, { nom: note, quantite: p.quantite || 1, prixUnit: prixU })
+      } else {
+        // clé distincte par configuration pour ne pas fusionner 2 recettes du même menu
+        add(prod, p.quantite || 1, prixU, ings, note, ings.length > 0 ? `fav_${p.ligne_id}` : null)
+      }
+    })
+    toast.success(`Liste « ${liste.nom} » ajoutée au panier`)
+    navigate('/panier')
+  }
+  const supprimer = async (liste) => {
+    try { await api.delete(`/favoris/${liste.id}`); toast.success(`Liste « ${liste.nom} » supprimée`); charger() }
+    catch { toast.error('Suppression impossible') }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+        <span className="text-xs font-bold text-[#0D2137] uppercase tracking-wide">❤️ Mes listes enregistrées</span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {listes.map(l => {
+          const totalL = l.produits.reduce((a, p) => a + (p.prix_base_fcfa || 0) * (p.quantite || 1), 0)
+          return (
+            <div key={l.id} className="px-5 py-4">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <div>
+                  <span className="font-bold text-[#0D2137] text-sm">{l.nom}</span>
+                  <span className="text-xs text-gray-400 ml-2">{l.produits.length} produit{l.produits.length > 1 ? 's' : ''} · ≈ {totalL.toLocaleString()} F</span>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => ajouterTout(l)}
+                    className="bg-[#0D2137] text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 hover:bg-amber-400 hover:text-gray-900 transition-all">
+                    <ShoppingCart size={13}/> Ajouter au panier
+                  </button>
+                  <button onClick={() => supprimer(l)} title="Supprimer la liste"
+                    className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-500 flex items-center justify-center transition-colors">
+                    <X size={14}/>
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {l.produits.map(p => (
+                  <span key={p.ligne_id} className="flex items-center gap-1.5 bg-gray-50 rounded-full pl-1 pr-2.5 py-1 text-xs text-gray-600">
+                    <SafeImg src={getImageUrl(p.image_url)} alt="" className="w-5 h-5 rounded-full object-cover"/>
+                    {p.configuration?.note || p.nom} <span className="text-gray-400">×{p.quantite}</span>
+                    {p.configuration?.ingredients?.length > 0 && <span title="Recette personnalisée">🥘</span>}
+                    {p.configuration?.custom && <span title="Prix confirmé par l'agent au marché">🛒</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -871,7 +945,7 @@ export function ProduitDetail() {
               <div className="border-t border-gray-100 pt-4 space-y-2">
                 {prixIngs > 0 && (
                   <div className="flex justify-between text-xs text-gray-400">
-                    <span>Base {prixBase.toLocaleString()} F + options {prixIngs.toLocaleString()} F</span>
+                    <span>Σ ingrédients choisis : {prixIngs.toLocaleString()} F{prixIngs !== prixBase ? ` (défaut : ${prixBase.toLocaleString()} F)` : ''}</span>
                     <span>× {qty}</span>
                   </div>
                 )}
@@ -889,7 +963,7 @@ export function ProduitDetail() {
               className="w-full bg-[#0D2137] hover:bg-amber-400 hover:text-gray-900 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all disabled:opacity-40 text-sm shadow-lg">
               <ShoppingCart size={18}/> Ajouter au panier — {total.toLocaleString()} F
             </button>
-            <p className="text-center text-xs text-gray-400">🔒 Paiement sécurisé · 🚚 Livraison dès 500 F · Yaoundé & Douala</p>
+            <p className="text-center text-xs text-gray-400">🔒 Paiement sécurisé · 🚚 Livraison dès 1000 F · Yaoundé & Douala</p>
           </div>
         </div>
       </div>

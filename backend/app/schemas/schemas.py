@@ -155,7 +155,7 @@ class IngredientCmdIn(BaseModel):
 
 class LigneCmdIn(BaseModel):
     produit_id: UUID
-    section_id: UUID
+    section_id: Optional[UUID] = None  # déduit du produit si absent (panier restauré)
     quantite: int
     prix_unitaire: int
     note_ligne: Optional[str] = None  # article personnalisé saisi par le client

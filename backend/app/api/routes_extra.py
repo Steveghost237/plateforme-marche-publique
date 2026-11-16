@@ -16,7 +16,7 @@ from app.models.models import (
     Section, Produit, Adresse, ZoneLivraison, Commande,
     SuggestionProduit, VoteSuggestion, HistoriquePrix,
     FideliteCompte, FideliteTransaction, Notification, Utilisateur,
-    Ingredient
+    Ingredient, PanierItem
 )
 
 # ──────────────────────────────────────────────
@@ -121,6 +121,26 @@ zones_router = APIRouter(prefix="/zones-livraison", tags=["Zones livraison"])
 def get_zones(db: Session = Depends(get_db)):
     return db.query(ZoneLivraison).filter(ZoneLivraison.actif == True).order_by(ZoneLivraison.ordre).all()
 
+def geocoder_adresse(adr, db):
+    """Remplit latitude/longitude de l'adresse via Nominatim (OpenStreetMap).
+    Best-effort : silencieux si le service est indisponible. Persiste pour
+    ne géocoder qu'une seule fois par adresse."""
+    if adr.latitude is not None and adr.longitude is not None:
+        return
+    try:
+        import urllib.request, urllib.parse, json as _json
+        q = urllib.parse.quote(f"{adr.quartier or ''}, {adr.ville or ''}, Cameroun".strip(", "))
+        req = urllib.request.Request(
+            f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&countrycodes=cm",
+            headers={"User-Agent": "marche-en-ligne/2.0 (geocodage adresse livraison)"})
+        data = _json.loads(urllib.request.urlopen(req, timeout=4).read())
+        if data:
+            adr.latitude  = float(data[0]["lat"])
+            adr.longitude = float(data[0]["lon"])
+            db.flush()
+    except Exception:
+        pass
+
 @zones_router.post("/calcul")
 def calculer_frais(body: dict, db: Session = Depends(get_db)):
     """Calcule les frais de livraison (formule combinée distance + poids)."""
@@ -131,9 +151,13 @@ def calculer_frais(body: dict, db: Session = Depends(get_db)):
 
     if adresse_id:
         adr = db.query(Adresse).filter(Adresse.id == adresse_id).first()
-        if adr and adr.latitude and adr.longitude:
-            lat = float(adr.latitude)
-            lon = float(adr.longitude)
+        if adr:
+            geocoder_adresse(adr, db)  # géocodage silencieux si coordonnées absentes
+            if adr.latitude and adr.longitude:
+                try: db.commit()  # persiste pour ne pas re-géocoder à chaque calcul
+                except Exception: db.rollback()
+                lat = float(adr.latitude)
+                lon = float(adr.longitude)
 
     if lat is None or lon is None:
         return {"frais_fcfa": 1000, "frais_total": 1000, "distance_km": None,
@@ -560,3 +584,79 @@ def seed_oumbe_endpoint(db: Session = Depends(get_db), _=Depends(get_current_adm
         db.rollback()
         raise HTTPException(500, f"Import échoué: {e}")
     return {"ok": True, **recap}
+
+# ══════════════════════════════════════════════
+# PANIER PERSISTÉ (par utilisateur, sync multi-appareils)
+# ══════════════════════════════════════════════
+panier_router = APIRouter(prefix="/panier", tags=["Panier"])
+
+def _fmt_panier(item: PanierItem) -> dict:
+    p = item.produit
+    return {
+        "key":       item.item_key,
+        "quantite":  item.quantite,
+        "prixUnit":  item.prix_unitaire,
+        "ingredients": item.ingredients or [],
+        "note":      item.note,
+        # article « au marché » : note obligatoire sur le produit générique — sinon il repartirait dans « AUTRES »
+        "custom":    bool(item.note and p and p.slug == "article-personnalise"),
+        "selected":  item.selected if item.selected is not None else True,
+        "produit": {
+            "id": str(item.produit_id),
+            "nom": p.nom if p else "?",
+            "slug": p.slug if p else "",
+            "image_url": p.image_url if p else None,
+            "prix_base_fcfa": p.prix_base_fcfa if p else item.prix_unitaire,
+            "prix_max_fcfa": p.prix_max_fcfa if p else None,
+            "est_menu": bool(p.est_menu) if p else False,
+            "stock_dispo": bool(p.est_actif) if p else False,
+            "section_id": str(p.section_id) if p and p.section_id else None,
+            "poids_kg": float(p.poids_kg) if p and p.poids_kg else 0.5,
+        },
+    }
+
+@panier_router.get("/")
+def mon_panier(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Panier persisté de l'utilisateur (restauré à la connexion, tous appareils)."""
+    items = (db.query(PanierItem).filter(PanierItem.utilisateur_id == user.id)
+               .order_by(PanierItem.created_at).all())
+    return [_fmt_panier(i) for i in items]
+
+@panier_router.put("/")
+def sync_panier(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Remplace le panier serveur par l'état envoyé (le client est la source de vérité).
+    Couvre ajout, retrait, changement de quantité et sélection en un seul appel."""
+    lignes = body.get("lignes") or []
+    db.query(PanierItem).filter(PanierItem.utilisateur_id == user.id).delete()
+    for l in lignes:
+        prod_id = l.get("produit_id") or (l.get("produit") or {}).get("id")
+        if not prod_id:
+            continue
+        db.add(PanierItem(
+            utilisateur_id = user.id,
+            item_key       = str(l.get("key") or prod_id)[:80],
+            produit_id     = prod_id,
+            quantite       = max(1, int(l.get("quantite") or 1)),
+            prix_unitaire  = int(l.get("prixUnit") or l.get("prix_unitaire") or 0),
+            ingredients    = l.get("ingredients") or [],
+            note           = l.get("note"),
+            selected       = bool(l.get("selected", True)),
+        ))
+    db.commit()
+    return {"ok": True, "count": len(lignes)}
+
+@panier_router.delete("/{item_key}")
+def retirer_item_panier(item_key: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Retire une ligne précise du panier persisté."""
+    db.query(PanierItem).filter(
+        PanierItem.utilisateur_id == user.id,
+        PanierItem.item_key == item_key).delete()
+    db.commit()
+    return {"ok": True}
+
+@panier_router.delete("/")
+def vider_panier(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Vide entièrement le panier persisté."""
+    db.query(PanierItem).filter(PanierItem.utilisateur_id == user.id).delete()
+    db.commit()
+    return {"ok": True}
