@@ -246,8 +246,23 @@ class _CheckoutScreenState extends State<CheckoutScreen>
 
       final response = await _api.post('/commandes/', commandeData);
       final cmdId = response['id'];
-
       final numero = response['numero']?.toString() ?? '';
+
+      // Workflow "prix au marché" : articles sans prix → commande enregistrée,
+      // un agent confirmera les prix réels avant le paiement
+      if (cart.hasPrixMarche) {
+        cart.clear();
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Commande enregistrée ! Notre agent va confirmer les prix du marché et vous notifiera.'),
+            backgroundColor: Colors.purple,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
 
       if (_besoinTelephone) {
         // Mobile Money : déclenche un USSD push (MTN MoMo / Orange Money)
@@ -811,9 +826,11 @@ class _CheckoutScreenState extends State<CheckoutScreen>
                           const Icon(Icons.lock_rounded, size: 18),
                           const SizedBox(width: 8),
                           Text(
-                            _modePaiement == 'especes'
-                                ? 'Confirmer la commande'
-                                : 'Payer ${_formatPrix(total)} F',
+                            context.read<CartProvider>().hasPrixMarche
+                                ? 'Enregistrer la commande'
+                                : _modePaiement == 'especes'
+                                    ? 'Confirmer la commande'
+                                    : 'Payer ${_formatPrix(total)} F',
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w800),
                           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/cart_provider.dart';
 import '../utils/validators.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
@@ -157,10 +158,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final cartProvider = Provider.of<CartProvider>(context, listen: false);
       await authProvider.login(
         _telephoneController.text.trim(),
         _passwordController.text,
       );
+
+      // Restaurer le panier depuis le serveur après connexion
+      if (authProvider.isAuthenticated) {
+        await cartProvider.loadFromServer();
+      }
 
       if (!mounted) return;
 

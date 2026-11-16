@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
+import '../providers/cart_provider.dart';
 import '../widgets/social_media_bar.dart';
 import 'login_screen.dart';
 import 'orders_screen.dart';
@@ -242,6 +243,8 @@ class ProfileScreen extends StatelessWidget {
                     );
 
                     if (confirm == true && context.mounted) {
+                      // Vider le panier local avant déconnexion
+                      Provider.of<CartProvider>(context, listen: false).clearLocalOnly();
                       await authProvider.logout();
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(

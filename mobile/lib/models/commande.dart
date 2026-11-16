@@ -30,6 +30,10 @@ class Commande {
   // Lignes
   final List<LigneCommande>? lignes;
 
+  // Paiement
+  final String? modePaiement;
+  final String? telephonePaiement;
+
   Commande({
     required this.id,
     required this.numero,
@@ -53,6 +57,8 @@ class Commande {
     this.clientTelephone,
     this.adresse,
     this.lignes,
+    this.modePaiement,
+    this.telephonePaiement,
   });
 
   factory Commande.fromJson(Map<String, dynamic> json) {
@@ -87,6 +93,8 @@ class Commande {
       lignes: json['lignes'] != null
           ? (json['lignes'] as List).map((l) => LigneCommande.fromJson(l)).toList()
           : null,
+      modePaiement: json['mode_paiement'],
+      telephonePaiement: json['telephone_paiement'],
     );
   }
 
@@ -98,6 +106,8 @@ class Commande {
   bool get isEnCours => ['assignee', 'en_cours_marche', 'en_livraison'].contains(statut);
   bool get isLivree => statut == 'livree';
   bool get isAnnulee => statut == 'annulee';
+  bool get isEnAttentePaiement => statut == 'en_attente_paiement';
+  bool get isPrixAConfirmer => statut == 'prix_a_confirmer';
 }
 
 class LigneCommande {

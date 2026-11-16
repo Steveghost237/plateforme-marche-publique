@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/cart_provider.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'livreur_screen.dart';
@@ -21,7 +22,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
     await authProvider.init();
+
+    // Restaurer le panier depuis le serveur si déjà connecté
+    if (authProvider.isAuthenticated) {
+      await cartProvider.loadFromServer();
+    }
 
     await Future.delayed(const Duration(seconds: 2));
 
