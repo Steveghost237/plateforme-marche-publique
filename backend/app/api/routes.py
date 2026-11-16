@@ -545,14 +545,19 @@ async def initier_paiement_momo(cmd_id: UUID, body: dict = None, db: Session = D
             description=f"Commande {cmd.numero} — ComeBuy",
         )
     else:
-        backend_url = os.environ.get("BACKEND_URL", "https://comebuy-api.onrender.com")
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        # URL de RETOUR navigateur (page succès qui poll le statut) — pas le webhook
+        # serveur : NotchPay redirige le client vers « callback » après paiement.
+        # Le webhook /api/webhooks/notchpay se configure dans le dashboard NotchPay.
+        retour = (f"{frontend_url}/commande/succes?cmd={cmd_id}&mode=momo"
+                  f"&operator={op_hint or ''}&tel={telephone}")
         result = await initier_paiement(
             montant_fcfa=cmd.total_fcfa,
             telephone=telephone,
             email=user.email,
             reference=cmd.numero,
             description=f"Commande {cmd.numero} — ComeBuy",
-            callback_url=body.get("callback_url") or f"{backend_url}/api/webhooks/notchpay",
+            callback_url=body.get("callback_url") or retour,
             operator=op_hint,
         )
     if result.get("success"):

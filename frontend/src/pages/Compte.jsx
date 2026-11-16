@@ -173,15 +173,48 @@ export function Profil() {
 // ── MES COMMANDES ─────────────────────────────────────────────
 export function MesCommandes() {
   const [commandes, setCommandes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]     = useState(true)
+  const [page, setPage]           = useState(1)
+  const [hasMore, setHasMore]     = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [recherche, setRecherche] = useState('')
+  const [filtreStatut, setFiltreStatut] = useState('tous')
   const { isAuth } = useAuth()
   const navigate = useNavigate()
 
+  const charger = async (p = 1, append = false) => {
+    try {
+      const { data } = await api.get('/commandes/mes-commandes', { params: { page: p } })
+      const liste = data || []
+      setCommandes(prev => append ? [...prev, ...liste] : liste)
+      setHasMore(liste.length === 10)
+      setPage(p)
+      return liste
+    } catch { return [] }
+  }
+
+  // Confirme silencieusement les paiements MoMo finalisés hors de l'app
+  // (ex : paiement terminé sur la page hébergée NotchPay)
+  const confirmerMomoEnAttente = async (liste) => {
+    const res = await Promise.all((liste || [])
+      .filter(c => c.statut === 'en_attente_paiement')
+      .map(c => api.get(`/commandes/${c.id}/statut-paiement-momo`)
+        .then(r => ({ id: c.id, ok: r.data?.status === 'complete' })).catch(() => null)))
+    const payees = res.filter(r => r?.ok).map(r => r.id)
+    if (payees.length) setCommandes(prev => prev.map(c => payees.includes(c.id) ? { ...c, statut: 'payee' } : c))
+  }
+
   useEffect(() => {
     if (!isAuth) { navigate('/connexion'); return }
-    api.get('/commandes/mes-commandes').then(r => setCommandes(r.data)).catch(() => {})
+    charger(1).then(confirmerMomoEnAttente)
       .finally(() => setLoading(false))
   }, [isAuth])
+
+  const chargerPlus = async () => {
+    setLoadingMore(true)
+    await charger(page + 1, true)
+    setLoadingMore(false)
+  }
 
   const { confirm, ConfirmDialog } = useConfirm()
 
@@ -271,6 +304,21 @@ export function MesCommandes() {
 
   const isActive = (s) => ['payee','prete','assignee','en_cours_marche','en_livraison'].includes(s)
 
+  const FILTRES = [
+    { val:'tous',                label:'Toutes' },
+    { val:'en_attente_paiement', label:'⏳ En attente' },
+    { val:'prix_a_confirmer',    label:'💰 Prix en cours' },
+    { val:'actives',             label:'🚀 En cours' },
+    { val:'livree',              label:'🎉 Livrées' },
+    { val:'annulee',             label:'❌ Annulées' },
+  ]
+  const commandesFiltrees = commandes.filter(c => {
+    if (recherche && !(c.numero || '').toLowerCase().includes(recherche.toLowerCase())) return false
+    if (filtreStatut === 'tous')    return true
+    if (filtreStatut === 'actives') return isActive(c.statut)
+    return c.statut === filtreStatut
+  })
+
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
       <div className="bg-[#0D2137] px-6 py-5">
@@ -314,7 +362,23 @@ export function MesCommandes() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-5">
+      <div className="max-w-lg mx-auto px-4 py-5 pb-24">
+        {!loading && commandes.length > 0 && (
+          <div className="mb-4 space-y-2.5">
+            <input type="search" value={recherche} onChange={e => setRecherche(e.target.value)}
+              placeholder="🔍 Rechercher une commande (MKT-00001…)"
+              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"/>
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+              {FILTRES.map(f => (
+                <button key={f.val} onClick={() => setFiltreStatut(f.val)}
+                  className={`shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full border transition-all
+                    ${filtreStatut === f.val ? 'bg-[#0D2137] text-white border-[#0D2137]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#0D2137]/40'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3">{[...Array(3)].map((_,i)=><div key={i} className="bg-white rounded-2xl h-24 animate-pulse"/>)}</div>
         ) : commandes.length === 0 ? (
@@ -330,7 +394,10 @@ export function MesCommandes() {
           </div>
         ) : (
           <div className="space-y-3">
-            {commandes.map(c => {
+            {commandesFiltrees.length === 0 && (
+              <p className="text-center text-gray-400 text-sm py-10">Aucune commande ne correspond au filtre.</p>
+            )}
+            {commandesFiltrees.map(c => {
               const s = STATUT_CONFIG[c.statut] || { label:c.statut, emoji:'🔵', bg:'bg-gray-50', text:'text-gray-500' }
               return (
                 <div key={c.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -381,6 +448,12 @@ export function MesCommandes() {
                 </div>
               )
             })}
+            {hasMore && !recherche && filtreStatut === 'tous' && (
+              <button onClick={chargerPlus} disabled={loadingMore}
+                className="w-full bg-white border border-gray-200 text-[#0D2137] font-bold py-3 rounded-xl text-sm hover:border-[#0D2137]/40 transition-all disabled:opacity-40">
+                {loadingMore ? 'Chargement…' : `Charger plus de commandes`}
+              </button>
+            )}
           </div>
         )}
       </div>
