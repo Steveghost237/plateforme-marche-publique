@@ -4,13 +4,14 @@ Script pour gérer les produits Boissons :
 2. Supprimer les doublons
 3. Ajouter les nouveaux produits depuis les images locales
 """
-import requests
+import os
+import httpx
 import re
 from urllib.parse import quote
 
-API_BASE = "https://comebuy-api.onrender.com/api"
-ADMIN_PHONE = "+237600000000"
-ADMIN_PASS = "Admin@2026!"
+API_BASE = os.environ.get("API_BASE_URL", "https://comebuy-api.onrender.com/api")
+ADMIN_PHONE = os.environ.get("ADMIN_PHONE", "+237600000000")
+ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")
 
 SECTION_ID = "abaec2d3-8e10-4f14-a142-521feb8ef7b5"  # Boissons
 
@@ -77,7 +78,7 @@ def slugify(name):
 
 def login():
     """Se connecter en tant qu'admin"""
-    r = requests.post(f"{API_BASE}/auth/connexion", json={
+    r = httpx.post(f"{API_BASE}/auth/connexion", json={
         "telephone": ADMIN_PHONE,
         "mot_de_passe": ADMIN_PASS,
     })
@@ -92,7 +93,7 @@ def login():
 def get_boissons(token):
     """Lister tous les produits Boissons existants"""
     headers = {"Authorization": f"Bearer {token}"}
-    r = requests.get(f"{API_BASE}/catalogue/produits?section=boissons&limit=100", headers=headers)
+    r = httpx.get(f"{API_BASE}/catalogue/produits?section=boissons&limit=100", headers=headers)
     if r.status_code != 200:
         print(f"ERREUR liste: {r.status_code}")
         return []
@@ -102,7 +103,7 @@ def get_boissons(token):
 def delete_product(token, product_id, nom):
     """Supprimer un produit (soft delete)"""
     headers = {"Authorization": f"Bearer {token}"}
-    r = requests.delete(f"{API_BASE}/catalogue/produits/{product_id}", headers=headers)
+    r = httpx.delete(f"{API_BASE}/catalogue/produits/{product_id}", headers=headers)
     if r.status_code == 200:
         print(f"  🗑️  Supprimé: {nom} ({product_id})")
     else:
@@ -129,13 +130,13 @@ def create_product(token, name, info):
         "stock_dispo": True,
     }
     
-    r = requests.post(f"{API_BASE}/catalogue/produits", json=payload, headers=headers)
+    r = httpx.post(f"{API_BASE}/catalogue/produits", json=payload, headers=headers)
     if r.status_code == 200:
         print(f"  ✅ Créé: {name} → {image_url}")
     elif r.status_code == 409:
         print(f"  ⚠️  Slug déjà existant pour: {name} ({slug}), tentative avec suffixe...")
         payload["slug"] = slug + "-boisson"
-        r2 = requests.post(f"{API_BASE}/catalogue/produits", json=payload, headers=headers)
+        r2 = httpx.post(f"{API_BASE}/catalogue/produits", json=payload, headers=headers)
         if r2.status_code == 200:
             print(f"  ✅ Créé: {name} → {image_url} (slug: {slug}-boisson)")
         else:
