@@ -25,6 +25,13 @@ const STATUT_LABELS = {
   brouillon: 'Brouillon',
 }
 
+const MOIS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+const labelMois = (mois) => {
+  if (!mois) return ''
+  const [y, m] = mois.split('-').map(Number)
+  return `${MOIS_FR[m - 1]} ${String(y).slice(2)}`
+}
+
 export default function AdminStats() {
   const [dashboard, setDashboard] = useState(null)
   const [topProduits, setTopProduits] = useState([])
@@ -152,17 +159,19 @@ export default function AdminStats() {
             <div className="text-center py-10 text-gray-400 text-sm">Aucune donnée de revenus</div>
           ) : (
             <>
-              {/* Barres de revenus */}
+              {/* Barres de revenus — 6 derniers mois, 0 pour les mois sans vente */}
               <div className="flex items-end gap-2 h-48 mb-4">
-                {[...revenus].reverse().map((r, i) => {
+                {[...revenus].reverse().map((r) => {
                   const pct = maxRevenu > 0 ? (r.ca / maxRevenu) * 100 : 0
                   return (
-                    <div key={r.mois} className="flex-1 flex flex-col items-center gap-1 group" title={`${r.mois}: ${r.ca.toLocaleString()} FCFA`}>
-                      <div className="text-[10px] text-gray-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        {r.ca?.toLocaleString()} F
+                    <div key={r.mois} className="flex-1 flex flex-col items-center gap-1 group"
+                      title={`${labelMois(r.mois)} : ${r.nb_commandes} commande(s) — ${r.ca.toLocaleString()} FCFA`}>
+                      <div className={`text-[10px] font-semibold transition-opacity ${r.ca > 0 ? 'text-[#0D2137]' : 'text-transparent'}`}>
+                        {r.ca > 0 ? `${(r.ca/1000).toFixed(r.ca % 1000 === 0 ? 0 : 1)}k` : '·'}
                       </div>
-                      <div className="w-full rounded-t-lg bg-gradient-to-t from-blue-600 to-cyan-400 transition-all duration-500 min-h-[4px]"
-                        style={{ height: `${Math.max(pct, 3)}%` }} />
+                      <div className={`w-full rounded-t-lg transition-all duration-500 min-h-[3px] ${
+                        r.ca > 0 ? 'bg-gradient-to-t from-blue-600 to-cyan-400' : 'bg-gray-100'}`}
+                        style={{ height: r.ca > 0 ? `${Math.max(pct, 4)}%` : '3px' }} />
                     </div>
                   )
                 })}
@@ -170,7 +179,7 @@ export default function AdminStats() {
               <div className="flex gap-2">
                 {[...revenus].reverse().map(r => (
                   <div key={r.mois} className="flex-1 text-center">
-                    <div className="text-[10px] text-gray-400 font-medium">{r.mois?.slice(5)}/{r.mois?.slice(2, 4)}</div>
+                    <div className="text-[10px] text-gray-500 font-medium">{labelMois(r.mois)}</div>
                   </div>
                 ))}
               </div>
@@ -188,7 +197,7 @@ export default function AdminStats() {
                   <tbody className="divide-y divide-gray-50">
                     {revenus.map(r => (
                       <tr key={r.mois} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium text-navy">{r.mois}</td>
+                        <td className="px-4 py-2 font-medium text-navy">{labelMois(r.mois)}</td>
                         <td className="px-4 py-2 text-gray-600">{r.nb_commandes}</td>
                         <td className="px-4 py-2 font-semibold text-amber-600">{(r.ca || 0).toLocaleString()} FCFA</td>
                       </tr>

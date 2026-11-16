@@ -134,7 +134,7 @@ const fr = {
   signup_title: 'Créer un compte',
   signup_sub: 'Rejoignez ComeBuy en quelques secondes',
   signup_name: 'Nom complet',
-  signup_email: 'Email (optionnel)',
+  signup_email: 'Email',
   signup_phone: 'Téléphone',
   signup_password: 'Mot de passe',
   signup_role: 'Je suis',
@@ -144,7 +144,7 @@ const fr = {
   signup_have_account: 'Déjà un compte ?',
   signup_login: 'Se connecter',
   otp_title: 'Vérification',
-  otp_sub: 'Entrez le code OTP reçu par SMS',
+  otp_sub: 'Entrez le code OTP reçu par email',
   otp_resend: 'Renvoyer le code',
   otp_verify: 'Vérifier',
 
@@ -361,7 +361,7 @@ const en = {
   signup_have_account: 'Already have an account?',
   signup_login: 'Sign in',
   otp_title: 'Verification',
-  otp_sub: 'Enter the OTP code received by SMS',
+  otp_sub: 'Enter the OTP code received by email',
   otp_resend: 'Resend code',
   otp_verify: 'Verify',
 

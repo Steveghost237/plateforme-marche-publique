@@ -6,6 +6,7 @@ import api from '../utils/api'
 import { useAuth } from '../store'
 import { useT } from '../store/langStore'
 import { isValidCameroonPhone, normalizeCameroonPhone, getPasswordStrength } from '../utils/format'
+import PasswordStrength from '../components/common/PasswordStrength'
 
 // ── CONNEXION ─────────────────────────────────────────────────
 export function Connexion() {
@@ -26,7 +27,7 @@ export function Connexion() {
       const { data } = await api.post('/auth/connexion', { ...form, telephone: normalizeCameroonPhone(form.telephone), plateforme: 'web' })
       setAuth(data.user, data.access_token, data.refresh_token)
       toast.success(`Bienvenue ${data.user.nom_complet?.split(' ')[0]} !`)
-      navigate(data.user.role === 'admin' || data.user.role === 'super_admin' ? '/admin'
+      navigate(['admin','super_admin','agent'].includes(data.user.role) ? '/admin'
              : data.user.role === 'livreur' ? '/livreur' : '/')
     } catch(err) {
       toast.error(err.response?.data?.detail || 'Identifiants incorrects')
@@ -76,7 +77,6 @@ export function Inscription() {
   const [email, setEmail] = useState('')
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
-  const [otpCanal, setOtpCanal] = useState('email')
   const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client', tel2:'' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -91,9 +91,8 @@ export function Inscription() {
     setLoading(true)
     try {
       const res = await api.post('/auth/inscription/otp', { telephone: tel, operateur: op, email: email.trim().toLowerCase() })
-      const canal = res.data?.message?.includes('email') ? 'email' : res.data?.message?.includes('sms') ? 'SMS' : 'email'
-      setOtpCanal(canal)
-      toast.success(`Code de vérification envoyé sur votre ${canal === 'email' ? 'adresse email ✉️' : 'téléphone 📱'}`)
+      setOtpCanal('email')
+      toast.success('Code de vérification envoyé sur votre adresse email ✉️')
       setStep(2)
     } catch(err) {
       const d = err.response?.data?.detail
@@ -113,6 +112,7 @@ export function Inscription() {
 
   const step3 = async e => {
     e.preventDefault()
+    if (!getPasswordStrength(form.mot_de_passe).ok) { toast.error('Mot de passe trop faible — suivez la liste des critères sous le champ'); return }
     if (form.tel2 && !isValidCameroonPhone(form.tel2)) { toast.error('Second numéro invalide (ex: +237 6XX XXX XXX)'); return }
     if (form.tel2 && normalizeCameroonPhone(form.tel2) === normalizeCameroonPhone(tel)) { toast.error('Le second numéro doit être différent du premier'); return }
     setLoading(true)
@@ -186,11 +186,9 @@ export function Inscription() {
         <form onSubmit={step2} className="space-y-5 animate-fade-up">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
             <p className="text-sm text-blue-800 font-semibold">
-              {otpCanal === 'email' ? '✉️ Code envoyé sur votre adresse email' : '📱 Code envoyé par SMS'}
+              ✉️ Code envoyé sur votre adresse email
             </p>
-            <p className="text-xs text-blue-600 mt-0.5">
-              {otpCanal === 'email' ? email : tel}
-            </p>
+            <p className="text-xs text-blue-600 mt-0.5">{email}</p>
           </div>
           <div className="flex gap-2 justify-center">
             {otp.map((d, i) => (
@@ -241,27 +239,23 @@ export function Inscription() {
           <div>
             <label className="text-xs font-semibold text-navy/70 mb-1.5 block">Mot de passe</label>
             <div className="relative">
-              <input className="input pr-10" type={show ? 'text' : 'password'} placeholder="Minimum 8 caractères" required minLength={6}
+              <input className="input pr-10" type={show ? 'text' : 'password'} placeholder="8+ car., majuscule, chiffre, spécial" required minLength={8}
                 value={form.mot_de_passe} onChange={e => setForm({...form, mot_de_passe: e.target.value})}/>
               <button type="button" onClick={() => setShow(!show)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                 {show ? <EyeOff size={16}/> : <Eye size={16}/>}
               </button>
             </div>
-            {form.mot_de_passe && (() => {
-              const s = getPasswordStrength(form.mot_de_passe)
-              return (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1">
-                    {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.score ? s.color : 'bg-gray-200'}`}/>)}
-                  </div>
-                  <p className={`text-[10px] font-semibold ${s.text}`}>{s.label} — min. 8 car., 1 majuscule, 1 chiffre, 1 spécial</p>
-                </div>
-              )
-            })()}
+            <PasswordStrength password={form.mot_de_passe}/>
           </div>
-          <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading || !getPasswordStrength(form.mot_de_passe).ok}
+            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Créer mon compte 🎉</>}
           </button>
+          {form.mot_de_passe && !getPasswordStrength(form.mot_de_passe).ok && (
+            <p className="text-[11px] text-amber-600 font-semibold text-center">
+              Le mot de passe doit atteindre le niveau « Fort » pour créer le compte
+            </p>
+          )}
         </form>
       )}
 

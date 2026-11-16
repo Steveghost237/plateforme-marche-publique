@@ -133,7 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white),
-                  decoration: _buildInputDecoration('Email (optionnel)', Icons.email),
+                  decoration: _buildInputDecoration('Email', Icons.email),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

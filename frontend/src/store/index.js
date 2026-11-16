@@ -39,16 +39,22 @@ export const usePanier = create(persist((set, get) => ({
       next[idx] = { ...next[idx], quantite: next[idx].quantite + quantite }
       set({ lignes: next })
     } else {
-      set({ lignes: [...lignes, { produit, quantite, prixUnit, ingredients, note, key: k }] })
+      set({ lignes: [...lignes, { produit, quantite, prixUnit, ingredients, note, key: k, selected: true }] })
     }
   },
   // Article personnalisé (section "Ma Liste") — chaque ligne reste distincte
   addCustom: (produit, { nom, quantite = 1, prixUnit = 0 }) => {
     const key = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     set(s => ({ lignes: [...s.lignes, {
-      produit, quantite, prixUnit, ingredients: [], note: nom, key, custom: true,
+      produit, quantite, prixUnit, ingredients: [], note: nom, key, custom: true, selected: true,
     }] }))
   },
+  // Sélection au checkout : le client choisit quels articles commander
+  toggleSelect: (id) => set(s => ({ lignes: s.lignes.map(l =>
+    (l.key || l.produit.id) === id ? { ...l, selected: l.selected === false } : l) })),
+  setAllSelected: (v) => set(s => ({ lignes: s.lignes.map(l => ({ ...l, selected: v })) })),
+  // Retire uniquement les lignes commandées — les non-sélectionnées restent au panier
+  removeKeys: (keys) => set(s => ({ lignes: s.lignes.filter(l => !keys.includes(l.key || l.produit.id)) })),
   setQty: (id, q) => {
     if (q <= 0) set(s => ({ lignes: s.lignes.filter(l => (l.key || l.produit.id) !== id) }))
     else set(s => ({ lignes: s.lignes.map(l => (l.key || l.produit.id) === id ? { ...l, quantite: q } : l) }))

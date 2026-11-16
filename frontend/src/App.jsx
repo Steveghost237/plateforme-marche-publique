@@ -22,10 +22,16 @@ import AdminPrix from './pages/AdminPrix'
 import AdminLivraison from './pages/AdminLivraison'
 import AdminImages from './pages/AdminImages'
 import AdminMonitoring from './pages/AdminMonitoring'
+import AdminAgents from './pages/AdminAgents'
+import AdminAdministrateurs from './pages/AdminAdministrateurs'
+import AdminPointsAchat from './pages/AdminPointsAchat'
 import { LiveurDashboard } from './pages/Livreur'
 import { useAuth } from './store'
+import api from './utils/api'
+import { playNotifSound } from './utils/sound'
 import WhatsAppButton from './components/common/WhatsAppButton'
 import BottomNav from './components/common/BottomNav'
+import { useRef } from 'react'
 
 function Spinner() {
   return (
@@ -40,6 +46,27 @@ function ProtectedRoute({ children, roles }) {
   if (!isAuth) return <Navigate to="/connexion" replace/>
   if (roles && !roles.includes(user?.role)) return <Navigate to="/" replace/>
   return children
+}
+
+// Surveille les notifications non lues et émet un son à chaque nouvelle
+function NotificationWatcher() {
+  const { isAuth } = useAuth()
+  const prevCount = useRef(null)
+  useEffect(() => {
+    if (!isAuth) { prevCount.current = null; return }
+    const check = async () => {
+      try {
+        const { data } = await api.get('/notifications/?non_lues=true')
+        const n = data?.length || 0
+        if (prevCount.current !== null && n > prevCount.current) playNotifSound()
+        prevCount.current = n
+      } catch {}
+    }
+    check()
+    const iv = setInterval(check, 15000)
+    return () => clearInterval(iv)
+  }, [isAuth])
+  return null
 }
 
 // Pages avec navbar+footer
@@ -60,6 +87,7 @@ export default function App() {
 
   return (
     <Suspense fallback={<Spinner/>}>
+      <NotificationWatcher/>
       <Routes>
         {/* PUBLIC */}
         <Route path="/" element={<PublicLayout><Accueil/></PublicLayout>}/>
@@ -88,16 +116,19 @@ export default function App() {
         <Route path="/livreur" element={<ProtectedRoute roles={['livreur','admin','super_admin']}><LiveurDashboard/></ProtectedRoute>}/>
 
         {/* ADMIN */}
-        <Route path="/admin"                  element={<ProtectedRoute roles={['admin','super_admin']}><AdminDashboard/></ProtectedRoute>}/>
-        <Route path="/admin/commandes"        element={<ProtectedRoute roles={['admin','super_admin']}><AdminCommandes/></ProtectedRoute>}/>
-        <Route path="/admin/livreurs"         element={<ProtectedRoute roles={['admin','super_admin']}><AdminLivreurs/></ProtectedRoute>}/>
-        <Route path="/admin/clients"          element={<ProtectedRoute roles={['admin','super_admin']}><AdminClients/></ProtectedRoute>}/>
-        <Route path="/admin/stats"            element={<ProtectedRoute roles={['admin','super_admin']}><AdminStats/></ProtectedRoute>}/>
-        <Route path="/admin/suggestions"      element={<ProtectedRoute roles={['admin','super_admin']}><AdminSuggestions/></ProtectedRoute>}/>
-        <Route path="/admin/prix"             element={<ProtectedRoute roles={['admin','super_admin']}><AdminPrix/></ProtectedRoute>}/>
-        <Route path="/admin/livraison"        element={<ProtectedRoute roles={['admin','super_admin']}><AdminLivraison/></ProtectedRoute>}/>
-        <Route path="/admin/images"           element={<ProtectedRoute roles={['admin','super_admin']}><AdminImages/></ProtectedRoute>}/>
-        <Route path="/admin/monitoring"      element={<ProtectedRoute roles={['admin','super_admin']}><AdminMonitoring/></ProtectedRoute>}/>
+        <Route path="/admin"                  element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminDashboard/></ProtectedRoute>}/>
+        <Route path="/admin/commandes"        element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminCommandes/></ProtectedRoute>}/>
+        <Route path="/admin/livreurs"         element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminLivreurs/></ProtectedRoute>}/>
+        <Route path="/admin/clients"          element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminClients/></ProtectedRoute>}/>
+        <Route path="/admin/stats"            element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminStats/></ProtectedRoute>}/>
+        <Route path="/admin/suggestions"      element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminSuggestions/></ProtectedRoute>}/>
+        <Route path="/admin/prix"             element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminPrix/></ProtectedRoute>}/>
+        <Route path="/admin/livraison"        element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminLivraison/></ProtectedRoute>}/>
+        <Route path="/admin/images"           element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminImages/></ProtectedRoute>}/>
+        <Route path="/admin/monitoring"      element={<ProtectedRoute roles={['admin','super_admin','agent']}><AdminMonitoring/></ProtectedRoute>}/>
+        <Route path="/admin/agents"          element={<ProtectedRoute roles={['admin','super_admin']}><AdminAgents/></ProtectedRoute>}/>
+        <Route path="/admin/administrateurs" element={<ProtectedRoute roles={['admin','super_admin']}><AdminAdministrateurs/></ProtectedRoute>}/>
+        <Route path="/admin/points-achat"    element={<ProtectedRoute roles={['admin','super_admin']}><AdminPointsAchat/></ProtectedRoute>}/>
 
         {/* 404 */}
         <Route path="*" element={

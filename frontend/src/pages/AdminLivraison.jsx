@@ -40,6 +40,7 @@ function simulerLocal(f, distKm = 5, poidsKg = 2, pointe = false) {
 
 export default function AdminLivraison() {
   const [zones, setZones]     = useState([])
+  const [marches, setMarches] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal]     = useState(null)   // null | 'creer' | 'editer'
   const [form, setForm]       = useState(ZONE_DEFAUT)
@@ -62,7 +63,10 @@ export default function AdminLivraison() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    api.get('/admin/points-achat').then(({ data }) => setMarches(data.filter(m => m.actif))).catch(() => {})
+  }, [])
 
   const openCreer = () => {
     setForm({ ...ZONE_DEFAUT, ordre: zones.length + 1 })
@@ -148,7 +152,7 @@ export default function AdminLivraison() {
           </Link>
           <div className="flex-1">
             <h1 className="text-white font-bold text-lg">🚚 Zones de Livraison</h1>
-            <p className="text-white/50 text-xs">Distance · Poids estimé · Majoration Lun–Ven uniquement</p>
+            <p className="text-white/50 text-xs">Distance · Poids estimé · Majoration 7j/7</p>
           </div>
           <button onClick={openCreer}
             className="flex items-center gap-2 bg-amber-400 text-gray-900 font-bold px-4 py-2 rounded-xl text-sm hover:bg-amber-500 transition-colors shadow-sm">
@@ -164,12 +168,24 @@ export default function AdminLivraison() {
             <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
               <MapPin size={18} className="text-blue-500"/>
             </div>
-            <div>
-              <p className="font-bold text-[#0D2137] text-sm">Point de départ : Marché Mokolo, Yaoundé</p>
-              <p className="text-gray-400 text-xs mt-0.5">Lat: 3.8667 · Lon: 11.5167 · Les frais sont calculés selon la distance haversine</p>
+            <div className="flex-1">
+              <p className="font-bold text-[#0D2137] text-sm">Points de départ : marché le plus proche de l'adresse client</p>
+              <p className="text-gray-400 text-xs mt-0.5">Distance haversine depuis le point d'achat assigné à la commande</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {marches.length === 0 ? (
+                  <span className="text-xs text-gray-400 italic">Aucun marché géolocalisé — repli : Marché Mokolo (3.8667, 11.5167)</span>
+                ) : marches.map(m => (
+                  <span key={m.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[11px] px-2 py-1 rounded-full"
+                    title={m.latitude != null ? `${m.latitude}, ${m.longitude}` : 'Coordonnées manquantes'}>
+                    <MapPin size={9} className={m.latitude != null ? 'text-green-500' : 'text-gray-300'}/>
+                    {m.nom}{m.quartier ? ` · ${m.quartier}` : ''}
+                    {m.latitude == null && <span className="text-amber-500">(sans GPS)</span>}
+                  </span>
+                ))}
+              </div>
               <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><Zap size={10} className="text-amber-500"/> Majoration Lun–Ven : 11h–14h et 18h–22h</span>
-                <span className="flex items-center gap-1 text-gray-400">🚫 Pas de majoration le weekend</span>
+                <span className="flex items-center gap-1"><Zap size={10} className="text-amber-500"/> Majoration 7j/7 : 11h–14h et 18h–22h</span>
+                <span className="flex items-center gap-1 text-gray-400">✓ Majoration aussi le weekend</span>
                 <span className="flex items-center gap-1 text-green-600">✓ Minimum 1000 FCFA · jamais gratuite</span>
               </div>
             </div>
@@ -215,7 +231,7 @@ export default function AdminLivraison() {
                     </p>
                     {(z.majoration_pointe_pct||0) > 0 && (
                       <p className="text-[10px] text-amber-500 flex items-center gap-1 justify-end">
-                        <Zap size={8}/> +{z.majoration_pointe_pct}% Lun–Ven
+                        <Zap size={8}/> +{z.majoration_pointe_pct}% pointe
                       </p>
                     )}
                   </div>
@@ -242,7 +258,7 @@ export default function AdminLivraison() {
           <h2 className="font-bold text-[#0D2137] text-sm mb-1 flex items-center gap-2">
             <Zap size={15} className="text-amber-400"/> Simulateur de tarif
           </h2>
-          <p className="text-xs text-gray-400 mb-4">Formule : <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">frais = base + (km × F/km) + (kg × F/kg)</span> · Majoration % Lun–Ven uniquement</p>
+          <p className="text-xs text-gray-400 mb-4">Formule : <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">frais = base + (km × F/km) + (kg × F/kg)</span> · Majoration % 7j/7</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
             <div>
               <label className="text-xs font-bold text-gray-400 block mb-1.5">Distance (km)</label>
@@ -259,7 +275,7 @@ export default function AdminLivraison() {
             <div className="flex items-end">
               <button onClick={() => setSimPointe(p => !p)}
                 className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${simPointe ? 'bg-amber-400 text-gray-900 border-amber-400' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}>
-                <Zap size={12} className="inline mr-1"/> Heure pointe (Lun–Ven)
+                <Zap size={12} className="inline mr-1"/> Heure pointe
               </button>
             </div>
             <button onClick={simuler} disabled={simLoading}
@@ -291,7 +307,7 @@ export default function AdminLivraison() {
                 )}
                 {simResult.majoration > 0 && (
                   <div className="flex justify-between text-sm text-amber-600">
-                    <span className="flex items-center gap-1"><Zap size={11}/> Heure de pointe Lun–Ven (+{simResult.majoration_pct}%)</span>
+                    <span className="flex items-center gap-1"><Zap size={11}/> Heure de pointe (+{simResult.majoration_pct}%)</span>
                     <span>+{(simResult.majoration||0).toLocaleString()} F</span>
                   </div>
                 )}
@@ -319,7 +335,7 @@ export default function AdminLivraison() {
               {/* Champs formule combinée */}
               <div className="bg-blue-50 rounded-xl p-3 mb-2">
                 <p className="text-[10px] font-bold text-blue-600 mb-1 uppercase tracking-wide">📐 Formule combinée distance + poids</p>
-                <p className="text-[10px] text-blue-500 font-mono">frais = base + (km × F/km) + (kg × F/kg) [× (1 + %/100) si pointe Lun–Ven]</p>
+                <p className="text-[10px] text-blue-500 font-mono">frais = base + (km × F/km) + (kg × F/kg) [× (1 + %/100) si heure de pointe]</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -365,7 +381,7 @@ export default function AdminLivraison() {
                   <p className="text-[10px] text-gray-400 mt-0.5">Ex: 100 → 3 kg = +300 F</p>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-400 block mb-1.5">Majoration pointe Lun–Ven (%)</label>
+                  <label className="text-xs font-bold text-gray-400 block mb-1.5">Majoration heure de pointe (%)</label>
                   <input type="number" min="0" max="100"
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
                     value={form.majoration_pointe_pct} onChange={e => setForm(f=>({...f, majoration_pointe_pct: parseInt(e.target.value)||0}))}/>

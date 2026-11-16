@@ -5,6 +5,8 @@ import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
 import { useConfirm } from '../components/common/useConfirm'
+import ChangerMotDePasse from '../components/common/ChangerMotDePasse'
+import BoutonGPS from '../components/common/BoutonGPS'
 
 const NIVEAUX_INFO = {
   bronze: { emoji:'🥉', label:'Bronze',  color:'text-amber-700 bg-amber-100', min:0,     max:999  },
@@ -21,6 +23,7 @@ export function Profil() {
   const [loading, setLoading] = useState(false)
   const [fidelite, setFidelite] = useState(null)
   const [editMode, setEditMode] = useState(false)
+  const [showMdp, setShowMdp] = useState(false)
   const [nbCommandes, setNbCommandes] = useState(0)
   const [nbAdresses, setNbAdresses] = useState(0)
 
@@ -76,7 +79,7 @@ export function Profil() {
               <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]" value={form.nom_complet} onChange={e => setForm({...form, nom_complet: e.target.value})}/>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 mb-1 block">Email (optionnel)</label>
+              <label className="text-xs font-bold text-gray-400 mb-1 block">Email</label>
               <input type="email" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]" placeholder="exemple@mail.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})}/>
             </div>
             <div>
@@ -103,6 +106,27 @@ export function Profil() {
             <div className="flex-1 text-left">
               <p className="font-semibold text-[#0D2137] text-sm">Modifier mon profil</p>
               <p className="text-xs text-gray-400">{user?.nom_complet}</p>
+            </div>
+            <ChevronRight size={14} className="text-gray-300"/>
+          </button>
+        )}
+
+        {/* Sécurité — changement de mot de passe */}
+        {showMdp ? (
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-[#0D2137] text-sm">Changer le mot de passe</h2>
+              <button onClick={() => setShowMdp(false)} className="text-gray-400 hover:text-gray-600"><XCircle size={18}/></button>
+            </div>
+            <ChangerMotDePasse/>
+          </div>
+        ) : (
+          <button onClick={() => setShowMdp(true)}
+            className="w-full bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+            <div className="w-9 h-9 bg-[#F0F4F8] rounded-xl flex items-center justify-center text-sm">🔒</div>
+            <div className="flex-1 text-left">
+              <p className="font-semibold text-[#0D2137] text-sm">Changer le mot de passe</p>
+              <p className="text-xs text-gray-400">Sécurité du compte</p>
             </div>
             <ChevronRight size={14} className="text-gray-300"/>
           </button>
@@ -168,6 +192,7 @@ export function MesCommandes() {
     brouillon:           { label:'Brouillon',   emoji:'📝', bg:'bg-gray-100',  text:'text-gray-600' },
     en_attente_paiement: { label:'En attente',  emoji:'⏳',  bg:'bg-amber-50', text:'text-amber-600' },
     payee:               { label:'Payée',       emoji:'✅',  bg:'bg-blue-50',  text:'text-blue-600'  },
+    prete:               { label:'Prête',       emoji:'🛍️',  bg:'bg-emerald-50', text:'text-emerald-600' },
     assignee:            { label:'Assignée',    emoji:'🛕',  bg:'bg-blue-50',  text:'text-blue-600'  },
     en_cours_marche:     { label:'Au marché',   emoji:'🛍️',  bg:'bg-blue-50',  text:'text-blue-600'  },
     en_livraison:        { label:'En route',    emoji:'🚀',  bg:'bg-amber-50', text:'text-amber-600' },
@@ -175,7 +200,7 @@ export function MesCommandes() {
     annulee:             { label:'Annulée',     emoji:'❌',  bg:'bg-red-50',   text:'text-red-500'   },
   }
 
-  const isActive = (s) => ['payee','assignee','en_cours_marche','en_livraison'].includes(s)
+  const isActive = (s) => ['payee','prete','assignee','en_cours_marche','en_livraison'].includes(s)
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
@@ -476,6 +501,7 @@ export function MesAdresses() {
               placeholder="Quartier" value={form.quartier} onChange={e => setForm({...form, quartier: e.target.value})}/>
             <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
               placeholder="Ville" value={form.ville} onChange={e => setForm({...form, ville: e.target.value})}/>
+            <BoutonGPS onCoords={c => setForm(f => ({ ...f, ...c }))}/>
             <div className="flex gap-2">
               <button onClick={ajouter} className="flex-1 bg-[#0D2137] text-white font-bold py-2.5 rounded-xl text-sm hover:bg-amber-400 hover:text-gray-900 transition-all">Ajouter</button>
               <button onClick={() => setShowForm(false)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-2.5 rounded-xl text-sm">Annuler</button>
@@ -498,7 +524,9 @@ export function MesAdresses() {
                   {a.est_par_defaut ? <Star size={18} className="text-amber-500"/> : <MapPin size={18} className="text-gray-400"/>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[#0D2137] text-sm">{a.libelle || a.quartier}</p>
+                  <p className="font-semibold text-[#0D2137] text-sm">{a.libelle || a.quartier}
+                    {a.latitude != null && <span className="ml-2 text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full align-middle">📍 GPS</span>}
+                  </p>
                   <p className="text-xs text-gray-400">{a.quartier}, {a.ville}</p>
                 </div>
                 <button onClick={() => supprimer(a.id)} className="text-red-400 hover:text-red-600 text-xs transition-colors p-1">✕</button>

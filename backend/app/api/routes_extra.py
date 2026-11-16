@@ -3,7 +3,7 @@ routes_extra.py — Suggestions, gestion prix, zones de livraison par distance
 """
 import math
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -11,11 +11,12 @@ from sqlalchemy import func, or_
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user, get_current_admin
+from app.core.security import get_current_user, get_current_admin, get_current_staff
 from app.models.models import (
     Section, Produit, Adresse, ZoneLivraison, Commande,
     SuggestionProduit, VoteSuggestion, HistoriquePrix,
-    FideliteCompte, FideliteTransaction, Notification, Utilisateur
+    FideliteCompte, FideliteTransaction, Notification, Utilisateur,
+    Ingredient
 )
 
 # ──────────────────────────────────────────────
@@ -31,11 +32,12 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+def heure_cameroun() -> datetime:
+    """Heure locale Cameroun (WAT = UTC+1, pas d'heure d'été)."""
+    return datetime.utcnow() + timedelta(hours=1)
+
 def est_heure_pointe(now: datetime) -> bool:
-    """Majoration en semaine (Lun–Ven) aux heures de pointe : 11h–14h et 18h–22h."""
-    jour_semaine = now.weekday()  # 0=lun … 4=ven, 5=sam, 6=dim
-    if jour_semaine >= 5:          # weekend -> pas de majoration
-        return False
+    """Majoration aux heures de pointe, 7j/7 : 11h–14h et 18h–22h."""
     return now.hour in range(11, 14) or now.hour in range(18, 22)
 
 def _get_zone(distance_km: float, db: Session):
@@ -97,6 +99,19 @@ def get_zone_pour_distance(distance_km: float, db: Session):
     z, _ = _get_zone(distance_km, db)
     return z
 
+def point_depart(db: Session, dest_lat: float = None, dest_lon: float = None):
+    """Point d'achat actif le plus proche de la destination (repli : Marché Mokolo).
+    Retourne (lat, lon, point_achat_ou_None)."""
+    from app.models.models import PointAchat
+    pas = [p for p in db.query(PointAchat).filter(PointAchat.actif == True).all()
+           if p.latitude is not None and p.longitude is not None]
+    if dest_lat is not None and dest_lon is not None and pas:
+        pa = min(pas, key=lambda p: haversine(dest_lat, dest_lon, float(p.latitude), float(p.longitude)))
+        return float(pa.latitude), float(pa.longitude), pa
+    if pas:
+        return float(pas[0].latitude), float(pas[0].longitude), pas[0]
+    return MARCHE_LAT, MARCHE_LON, None
+
 # ══════════════════════════════════════════════
 # ZONES DE LIVRAISON (public)
 # ══════════════════════════════════════════════
@@ -126,12 +141,14 @@ def calculer_frais(body: dict, db: Session = Depends(get_db)):
                 "frais_base": 1000, "part_distance": 0, "part_poids": 0,
                 "majoration": 0, "est_pointe": False, "poids_kg": poids_kg}
 
-    dist   = haversine(MARCHE_LAT, MARCHE_LON, lat, lon)
-    now    = datetime.utcnow()
+    dep_lat, dep_lon, pa = point_depart(db, lat, lon)
+    dist   = haversine(dep_lat, dep_lon, lat, lon)
+    now    = heure_cameroun()
     pointe = est_heure_pointe(now)
     d      = detail_frais(dist, pointe, db, poids_kg)
     # Alias frais_fcfa pour compatibilité frontend
     d["frais_fcfa"] = d["frais_total"]
+    d["point_depart"] = pa.nom if pa else "Marché Mokolo"
     return d
 
 # ══════════════════════════════════════════════
@@ -247,7 +264,7 @@ def admin_liste_suggestions(
     statut: str = "en_attente",
     page: int = 1,
     db: Session = Depends(get_db),
-    _=Depends(get_current_admin)
+    _=Depends(get_current_staff)
 ):
     q = db.query(SuggestionProduit)
     if statut != "toutes":
@@ -257,7 +274,7 @@ def admin_liste_suggestions(
     return {"total": total, "items": [_fmt_suggestion(s) for s in items]}
 
 @admin_suggest_router.put("/{sid}/approuver")
-def admin_approuver(sid: UUID, body: dict = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def admin_approuver(sid: UUID, body: dict = None, db: Session = Depends(get_db), admin=Depends(get_current_staff)):
     body = body or {}
     s = db.query(SuggestionProduit).filter(SuggestionProduit.id == sid).first()
     if not s: raise HTTPException(404)
@@ -314,7 +331,7 @@ def admin_approuver(sid: UUID, body: dict = None, db: Session = Depends(get_db),
     return {"message": "Suggestion approuvée et produit créé", "produit_id": str(prod.id)}
 
 @admin_suggest_router.put("/{sid}/rejeter")
-def admin_rejeter(sid: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_rejeter(sid: UUID, body: dict = None, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     body = body or {}
     s = db.query(SuggestionProduit).filter(SuggestionProduit.id == sid).first()
     if not s: raise HTTPException(404)
@@ -339,13 +356,14 @@ def get_tous_prix(
     q: Optional[str] = None,
     page: int = 1,
     db: Session = Depends(get_db),
-    _=Depends(get_current_admin)
+    _=Depends(get_current_staff)
 ):
     query = (db.query(Produit)
+             .join(Section, Produit.section_id == Section.id)
              .options(joinedload(Produit.section))
              .filter(Produit.deleted_at.is_(None)))
     if section:
-        query = query.join(Section).filter(Section.code == section)
+        query = query.filter(Section.code == section)
     if q:
         query = query.filter(func.lower(Produit.nom).contains(q.lower()))
     total = query.count()
@@ -357,14 +375,17 @@ def get_tous_prix(
             "prix_base_fcfa": p.prix_base_fcfa,
             "prix_max_fcfa": p.prix_max_fcfa,
             "est_actif": p.est_actif, "est_populaire": p.est_populaire,
+            "est_menu": p.est_menu,
             "section_nom": p.section.nom if p.section else None,
             "section_code": p.section.code if p.section else None,
+            "section_id": str(p.section_id) if p.section_id else None,
+            "description": p.description,
             "image_url": p.image_url,
         } for p in produits]
     }
 
 @admin_prix_router.put("/{produit_id}")
-def update_prix(produit_id: UUID, body: dict, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def update_prix(produit_id: UUID, body: dict, db: Session = Depends(get_db), admin=Depends(get_current_staff)):
     prod = db.query(Produit).filter(Produit.id == produit_id).first()
     if not prod: raise HTTPException(404)
 
@@ -391,7 +412,7 @@ def update_prix(produit_id: UUID, body: dict, db: Session = Depends(get_db), adm
     return {"ok": True, "nouveau_prix": prod.prix_base_fcfa}
 
 @admin_prix_router.post("/bulk-update")
-def bulk_update_prix(body: dict, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def bulk_update_prix(body: dict, db: Session = Depends(get_db), admin=Depends(get_current_staff)):
     """Mise à jour en masse : +/- % ou valeur fixe sur toute une section."""
     section_code = body.get("section_code")
     mode         = body.get("mode", "pourcentage")  # pourcentage | fixe
@@ -404,7 +425,34 @@ def bulk_update_prix(body: dict, db: Session = Depends(get_db), admin=Depends(ge
 
     produits = query.all()
     mis_a_jour = 0
+    menus_ignores = 0
     for p in produits:
+        if p.est_menu:
+            # Un menu a un prix dérivé : on propage la variation en %
+            # aux prix de ses ingrédients (min/défaut/max), puis resync.
+            if mode == "pourcentage" and valeur != 0:
+                ancien = p.prix_base_fcfa or 0
+                ings = db.query(Ingredient).filter(
+                    Ingredient.produit_id == p.id, Ingredient.actif == True).all()
+                for ing in ings:
+                    for f in ("prix_min_fcfa", "prix_defaut_fcfa", "prix_max_fcfa"):
+                        v = getattr(ing, f)
+                        if v is not None:
+                            setattr(ing, f, max(0, int(v * (1 + valeur / 100))))
+                if ings:
+                    from app.api.routes import _sync_prix_menu
+                    _sync_prix_menu(db, p.id)
+                    nouveau = p.prix_base_fcfa or 0
+                    variation = round(((nouveau - ancien) / ancien * 100), 2) if ancien else 0
+                    db.add(HistoriquePrix(
+                        produit_id=p.id, admin_id=admin.id,
+                        ancien_prix=ancien, nouveau_prix=nouveau,
+                        variation_pct=variation, raison=raison
+                    ))
+                    mis_a_jour += 1
+                    continue
+            menus_ignores += 1
+            continue
         ancien = p.prix_base_fcfa or 0
         if mode == "pourcentage":
             nouveau = max(0, int(ancien * (1 + valeur / 100)))
@@ -421,10 +469,10 @@ def bulk_update_prix(body: dict, db: Session = Depends(get_db), admin=Depends(ge
             mis_a_jour += 1
 
     db.commit()
-    return {"ok": True, "mis_a_jour": mis_a_jour}
+    return {"ok": True, "mis_a_jour": mis_a_jour, "menus_ignores": menus_ignores}
 
 @admin_prix_router.get("/{produit_id}/historique")
-def historique_prix(produit_id: UUID, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def historique_prix(produit_id: UUID, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     rows = (db.query(HistoriquePrix)
             .filter(HistoriquePrix.produit_id == produit_id)
             .order_by(HistoriquePrix.created_at.desc()).limit(20).all())
@@ -443,18 +491,24 @@ def historique_prix(produit_id: UUID, db: Session = Depends(get_db), _=Depends(g
 admin_zones_router = APIRouter(prefix="/admin/zones-livraison", tags=["Admin - Zones"])
 
 @admin_zones_router.get("/")
-def admin_get_zones(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_get_zones(db: Session = Depends(get_db), _=Depends(get_current_staff)):
     return db.query(ZoneLivraison).order_by(ZoneLivraison.ordre).all()
 
 @admin_zones_router.post("/")
-def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_current_staff)):
+    if not (body.get("nom") or "").strip():
+        raise HTTPException(400, "Nom de zone requis")
+    frais_base = int(body.get("frais_base_fcfa") or 200)
     z = ZoneLivraison(
-        nom=body["nom"],
+        nom=body["nom"].strip(),
         ville=body.get("ville", "Yaoundé"),
         distance_min_km=body.get("distance_min_km", 0),
         distance_max_km=body.get("distance_max_km"),
-        frais_fcfa=body["frais_fcfa"],
-        frais_pointe_fcfa=body.get("frais_pointe_fcfa"),
+        frais_base_fcfa=frais_base,
+        prix_par_km_fcfa=body.get("prix_par_km_fcfa", 50),
+        prix_par_kg_fcfa=body.get("prix_par_kg_fcfa", 100),
+        majoration_pointe_pct=body.get("majoration_pointe_pct", 20),
+        frais_fcfa=body.get("frais_fcfa", frais_base),  # champ legacy
         delai_min=body.get("delai_min", 30),
         delai_max=body.get("delai_max", 60),
         couleur_hex=body.get("couleur_hex", "#6B7280"),
@@ -465,7 +519,7 @@ def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_cu
     return z
 
 @admin_zones_router.put("/{zone_id}")
-def admin_update_zone(zone_id: UUID, body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_update_zone(zone_id: UUID, body: dict, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     z = db.query(ZoneLivraison).filter(ZoneLivraison.id == zone_id).first()
     if not z: raise HTTPException(404)
     for k, v in body.items():
@@ -474,14 +528,14 @@ def admin_update_zone(zone_id: UUID, body: dict, db: Session = Depends(get_db), 
     return {"ok": True}
 
 @admin_zones_router.delete("/{zone_id}")
-def admin_delete_zone(zone_id: UUID, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def admin_delete_zone(zone_id: UUID, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     z = db.query(ZoneLivraison).filter(ZoneLivraison.id == zone_id).first()
     if not z: raise HTTPException(404)
     db.delete(z); db.commit()
     return {"ok": True}
 
 @admin_zones_router.post("/simuler")
-def simuler_frais(body: dict, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+def simuler_frais(body: dict, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     """Simule les frais (formule combinée distance+poids) pour l'outil admin."""
     dist     = float(body.get("distance_km", 0))
     pointe   = bool(body.get("est_pointe", False))

@@ -119,15 +119,32 @@ def _html_otp(otp: str, nom: str, contexte: str = "inscription") -> str:
 </div></body></html>"""
 
 
-def _html_welcome(nom: str, telephone: str, role: str) -> str:
+def _html_welcome(nom: str, telephone: str, role: str, mot_de_passe: str = None) -> str:
     nom_safe   = _s(nom) or "Nouvel utilisateur"
-    role_label = {"client": "Client", "livreur": "Livreur Partenaire"}.get(role, role.capitalize())
-    role_emoji = "🛒" if role == "client" else "🛵"
+    role_label = {"client": "Client", "livreur": "Livreur Partenaire",
+                  "agent": "Agent commercial", "admin": "Administrateur",
+                  "super_admin": "Super administrateur"}.get(role, role.capitalize())
+    role_emoji = {"client": "🛒", "livreur": "🛵", "agent": "🏪",
+                  "admin": "🛡️", "super_admin": "🛡️"}.get(role, "🛒")
     if role == "client":
         role_msg = '<p style="font-size:13px;color:#374151">🛒 Parcourez notre catalogue et passez votre première commande dès maintenant !</p>'
-    else:
+    elif role == "agent":
+        role_msg = "<p style=\"font-size:13px;color:#374151\">🏪 Bienvenue dans l'équipe ! Connectez-vous à votre tableau de bord pour gérer les commandes de votre point d'achat.</p>"
+    elif role == "livreur":
         role_msg = "<p style=\"font-size:13px;color:#374151\">🛵 Bienvenue dans l'équipe ! Connectez-vous sur l'app pour recevoir vos premières missions de livraison.</p>"
+    else:
+        role_msg = "<p style=\"font-size:13px;color:#374151\">🛡️ Bienvenue dans l'équipe ! Connectez-vous à l'administration pour gérer la plateforme.</p>"
     tel_safe = _s(telephone)
+    creds_block = ""
+    if mot_de_passe:
+        creds_block = f"""
+    <div style="background:#FEF3C7;border:1px solid #F59E0B33;border-radius:10px;padding:16px;margin:16px 0">
+      <p style="font-size:13px;font-weight:700;color:#92400E;margin:0 0 8px">🔑 Vos identifiants de connexion</p>
+      <div class="info-row"><span class="info-label">Identifiant</span><span class="info-val">{tel_safe}</span></div>
+      <div class="info-row" style="border:none"><span class="info-label">Mot de passe</span>
+        <span class="info-val" style="font-family:monospace">{_s(mot_de_passe)}</span></div>
+      <p style="font-size:11px;color:#92400E;margin:8px 0 0">Conservez-les précieusement et changez votre mot de passe dans vos paramètres après la première connexion.</p>
+    </div>"""
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">{_BASE_STYLE}</head>
 <body><div class="wrap">
   {_header("Bienvenue dans la famille ComeBuy !")}
@@ -143,6 +160,7 @@ def _html_welcome(nom: str, telephone: str, role: str) -> str:
         <span class="badge">{role_emoji} {role_label}</span>
       </div>
     </div>
+    {creds_block}
     {role_msg}
     <a href="https://comebuy-frontend.vercel.app" class="btn">Accéder à ComeBuy →</a>
   </div>
@@ -413,12 +431,13 @@ def send_otp_email(to_email: str, nom: str, otp: str,
 
 
 def send_welcome_email(to_email: str, nom: str, telephone: str,
-                       role: str = "client") -> dict:
-    """Envoie l'email de bienvenue après création de compte."""
+                       role: str = "client", mot_de_passe: str = None) -> dict:
+    """Envoie l'email de bienvenue après création de compte.
+    Si mot_de_passe fourni (comptes créés par un admin), les identifiants sont inclus."""
     return _send_email(
         to_email,
         "ComeBuy — Bienvenue ! Votre compte est actif",
-        _html_welcome(nom, telephone, role),
+        _html_welcome(nom, telephone, role, mot_de_passe),
     )
 
 

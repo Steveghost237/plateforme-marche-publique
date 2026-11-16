@@ -28,16 +28,22 @@ export function normalizeCameroonPhone(phone) {
 }
 
 export function getPasswordStrength(password) {
-  if (!password) return { score: 0, label: '', color: '' }
-  let score = 0
-  if (password.length >= 6) score++
-  if (password.length >= 8) score++
-  if (/[A-Z]/.test(password)) score++
-  if (/[0-9]/.test(password)) score++
-  if (/[^A-Za-z0-9]/.test(password)) score++
+  const p = password || ''
+  const checks = [
+    { key:'len8',     label:'8 caractères minimum',             ok: p.length >= 8 },
+    { key:'maj',      label:'1 majuscule (A-Z)',                ok: /[A-Z]/.test(p) },
+    { key:'min',      label:'1 minuscule (a-z)',                ok: /[a-z]/.test(p) },
+    { key:'chiffre',  label:'1 chiffre (0-9)',                  ok: /[0-9]/.test(p) },
+    { key:'special',  label:'1 caractère spécial (!@#…)',       ok: /[^A-Za-z0-9]/.test(p) },
+    { key:'len12',    label:'12 caractères ou plus (excellent)',ok: p.length >= 12 },
+  ]
+  const requis = checks.slice(0, 5).every(c => c.ok)
+  const score = checks.slice(0, 5).filter(c => c.ok).length + (requis && checks[5].ok ? 1 : 0)
 
-  if (score <= 1) return { score, label: 'Faible', color: 'bg-red-500', text: 'text-red-500' }
-  if (score <= 2) return { score, label: 'Moyen', color: 'bg-orange-400', text: 'text-orange-500' }
-  if (score <= 3) return { score, label: 'Bon', color: 'bg-amber-400', text: 'text-amber-600' }
-  return { score, label: 'Fort', color: 'bg-green-500', text: 'text-green-600' }
+  let out = { checks, score, ok: requis }
+  if (!p) return { ...out, score: 0, label: '', color: '', text: '', niveau: 'faible' }
+  if (requis && checks[5].ok) return { ...out, label: 'Excellent', color: 'bg-green-600', text: 'text-green-700', niveau: 'excellent' }
+  if (requis) return { ...out, label: 'Fort', color: 'bg-green-500', text: 'text-green-600', niveau: 'fort' }
+  if (score >= 3) return { ...out, label: 'Moyen', color: 'bg-amber-400', text: 'text-amber-600', niveau: 'moyen' }
+  return { ...out, label: 'Faible', color: 'bg-red-500', text: 'text-red-500', niveau: 'faible' }
 }

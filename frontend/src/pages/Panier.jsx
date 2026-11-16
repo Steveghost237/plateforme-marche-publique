@@ -6,6 +6,7 @@ import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
 import { useT } from '../store/langStore'
 import SafeImg from '../components/common/SafeImg'
+import BoutonGPS from '../components/common/BoutonGPS'
 
 const SECTION_ICONS = {
   menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞', epices: '🌶️',
@@ -15,13 +16,18 @@ const SECTION_ICONS = {
 // ── PANIER ────────────────────────────────────────────────────
 export function Panier() {
   const t = useT()
-  const { lignes, setQty, remove } = usePanier(s => ({
-    lignes: s.lignes, setQty: s.setQty, remove: s.remove
+  const { lignes, setQty, remove, toggleSelect, setAllSelected } = usePanier(s => ({
+    lignes: s.lignes, setQty: s.setQty, remove: s.remove,
+    toggleSelect: s.toggleSelect, setAllSelected: s.setAllSelected
   }))
 
+  // Le client choisit quels articles commander — les décochés restent au panier
+  const selectionnes = lignes.filter(l => l.selected !== false)
+  const toutCoche    = lignes.length > 0 && selectionnes.length === lignes.length
+
   const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
-  const sousTotal = lignes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
-  const fraisLiv  = lignes.length > 0 && lignes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : 1000
+  const sousTotal = selectionnes.reduce((a, l) => a + l.prixUnit * l.quantite, 0)
+  const fraisLiv  = selectionnes.length > 0 && selectionnes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : 1000
   const total     = sousTotal + fraisLiv
   const points    = Math.floor(total / 500)
 
@@ -66,6 +72,16 @@ export function Panier() {
       <div className="max-w-6xl mx-auto px-4 py-6 grid lg:grid-cols-3 gap-6">
         {/* Articles groupés par section */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Barre de sélection */}
+          <div className="bg-white rounded-2xl shadow-sm px-4 py-3 flex items-center justify-between">
+            <p className="text-xs font-semibold text-[#0D2137]">
+              <span className="text-amber-500 font-bold">{selectionnes.length}</span>/{lignes.length} article{lignes.length>1?'s':''} à commander
+            </p>
+            <button onClick={() => setAllSelected(!toutCoche)}
+              className="text-xs font-bold text-[#0D2137] hover:text-amber-500 transition-colors">
+              {toutCoche ? 'Tout décocher' : 'Tout sélectionner'}
+            </button>
+          </div>
           {Object.entries(grouped).map(([sec, { label, lignes: items }]) => (
             <div key={sec} className="bg-white rounded-2xl shadow-sm overflow-hidden">
               {/* Header section */}
@@ -78,8 +94,15 @@ export function Panier() {
               <div className="divide-y divide-gray-50">
                 {items.map(l => {
                   const k = l.key || l.produit.id
+                  const sel = l.selected !== false
                   return (
-                  <div key={k} className="p-4 flex gap-3 items-start">
+                  <div key={k} className={`p-4 flex gap-3 items-start transition-opacity ${sel ? '' : 'opacity-45'}`}>
+                    <button onClick={() => toggleSelect(k)}
+                      title={sel ? 'Ne pas commander cet article' : 'Commander cet article'}
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-4 transition-all ${
+                        sel ? 'bg-[#0D2137] border-[#0D2137] text-white' : 'border-gray-300 bg-white hover:border-[#0D2137]'}`}>
+                      {sel && <Check size={12}/>}
+                    </button>
                     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center">
                       {l.custom
                         ? <span className="text-xl">📝</span>
@@ -133,7 +156,10 @@ export function Panier() {
 
             {/* Mini-liste */}
             <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
-              {lignes.map(l => (
+              {selectionnes.length === 0 && (
+                <p className="text-xs text-gray-400 italic">Aucun article sélectionné — cochez ceux que vous voulez commander.</p>
+              )}
+              {selectionnes.map(l => (
                 <div key={l.key || l.produit.id} className="flex justify-between text-xs text-gray-600">
                   <span className="truncate flex-1">{l.note || l.produit.nom} ×{l.quantite}</span>
                   <span className="font-semibold ml-2 shrink-0">{(l.prixUnit*l.quantite).toLocaleString()} F</span>
@@ -143,7 +169,7 @@ export function Panier() {
 
             <div className="space-y-2 text-sm border-t border-gray-100 pt-3">
               <div className="flex justify-between text-gray-500">
-                <span>Sous-total ({lignes.length} art.)</span>
+                <span>Sous-total ({selectionnes.length} art.)</span>
                 <span>{sousTotal.toLocaleString()} F</span>
               </div>
               <div className="flex justify-between text-gray-500">
@@ -160,10 +186,17 @@ export function Panier() {
               </div>
             </div>
 
-            <Link to="/commande"
-              className="w-full mt-4 bg-[#0D2137] hover:bg-amber-400 hover:text-gray-900 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all text-sm shadow">
-              Passer la commande <ArrowRight size={15}/>
-            </Link>
+            {selectionnes.length === 0 ? (
+              <button disabled
+                className="w-full mt-4 bg-gray-200 text-gray-400 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm cursor-not-allowed">
+                Sélectionnez des articles <ArrowRight size={15}/>
+              </button>
+            ) : (
+              <Link to="/commande"
+                className="w-full mt-4 bg-[#0D2137] hover:bg-amber-400 hover:text-gray-900 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all text-sm shadow">
+                Commander {selectionnes.length} article{selectionnes.length>1?'s':''} <ArrowRight size={15}/>
+              </Link>
+            )}
             <Link to="/catalogue/menus_ingredients"
               className="w-full mt-2 border border-gray-200 text-gray-500 hover:border-[#0D2137] hover:text-[#0D2137] font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all text-xs">
               + Continuer mes achats
@@ -178,15 +211,30 @@ export function Panier() {
 // ── CHECKOUT ─────────────────────────────────────────────────
 export function Checkout() {
   const t = useT()
-  const { lignes, clear } = usePanier(s => ({ lignes: s.lignes, clear: s.clear }))
-  const sousTotal = lignes.reduce((a,l)=>a+l.prixUnit*l.quantite,0)
+  const { lignes, removeKeys } = usePanier(s => ({ lignes: s.lignes, removeKeys: s.removeKeys }))
+  // Ne commander que les articles cochés au panier — les autres y restent
+  const lignesSel = lignes.filter(l => l.selected !== false)
+  const sousTotal = lignesSel.reduce((a,l)=>a+l.prixUnit*l.quantite,0)
   const { isAuth, user } = useAuth()
   const navigate = useNavigate()
 
   const [adresses, setAdresses] = useState([])
   const [step, setStep] = useState(1)
   const [sel, setSel]   = useState({ adresseId: null, creneau: null, date: '', mode: 'mtn_mobile_money', tel: '' })
-  const [poidsKg, setPoidsKg]         = useState(0)
+  // Poids calculé automatiquement (le client n'a pas à le deviner) :
+  // • menu avec ingrédients → somme RÉELLE des ingrédients choisis
+  //   (g → /1000, cl → ×0.01 kg, pcs → ~0.15 kg/pièce)
+  // • produit simple → quantité × poids_kg du produit
+  const POIDS_ING = { g: 0.001, cl: 0.01, pcs: 0.15 }
+  const poidsLigne = (l) => {
+    if (l.ingredients?.length > 0) {
+      const poidsIngredients = l.ingredients.reduce((a, i) =>
+        a + (parseFloat(i.quantite) || 0) * (POIDS_ING[i.unite] ?? 0.15), 0)
+      return poidsIngredients * l.quantite
+    }
+    return l.quantite * (parseFloat(l.produit?.poids_kg) || 0.5)
+  }
+  const poidsKg = Math.round(lignesSel.reduce((a, l) => a + poidsLigne(l), 0) * 10) / 10
   const [fraisInfo, setFraisInfo]     = useState(null)   // résultat API /zones-livraison/calcul
   const [fraisLoading, setFraisLoading] = useState(false)
   const [cmdNumero, setCmdNumero]     = useState('')
@@ -198,13 +246,13 @@ export function Checkout() {
 
   const PRODUIT_TEST = '88a2bd29-d234-4ec8-a35b-6470be95d328'
   // Frais calculés dynamiquement (formule combinée distance + poids) — minimum 1000 F, gratuit pour le produit test
-  const fraisLiv = lignes.length > 0 && lignes.every(l => l.produit.id === PRODUIT_TEST) ? 0 : Math.max(1000, fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
+  const fraisLiv = lignesSel.length > 0 && lignesSel.every(l => l.produit.id === PRODUIT_TEST) ? 0 : Math.max(1000, fraisInfo ? (fraisInfo.frais_total ?? fraisInfo.frais_fcfa ?? 1000) : 1000)
   const total    = sousTotal + fraisLiv
   const points   = Math.floor(total / 500)
 
   useEffect(() => {
     if (!isAuth) { navigate('/connexion'); return }
-    if (lignes.length === 0) { navigate('/panier'); return }
+    if (lignesSel.length === 0) { navigate('/panier'); return }
     api.get('/adresses/').then(r => { setAdresses(r.data); if (r.data.length > 0) setSel(s => ({...s, adresseId: r.data[0].id})) }).catch(() => {})
   }, [isAuth])
 
@@ -243,7 +291,7 @@ export function Checkout() {
         mode_paiement: sel.mode,
         telephone_paiement: sel.tel || user?.telephone,
         poids_estime_kg: poidsKg,
-        lignes: lignes.map(l => ({
+        lignes: lignesSel.map(l => ({
           produit_id: l.produit.id,
           section_id: l.produit.section?.id || l.produit.section_id,
           quantite: l.quantite,
@@ -262,7 +310,7 @@ export function Checkout() {
         })
         if (stripeRes.checkout_url) {
           // Sauvegarder pour la page succès
-          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'stripe'}))
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes: lignesSel, mode: 'stripe'}))
           window.location.href = stripeRes.checkout_url
           return
         }
@@ -273,7 +321,7 @@ export function Checkout() {
           cancel_url: `${window.location.origin}/panier`,
         })
         if (ppRes.checkout_url) {
-          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'paypal'}))
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes: lignesSel, mode: 'paypal'}))
           window.location.href = ppRes.checkout_url
           return
         }
@@ -286,7 +334,7 @@ export function Checkout() {
           await api.post(`/commandes/${cmd.id}/payer`)
         } else if (momoRes.success) {
           // Flux natif : le USSD push a été envoyé → redirige vers page d'attente avec polling
-          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes, mode: 'momo'}))
+          sessionStorage.setItem('pending_order', JSON.stringify({id: cmd.id, numero: cmd.numero, lignes: lignesSel, mode: 'momo'}))
           navigate(`/commande/succes?cmd=${cmd.id}&mode=momo&operator=${momoRes.operator || ''}&tel=${encodeURIComponent(sel.tel || user?.telephone)}`)
           return
         } else {
@@ -297,9 +345,10 @@ export function Checkout() {
         await api.post(`/commandes/${cmd.id}/payer`)
       }
       setCmdNumero(cmd.numero)
-      setLignesSnap(lignes)
+      setLignesSnap(lignesSel)
       setTotauxSnap({ sous: sousTotal, frais: fraisLiv, total, points })
-      clear()
+      // Ne retirer que les articles commandés — les décochés restent au panier
+      removeKeys(lignesSel.map(l => l.key || l.produit.id))
       setStep(4)
     } catch(err) {
       toast.error(err.message || err.response?.data?.detail || 'Erreur lors de la commande')
@@ -376,7 +425,7 @@ export function Checkout() {
                 )}
                 {(fraisInfo?.majoration || 0) > 0 && (
                   <div className="flex justify-between text-[10px] text-amber-600">
-                    <span>Pointe Lun–Ven (+{fraisInfo.majoration_pct}%)</span>
+                    <span>Heure de pointe (+{fraisInfo.majoration_pct}%)</span>
                     <span>+{fraisInfo.majoration.toLocaleString()} F</span>
                   </div>
                 )}
@@ -447,7 +496,7 @@ export function Checkout() {
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Yaoundé — tous quartiers</span>
                   <span className="bg-white px-2 py-0.5 rounded-full border border-blue-200">📍 Douala — tous quartiers</span>
                 </div>
-                <p className="text-blue-500 mt-1.5">Frais à partir de 1000 F · Livraison jamais gratuite</p>
+                <p className="text-blue-500 mt-1.5">Frais à partir de 1000 F</p>
               </div>
               {adresses.length > 0 ? (
                 <div className="space-y-2 mb-4">
@@ -477,6 +526,7 @@ export function Checkout() {
                   <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]" value={newAdr.ville} onChange={e => setNewAdr({...newAdr, ville: e.target.value})}>
                     <option>Yaoundé</option><option>Douala</option>
                   </select>
+                  <BoutonGPS onCoords={c => setNewAdr(n => ({ ...n, ...c }))}/>
                   <div className="flex gap-2">
                     <button onClick={addAdresse} disabled={!newAdr.quartier} className="flex-1 bg-[#0D2137] text-white text-sm py-2 rounded-xl font-semibold hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">Ajouter</button>
                     <button onClick={() => setShowNewAdr(false)} className="flex-1 border border-gray-200 text-gray-500 text-sm py-2 rounded-xl font-medium">Annuler</button>
@@ -512,22 +562,17 @@ export function Checkout() {
                 ))}
               </div>
 
-              {/* Poids estimé */}
+              {/* Poids estimé automatiquement */}
               <div className="mb-5 border border-gray-100 rounded-xl p-4 bg-gray-50">
                 <label className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1">
-                  ⚖️ Poids estimé de la commande (optionnel)
+                  ⚖️ Poids estimé de la commande
+                  {fraisLoading && <span className="w-3.5 h-3.5 border-2 border-gray-300 border-t-[#0D2137] rounded-full animate-spin inline-block ml-1"/>}
                 </label>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 relative">
-                    <input type="number" min="0" max="100" step="0.5"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137] bg-white"
-                      placeholder="Ex: 3.5"
-                      value={poidsKg || ''} onChange={e => setPoidsKg(parseFloat(e.target.value) || 0)}/>
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">kg</span>
-                  </div>
-                  {fraisLoading && <div className="w-4 h-4 border-2 border-gray-300 border-t-[#0D2137] rounded-full animate-spin shrink-0"/>}
+                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-3 py-2.5">
+                  <span className="text-sm font-bold text-[#0D2137]">≈ {poidsKg} kg</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">calculé automatiquement</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1.5">Une estimation du poids total permet de calculer les frais de livraison précis. Laissez à 0 pour le tarif standard.</p>
+                <p className="text-[10px] text-gray-400 mt-1.5">Somme du poids des produits et des ingrédients bruts de vos menus. Le livreur confirmera le poids réel au marché.</p>
                 {fraisInfo && fraisInfo.prix_par_kg > 0 && poidsKg > 0 && (
                   <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
                     {poidsKg} kg × {fraisInfo.prix_par_kg} F/kg = +{(fraisInfo.part_poids||0).toLocaleString()} F de supplément
@@ -598,8 +643,8 @@ export function Checkout() {
         <div className="bg-white rounded-2xl shadow-sm p-5 h-fit sticky top-4">
           <h3 className="font-bold text-[#0D2137] text-sm mb-3 pb-3 border-b border-gray-100">Votre commande</h3>
           <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
-            {lignes.map(l => (
-              <div key={l.produit.id} className="flex justify-between text-xs">
+            {lignesSel.map(l => (
+              <div key={l.key || l.produit.id} className="flex justify-between text-xs">
                 <span className="text-gray-500 truncate flex-1">{l.produit.nom} ×{l.quantite}</span>
                 <span className="font-semibold text-[#0D2137] ml-2 shrink-0">{(l.prixUnit*l.quantite).toLocaleString()} F</span>
               </div>
@@ -649,7 +694,7 @@ export function Checkout() {
                   )}
                   {(fraisInfo.majoration||0) > 0 && (
                     <div className="flex justify-between text-[10px] text-amber-600">
-                      <span className="flex items-center gap-1"><Zap size={8}/> Pointe Lun–Ven (+{fraisInfo.majoration_pct}%)</span>
+                      <span className="flex items-center gap-1"><Zap size={8}/> Heure de pointe (+{fraisInfo.majoration_pct}%)</span>
                       <span>+{(fraisInfo.majoration).toLocaleString()} F</span>
                     </div>
                   )}

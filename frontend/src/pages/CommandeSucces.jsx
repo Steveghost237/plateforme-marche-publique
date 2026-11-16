@@ -8,7 +8,17 @@ import { useT } from '../store/langStore'
 export default function CommandeSucces() {
   const [sp] = useSearchParams()
   const nav = useNavigate()
-  const { clear } = usePanier()
+  const { clear, removeKeys } = usePanier()
+  // Ne retire du panier que les lignes effectivement commandées (les
+  // articles décochés au panier doivent y rester après le paiement)
+  const viderLignesCommandees = () => {
+    try {
+      const po = JSON.parse(sessionStorage.getItem('pending_order') || 'null')
+      const keys = (po?.lignes || []).map(l => l.key || l.produit?.id).filter(Boolean)
+      if (keys.length > 0) removeKeys(keys)
+      else clear()
+    } catch { clear() }
+  }
   const t = useT()
   const cmdId = sp.get('cmd')
   const mode = sp.get('mode') // stripe | paypal | momo
@@ -35,7 +45,7 @@ export default function CommandeSucces() {
         if (data.status === 'complete' || data.success && data.status === 'complete') {
           setNumero(data.numero || '')
           setState('success')
-          clear()
+          viderLignesCommandees()
           sessionStorage.removeItem('pending_order')
           return
         }
@@ -77,7 +87,7 @@ export default function CommandeSucces() {
           if (data.success !== false) {
             setNumero(data.numero || '')
             setState('success')
-            clear()
+            viderLignesCommandees()
             sessionStorage.removeItem('pending_order')
           } else {
             setState('error')

@@ -8,42 +8,34 @@ from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address)
 from app.core.database import get_db
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, get_current_user, valider_mot_de_passe_fort
 from app.models.models import Utilisateur, FideliteCompte
 from app.schemas.schemas import DemandeOTPIn, VerifOTPIn, FinaliserInscriptionIn, ConnexionIn, RefreshIn, TokenOut, UtilisateurOut, UtilisateurUpdateIn
-from app.services.sms_service import envoyer_sms
 from app.services.email_service import send_otp_email, send_welcome_email, is_valid_email
+from app.services.sms_service import envoyer_sms
 
+router = APIRouter(prefix="/auth", tags=["Authentification"])
+
+INFOBIP_CONFIGURE = bool(os.environ.get("INFOBIP_API_KEY"))
 
 def _send_otp_sms_sync(telephone: str, otp: str, contexte: str = "inscription"):
-    """Envoie un SMS OTP de façon synchrone (compatible avec routes FastAPI sync).
-    Le numéro doit être au format E.164 (+237XXXXXXXXX).
-    """
-    # Normaliser le numéro: ajouter +237 si absent
+    """Envoi SMS OTP en parallèle — utilisé UNIQUEMENT si INFOBIP_API_KEY est configurée.
+    Le canal affiché à l'utilisateur reste l'email ; le SMS sert de secours en prod."""
     tel = telephone.strip().replace(" ", "")
     if tel.startswith("00"):
         tel = "+" + tel[2:]
     elif not tel.startswith("+"):
         tel = "+237" + tel.lstrip("0")
-
-    if contexte == "reset":
-        msg = f"Marché·CM - Code de réinitialisation: {otp}\nValide 5 minutes. Ne le partagez pas."
-    else:
-        msg = f"Marché·CM - Code de vérification: {otp}\nValide 5 minutes. Bienvenue !"
-
+    msg = (f"Marché·CM - Code de réinitialisation: {otp}\nValide 5 minutes. Ne le partagez pas."
+           if contexte == "reset" else
+           f"Marché·CM - Code de vérification: {otp}\nValide 5 minutes. Bienvenue !")
     try:
-        # Appeler la coroutine asynchrone dans un nouvel event loop
         result = asyncio.run(envoyer_sms(tel, msg))
-        if result.get("success"):
-            print(f"[SMS OTP OK] {tel} - simulation={result.get('simulation', False)}")
-        else:
-            print(f"[SMS OTP ERR] {tel} - erreur: {result.get('error')}")
+        print(f"[SMS OTP {'OK' if result.get('success') else 'ERR'}] {tel}")
         return result
     except Exception as e:
         print(f"[SMS OTP EXCEPTION] {e}")
         return {"success": False, "error": str(e)}
-
-router = APIRouter(prefix="/auth", tags=["Authentification"])
 
 def gen_otp():
     """Génère un OTP unique et aléatoire qui n'a jamais été utilisé"""
@@ -156,24 +148,17 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[OTP DEV] {p.telephone} -> {otp} (unique: {attempt + 1 if 'attempt' in locals() else 'max'})")
 
-    # ── Envoi OTP par EMAIL (prioritaire) ──
-    email_result = {"success": False, "error": "Pas d'email fourni"}
-    if p.email and is_valid_email(p.email):
-        nom_tmp = user.nom_complet or ""
-        email_result = send_otp_email(p.email, nom_tmp, otp, contexte="inscription")
-
-    # ── Envoi OTP par SMS (fallback si pas d'email ou si email échoue) ──
-    sms_result = {"success": False, "simulation": True}
-    if not email_result.get("success"):
+    # ── Envoi OTP par EMAIL (canal principal) ──
+    email_result = send_otp_email(p.email, user.nom_complet or "", otp, contexte="inscription")
+    sms_result = {"success": False}
+    # ── Secours SMS en parallèle : uniquement si le provider SMS est configuré (prod) ──
+    if not email_result.get("success") and INFOBIP_CONFIGURE:
         sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
-
-    delivery_ok   = email_result.get("success") or sms_result.get("success")
-    canal         = "email" if email_result.get("success") else ("sms" if sms_result.get("success") else "none")
-    if not delivery_ok:
-        # Le code ne doit JAMAIS être exposé dans l'interface : si aucun canal
-        # n'a fonctionné, on refuse et l'utilisateur réessaie (code en console serveur pour le dev)
+    if not email_result.get("success") and not sms_result.get("success"):
+        # Le code ne doit JAMAIS être exposé dans l'interface : si l'envoi
+        # échoue, on refuse et l'utilisateur réessaie (code en console serveur pour le dev)
         raise HTTPException(503, "Impossible d'envoyer le code de vérification. Vérifiez votre adresse email et réessayez.")
-    resp = {"message": f"OTP envoyé par {canal}"}
+    resp = {"message": "OTP envoyé par email"}
     if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
@@ -241,6 +226,7 @@ def finaliser(p: FinaliserInscriptionIn, db: Session = Depends(get_db)):
     user = db.query(Utilisateur).filter(Utilisateur.telephone == p.telephone).first()
     if not user: raise HTTPException(404, "Numéro introuvable")
     if user.statut == "actif": raise HTTPException(409, "Déjà actif")
+    valider_mot_de_passe_fort(p.mot_de_passe)
     user.nom_complet = p.nom_complet
     user.mot_de_passe_hash = hash_password(p.mot_de_passe)
     if p.email:
@@ -320,18 +306,19 @@ def reset_otp(request: Request, body: dict = None, db: Session = Depends(get_db)
     debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes")
     print(f"[RESET OTP] {telephone} -> {otp}")
 
-    # ── Envoi OTP reset par EMAIL (prioritaire si email connu) ──
+    # ── Envoi OTP reset par EMAIL (canal principal) ──
     email_result = {"success": False}
     if user.email and is_valid_email(user.email):
         email_result = send_otp_email(user.email, user.nom_complet, otp, contexte="reset")
-
-    # ── Fallback SMS ──
-    sms_result = {"success": False, "simulation": True}
-    if not email_result.get("success"):
+    sms_result = {"success": False}
+    # ── Secours SMS en parallèle : si pas d'email ou échec, uniquement si provider SMS configuré ──
+    if not email_result.get("success") and INFOBIP_CONFIGURE:
         sms_result = _send_otp_sms_sync(telephone, otp, contexte="reset")
-
-    canal = "email" if email_result.get("success") else "sms"
-    resp = {"message": f"Code de réinitialisation envoyé par {canal}"}
+    if not email_result.get("success") and not sms_result.get("success"):
+        if not user.email:
+            raise HTTPException(400, "Aucune adresse email associée à ce compte — contactez le support")
+        raise HTTPException(503, "Impossible d'envoyer le code par email. Réessayez dans un instant.")
+    resp = {"message": "Code de réinitialisation envoyé par email"}
     if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
@@ -366,7 +353,7 @@ def reset_password(body: dict = None, db: Session = Depends(get_db)):
     token = body.get("reset_token")
     new_password = body.get("nouveau_mot_de_passe")
     if not token or not new_password: raise HTTPException(400, "Token et nouveau mot de passe requis")
-    if len(new_password) < 6: raise HTTPException(400, "Mot de passe trop court (min. 6 caractères)")
+    valider_mot_de_passe_fort(new_password)
     data = decode_token(token)
     user = db.query(Utilisateur).filter(Utilisateur.id == data.get("sub")).first()
     if not user: raise HTTPException(404, "Utilisateur introuvable")
@@ -377,7 +364,38 @@ def reset_password(body: dict = None, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UtilisateurOut)
 def me(user=Depends(get_current_user)): return user
 
+@router.put("/me/mot-de-passe")
+def changer_mot_de_passe(body: dict = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Changement de mot de passe : ancien requis + nouveau doit être fort."""
+    body = body or {}
+    ancien = body.get("ancien_mot_de_passe")
+    nouveau = body.get("nouveau_mot_de_passe")
+    if not ancien or not nouveau: raise HTTPException(400, "Ancien et nouveau mot de passe requis")
+    if not verify_password(ancien, user.mot_de_passe_hash or ""):
+        raise HTTPException(403, "Mot de passe actuel incorrect")
+    if ancien == nouveau: raise HTTPException(400, "Le nouveau mot de passe doit être différent de l'ancien")
+    valider_mot_de_passe_fort(nouveau)
+    user.mot_de_passe_hash = hash_password(nouveau)
+    db.commit()
+    return {"message": "Mot de passe modifié avec succès"}
+
 @router.put("/me", response_model=UtilisateurOut)
 def update_me(p: UtilisateurUpdateIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    for k, v in p.model_dump(exclude_none=True).items(): setattr(user, k, v)
-    db.commit(); db.refresh(user); return user
+    # Changement d'email : format valide + pas déjà pris par un autre compte
+    if p.email:
+        email = p.email.strip().lower()
+        if not is_valid_email(email):
+            raise HTTPException(422, "Adresse email invalide")
+        owner = db.query(Utilisateur).filter(
+            Utilisateur.email == email, Utilisateur.id != user.id).first()
+        if owner:
+            raise HTTPException(409, "Cette adresse email est déjà utilisée par un autre compte")
+        user.email = email
+    for k, v in p.model_dump(exclude_none=True).items():
+        if k != "email": setattr(user, k, v)
+    try:
+        db.commit(); db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Cette adresse email est déjà utilisée")
+    return user

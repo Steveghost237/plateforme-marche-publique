@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Package, Search, ChevronLeft, ChevronRight, Eye, UserPlus, X, Clock, Truck, CheckCircle, XCircle, ShoppingBag, CreditCard } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Package, Search, ChevronLeft, ChevronRight, Eye, UserPlus, X, Clock, Truck, CheckCircle, XCircle, ShoppingBag, CreditCard, ShoppingBasket, Store } from 'lucide-react'
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
+import { useConfirm } from '../components/common/useConfirm'
 
 const STATUTS = [
   { val: '', label: 'Tous' },
   { val: 'en_attente_paiement', label: 'En attente' },
   { val: 'payee', label: 'Payée' },
+  { val: 'prete', label: 'Prête' },
   { val: 'assignee', label: 'Assignée' },
   { val: 'en_cours_marche', label: 'Au marché' },
   { val: 'en_livraison', label: 'En livraison' },
@@ -17,6 +20,7 @@ const STATUTS = [
 const STATUT_STYLE = {
   en_attente_paiement: 'bg-yellow-50 text-yellow-700',
   payee: 'bg-blue-50 text-blue-700',
+  prete: 'bg-emerald-50 text-emerald-700',
   assignee: 'bg-indigo-50 text-indigo-700',
   en_cours_marche: 'bg-orange-50 text-orange-700',
   en_livraison: 'bg-cyan-50 text-cyan-700',
@@ -25,9 +29,16 @@ const STATUT_STYLE = {
   brouillon: 'bg-gray-100 text-gray-500',
 }
 
+const STATUT_LABEL = {
+  en_attente_paiement: 'en attente paiement', payee: 'payée', prete: 'prête',
+  assignee: 'assignée', en_cours_marche: 'au marché', en_livraison: 'en livraison',
+  livree: 'livrée', annulee: 'annulée', brouillon: 'brouillon',
+}
+
 const STATUT_ICON = {
   en_attente_paiement: <CreditCard size={14} />,
   payee: <CheckCircle size={14} />,
+  prete: <ShoppingBasket size={14} />,
   assignee: <UserPlus size={14} />,
   en_cours_marche: <ShoppingBag size={14} />,
   en_livraison: <Truck size={14} />,
@@ -38,12 +49,16 @@ const STATUT_ICON = {
 export default function AdminCommandes() {
   const [commandes, setCommandes] = useState([])
   const [livreurs, setLivreurs] = useState([])
-  const [filtre, setFiltre] = useState('')
+  const [sp] = useSearchParams()
+  const [filtre, setFiltre] = useState(sp.get('statut') || '')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { type: 'detail' | 'assign', commande }
+  const [detailFull, setDetailFull] = useState(null)
   const [erreur, setErreur] = useState('')
+  const [ok, setOk] = useState('')
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const fetchCommandes = () => {
     setLoading(true)
@@ -78,7 +93,33 @@ export default function AdminCommandes() {
     }
   }
 
-  const livreursDispos = livreurs.filter(l => l.statut === 'disponible' && l.est_verifie)
+  const ouvrirDetail = (c) => {
+    setModal({ type: 'detail', commande: c })
+    setDetailFull(null)
+    api.get(`/admin/commandes/${c.id}`).then(r => setDetailFull(r.data)).catch(() => {})
+  }
+
+  const marquerPrete = async (c) => {
+    if (!await confirm({
+      titre: 'Commande prête ?',
+      message: `Confirmer que la commande ${c.numero} est préparée ? Les livreurs disponibles, les administrateurs et le client seront alertés.`,
+      confirmLabel: 'Marquer prête',
+    })) return
+    try {
+      const r = await api.post(`/admin/commandes/${c.id}/prete`)
+      setOk(r.data?.message || 'Commande marquée prête')
+      fetchCommandes()
+    } catch (e) {
+      setErreur(e?.response?.data?.detail || 'Erreur')
+    }
+  }
+
+  // Tout livreur vérifié est assignable (un "hors ligne" recevra la notif à sa connexion).
+  // Tri : disponibles d'abord, hors ligne ensuite, occupés en dernier (désactivés).
+  const ORDRE_STATUT = { disponible: 0, hors_ligne: 1, occupe: 2 }
+  const livreursAssignables = livreurs
+    .filter(l => l.est_verifie)
+    .sort((a, b) => (ORDRE_STATUT[a.statut] ?? 3) - (ORDRE_STATUT[b.statut] ?? 3))
 
   // Stats rapides
   const stats = [
@@ -90,6 +131,13 @@ export default function AdminCommandes() {
 
   return (
     <AdminLayout title="Gestion des Commandes">
+      {ConfirmDialog}
+      {ok && (
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
+          {ok}
+          <button onClick={() => setOk('')} className="font-bold ml-4">&times;</button>
+        </div>
+      )}
       {erreur && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
           {erreur}
@@ -153,7 +201,7 @@ export default function AdminCommandes() {
                   <td className="px-5 py-3 font-semibold text-amber-600">{c.total_fcfa?.toLocaleString()} F</td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUT_STYLE[c.statut] || 'bg-gray-100 text-gray-500'}`}>
-                      {STATUT_ICON[c.statut]} {c.statut?.replace(/_/g, ' ')}
+                      {STATUT_ICON[c.statut]} {STATUT_LABEL[c.statut] || c.statut?.replace(/_/g, ' ')}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">{c.livreur_nom || <span className="text-gray-300">Non assigné</span>}</td>
@@ -162,11 +210,17 @@ export default function AdminCommandes() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setModal({ type: 'detail', commande: c })}
+                      <button onClick={() => ouvrirDetail(c)}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-navy transition-colors" title="Détails">
                         <Eye size={15} />
                       </button>
                       {c.statut === 'payee' && (
+                        <button onClick={() => marquerPrete(c)}
+                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors" title="Marquer prête (commande préparée)">
+                          <ShoppingBasket size={15} />
+                        </button>
+                      )}
+                      {['payee','prete'].includes(c.statut) && (
                         <button onClick={() => setModal({ type: 'assign', commande: c })}
                           className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Assigner livreur">
                           <UserPlus size={15} />
@@ -210,23 +264,48 @@ export default function AdminCommandes() {
                 ['Client', modal.commande.client_nom],
                 ['Téléphone', modal.commande.client_telephone],
                 ['Tél. secours', modal.commande.client_telephone2],
-                ['Statut', modal.commande.statut?.replace(/_/g, ' ')],
+                ['Statut', STATUT_LABEL[modal.commande.statut] || modal.commande.statut?.replace(/_/g, ' ')],
+                ['Marché', detailFull ? `${detailFull.point_achat_nom || '—'}${detailFull.point_achat_ville ? ` (${detailFull.point_achat_ville})` : ''}` : modal.commande.point_achat_nom],
+                ['Adresse', detailFull ? [detailFull.adresse_quartier, detailFull.adresse_ville].filter(Boolean).join(', ') : null],
                 ['Montant', `${modal.commande.total_fcfa?.toLocaleString()} FCFA`],
                 ['Sous-total', `${modal.commande.sous_total_fcfa?.toLocaleString()} FCFA`],
                 ['Frais livraison', `${modal.commande.frais_livraison?.toLocaleString()} FCFA`],
                 ['Créneau', modal.commande.creneau],
                 ['Date livraison', modal.commande.date_livraison],
                 ['Livreur', modal.commande.livreur_nom || 'Non assigné'],
+                ['Préparée par', detailFull?.preparee_par_nom],
+                ['Note client', detailFull?.note_client],
                 ['Créée le', modal.commande.created_at ? new Date(modal.commande.created_at).toLocaleString('fr-FR') : '—'],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">{k}</span>
-                  <span className="font-medium text-navy text-sm">{v || '—'}</span>
+                  <span className="font-medium text-navy text-sm text-right">{v || '—'}</span>
                 </div>
               ))}
+
+              {/* Produits */}
+              {detailFull?.lignes?.length > 0 && (
+                <div>
+                  <p className="text-gray-400 text-sm mb-2 flex items-center gap-1.5"><ShoppingBag size={13} /> Produits à préparer</p>
+                  <div className="bg-gray-50 rounded-xl divide-y divide-gray-100">
+                    {detailFull.lignes.map((l, i) => (
+                      <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                        <span className="text-navy font-medium">{l.nom} <span className="text-gray-400 font-normal">× {l.quantite}{l.unite ? ` ${l.unite}` : ''}</span></span>
+                        <span className="text-amber-600 font-semibold">{l.prix_total?.toLocaleString()} F</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            {modal.commande.statut === 'payee' && (
-              <div className="p-5 border-t border-gray-100">
+            {['payee','prete'].includes(modal.commande.statut) && (
+              <div className="p-5 border-t border-gray-100 space-y-2">
+                {modal.commande.statut === 'payee' && (
+                  <button onClick={() => { marquerPrete(modal.commande); setModal(null) }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors">
+                    <ShoppingBasket size={16} /> Marquer prête (commande préparée)
+                  </button>
+                )}
                 <button onClick={() => setModal({ type: 'assign', commande: modal.commande })}
                   className="btn-primary w-full flex items-center justify-center gap-2">
                   <UserPlus size={16} /> Assigner un livreur
@@ -249,14 +328,17 @@ export default function AdminCommandes() {
               <button onClick={() => setModal(null)} className="p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-2">
-              {livreursDispos.length === 0 ? (
+              {livreursAssignables.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <Truck size={32} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Aucun livreur disponible</p>
+                  <p className="text-sm">Aucun livreur vérifié</p>
                 </div>
-              ) : livreursDispos.map(l => (
+              ) : livreursAssignables.map(l => {
+                const missions = l.missions_actives || 0
+                return (
                 <button key={l.id}
                   onClick={() => assignerLivreur(modal.commande.id, l.id)}
+                  title={l.statut === 'hors_ligne' ? 'Hors ligne — sera notifié à sa connexion' : missions > 0 ? `${missions} course(s) en cours — peut en cumuler` : 'Disponible'}
                   className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-gray-100 hover:border-blue-200 transition-colors text-left">
                   <div className="w-9 h-9 rounded-full bg-navy/10 flex items-center justify-center text-navy font-bold text-sm">
                     {l.nom_complet?.[0]}
@@ -265,9 +347,19 @@ export default function AdminCommandes() {
                     <p className="font-semibold text-navy text-sm truncate">{l.nom_complet}</p>
                     <p className="text-gray-400 text-xs">{l.telephone} · ⭐ {Number(l.note_moyenne || 0).toFixed(1)} · {l.total_livraisons} livraisons</p>
                   </div>
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-50 text-green-600 capitalize">{l.niveau}</span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${l.statut === 'hors_ligne' ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-600'}`}>
+                      {l.statut === 'hors_ligne' ? '○ hors ligne' : '● en ligne'}
+                    </span>
+                    {missions > 0 && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                        {missions} course{missions > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>

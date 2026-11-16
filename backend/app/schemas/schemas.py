@@ -54,6 +54,7 @@ class UtilisateurOut(BaseModel):
     avatar_url: Optional[str] = None
     role: str
     statut: str
+    point_achat_id: Optional[UUID] = None
     created_at: datetime
     class Config: from_attributes = True
 
@@ -111,6 +112,7 @@ class IngredientOut(BaseModel):
     prix_max_fcfa: Optional[int] = None
     prix_defaut_fcfa: int
     ordre: int
+    actif: bool = True
     class Config: from_attributes = True
 
 class ProduitListOut(BaseModel):
@@ -120,6 +122,7 @@ class ProduitListOut(BaseModel):
     description: Optional[str] = None
     prix_base_fcfa: int
     prix_max_fcfa: Optional[int] = None
+    poids_kg: Optional[float] = 0.5
     image_url: Optional[str] = None
     est_menu: bool
     est_populaire: bool
@@ -138,6 +141,7 @@ class ProduitCreateIn(BaseModel):
     description: Optional[str] = None
     prix_base_fcfa: int = 0
     prix_max_fcfa: Optional[int] = None
+    poids_kg: Optional[float] = 0.5
     image_url: Optional[str] = None
     est_menu: bool = False
     est_populaire: bool = False

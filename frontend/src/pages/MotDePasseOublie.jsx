@@ -4,6 +4,7 @@ import { Phone, Lock, Eye, EyeOff, ArrowRight, Check, KeyRound } from 'lucide-re
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { isValidCameroonPhone, normalizeCameroonPhone, getPasswordStrength } from '../utils/format'
+import PasswordStrength from '../components/common/PasswordStrength'
 
 export default function MotDePasseOublie() {
   const [step, setStep] = useState(1)
@@ -21,7 +22,7 @@ export default function MotDePasseOublie() {
     setLoading(true)
     try {
       await api.post('/auth/mot-de-passe-oublie/otp', { telephone: normalizeCameroonPhone(tel) })
-      toast.success('Code envoyé par SMS')
+      toast.success('Code envoyé sur votre adresse email ✉️')
       setStep(2)
     } catch(err) { toast.error(err.response?.data?.detail || 'Erreur') }
     finally { setLoading(false) }
@@ -41,7 +42,7 @@ export default function MotDePasseOublie() {
 
   const resetPassword = async e => {
     e.preventDefault()
-    if (newPwd.length < 6) { toast.error('Minimum 6 caractères'); return }
+    if (!getPasswordStrength(newPwd).ok) { toast.error('Mot de passe trop faible — suivez la liste des critères'); return }
     setLoading(true)
     try {
       await api.post('/auth/mot-de-passe-oublie/reset', {
@@ -75,7 +76,7 @@ export default function MotDePasseOublie() {
           </h1>
           <p className="text-gray-500 text-sm mt-1">
             {step === 1 && 'Entrez votre numéro pour recevoir un code'}
-            {step === 2 && `Code envoyé au ${tel}`}
+            {step === 2 && 'Code envoyé sur votre adresse email'}
             {step === 3 && 'Choisissez un nouveau mot de passe sécurisé'}
           </p>
         </div>
@@ -136,22 +137,20 @@ export default function MotDePasseOublie() {
                 <div className="relative">
                   <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
                   <input className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:border-[#0D2137]"
-                    type={show ? 'text' : 'password'} placeholder="Minimum 8 caractères" required minLength={6}
+                    type={show ? 'text' : 'password'} placeholder="8+ car., majuscule, chiffre, spécial" required minLength={8}
                     value={newPwd} onChange={e => setNewPwd(e.target.value)}/>
                   <button type="button" onClick={() => setShow(!show)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                     {show ? <EyeOff size={16}/> : <Eye size={16}/>}
                   </button>
                 </div>
-                {newPwd && (
-                  <div className="mt-2">
-                    <div className="flex gap-1 mb-1">
-                      {[1,2,3,4,5].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i <= strength.score ? strength.color : 'bg-gray-200'}`}/>)}
-                    </div>
-                    <p className={`text-[10px] font-semibold ${strength.text}`}>{strength.label}</p>
-                  </div>
+                <PasswordStrength password={newPwd}/>
+                {newPwd && !strength.ok && (
+                  <p className="text-[11px] text-amber-600 font-semibold mt-1">
+                    Le mot de passe doit atteindre le niveau « Fort » pour continuer
+                  </p>
                 )}
               </div>
-              <button type="submit" disabled={loading}
+              <button type="submit" disabled={loading || !strength.ok}
                 className="w-full bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Réinitialiser <Check size={16}/></>}
               </button>

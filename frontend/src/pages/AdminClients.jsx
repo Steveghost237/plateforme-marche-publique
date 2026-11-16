@@ -3,10 +3,29 @@ import { Search, Users, UserCheck, UserX, ChevronLeft, ChevronRight, Eye, X, Shi
 import api from '../utils/api'
 import { AdminLayout } from './Admin'
 import { useConfirm } from '../components/common/useConfirm'
+import { useAuth } from '../store'
+
+const ROLE_TABS = [
+  { val: '',           label: 'Tous' },
+  { val: 'client',     label: 'Clients' },
+  { val: 'livreur',    label: 'Livreurs' },
+  { val: 'agent',      label: 'Agents',        adminOnly: true },
+  { val: 'admin',      label: 'Administrateurs', adminOnly: true },
+]
+
+const ROLE_BADGE = {
+  client: 'bg-blue-50 text-blue-600', livreur: 'bg-amber-50 text-amber-700',
+  agent: 'bg-green-50 text-green-600', admin: 'bg-purple-50 text-purple-600',
+  super_admin: 'bg-purple-50 text-purple-600',
+}
+const ROLE_LABEL = { client: 'Client', livreur: 'Livreur', agent: 'Agent', admin: 'Admin', super_admin: 'Super Admin' }
 
 export default function AdminClients() {
+  const { user } = useAuth()
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role)
   const [data, setData] = useState({ total: 0, users: [] })
   const [search, setSearch] = useState('')
+  const [filtreRole, setFiltreRole] = useState('client')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
@@ -15,21 +34,19 @@ export default function AdminClients() {
   const fetchClients = () => {
     setLoading(true)
     setErreur('')
-    api.get(`/admin/utilisateurs?role=client&page=${page}`)
+    const params = { page }
+    if (filtreRole) params.role = filtreRole
+    if (search) params.q = search
+    api.get('/admin/utilisateurs', { params })
       .then(r => setData(r.data))
-      .catch(e => setErreur(e?.response?.data?.detail || 'Erreur de chargement des clients'))
+      .catch(e => setErreur(e?.response?.data?.detail || 'Erreur de chargement des utilisateurs'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchClients() }, [page])
+  useEffect(() => { fetchClients() }, [page, filtreRole])
+  useEffect(() => { const t = setTimeout(() => { setPage(1); fetchClients() }, 300); return () => clearTimeout(t) }, [search])
 
-  const filtered = search
-    ? data.users.filter(u =>
-        u.nom_complet?.toLowerCase().includes(search.toLowerCase()) ||
-        u.telephone?.toLowerCase().includes(search.toLowerCase()) ||
-        u.email?.toLowerCase().includes(search.toLowerCase())
-      )
-    : data.users
+  const filtered = data.users
 
   const { confirm, ConfirmDialog } = useConfirm()
 
@@ -57,7 +74,7 @@ export default function AdminClients() {
   const enAttente = data.users.filter(u => u.statut === 'en_attente').length
 
   return (
-    <AdminLayout title="Gestion des Clients">
+    <AdminLayout title="Gestion des Utilisateurs">
       {ConfirmDialog}
       {erreur && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-4 text-sm flex justify-between items-center">
@@ -68,7 +85,7 @@ export default function AdminClients() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total clients', val: total, icon: <Users size={18} />, color: 'bg-navy/10 text-navy' },
+          { label: 'Total affichés', val: total, icon: <Users size={18} />, color: 'bg-navy/10 text-navy' },
           { label: 'Actifs', val: actifs, icon: <UserCheck size={18} />, color: 'bg-green-50 text-green-600' },
           { label: 'Suspendus', val: suspendus, icon: <UserX size={18} />, color: 'bg-red-50 text-red-600' },
           { label: 'En attente', val: enAttente, icon: <Shield size={18} />, color: 'bg-yellow-50 text-yellow-600' },
@@ -81,10 +98,18 @@ export default function AdminClients() {
         ))}
       </div>
 
-      {/* Recherche */}
+      {/* Filtres rôle + Recherche */}
       <div className="bg-white rounded-2xl shadow-sm mb-6 p-4">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <p className="text-gray-500 text-sm"><span className="font-bold text-navy">{total}</span> clients enregistrés</p>
+          <div className="flex flex-wrap gap-2">
+            {ROLE_TABS.filter(t => !t.adminOnly || isAdmin).map(t => (
+              <button key={t.val} onClick={() => { setFiltreRole(t.val); setPage(1) }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                  ${filtreRole === t.val ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className="relative w-full lg:w-80">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Rechercher par nom, téléphone ou email..."
@@ -99,16 +124,16 @@ export default function AdminClients() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                {['Client', 'Téléphone', 'Email', 'Statut', 'Inscrit le', 'Actions'].map(h => (
+                {['Utilisateur', 'Rôle', 'Téléphone', 'Email', 'Statut', 'Inscrit le', 'Actions'].map(h => (
                   <th key={h} className="px-5 py-3 text-left font-semibold">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-10 text-gray-400">Chargement...</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-gray-400">Chargement...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-10 text-gray-400">Aucun client trouvé</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-gray-400">Aucun utilisateur trouvé</td></tr>
               ) : filtered.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
@@ -118,6 +143,11 @@ export default function AdminClients() {
                       </div>
                       <span className="font-semibold text-navy">{u.nom_complet}</span>
                     </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-500'}`}>
+                      {ROLE_LABEL[u.role] || u.role}
+                    </span>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{u.telephone}</td>
                   <td className="px-5 py-3 text-gray-400 text-xs">{u.email || '—'}</td>

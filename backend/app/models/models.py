@@ -44,16 +44,35 @@ class Utilisateur(Base):
     fcm_token          = Column(Text)
     derniere_connexion = Column(DateTime(timezone=True))
     derniere_plateforme = Column(String(20))  # "web" ou "mobile"
+    point_achat_id     = Column(UUID(as_uuid=True), ForeignKey("points_achat.id"))  # marché de l'agent commercial
     created_at         = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at         = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at         = Column(DateTime(timezone=True))
 
     adresses        = relationship("Adresse", back_populates="utilisateur", cascade="all, delete-orphan")
+    point_achat     = relationship("PointAchat", back_populates="agents")
     commandes       = relationship("Commande", back_populates="client", foreign_keys="Commande.client_id")
     fidelite        = relationship("FideliteCompte", back_populates="utilisateur", uselist=False)
     livreur_profil  = relationship("Livreur", back_populates="utilisateur", uselist=False)
     notifications   = relationship("Notification", back_populates="destinataire", cascade="all, delete-orphan")
     listes          = relationship("ListeFavorite", back_populates="utilisateur", cascade="all, delete-orphan")
+
+# ── POINTS D'ACHAT (marchés où les agents préparent les commandes) ──
+class PointAchat(Base):
+    __tablename__ = "points_achat"
+    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nom         = Column(String(120), nullable=False)
+    ville       = Column(String(80))
+    quartier    = Column(String(120))
+    adresse     = Column(Text)
+    telephone   = Column(String(30))
+    latitude    = Column(Numeric(9,6))
+    longitude   = Column(Numeric(9,6))
+    actif       = Column(Boolean, default=True)
+    created_at  = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at  = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    agents      = relationship("Utilisateur", back_populates="point_achat")
+    commandes   = relationship("Commande", back_populates="point_achat")
 
 # ── ADRESSES ──────────────────────────────────────────────────
 class Adresse(Base):
@@ -119,6 +138,7 @@ class Produit(Base):
     description     = Column(Text)
     prix_base_fcfa  = Column(Integer, default=0)
     prix_max_fcfa   = Column(Integer)
+    poids_kg        = Column(Numeric(6,2), default=0.5)  # poids moyen par unité — sert au calcul auto des frais
     image_url       = Column(Text)
     est_menu        = Column(Boolean, default=False)
     est_actif       = Column(Boolean, default=True)
@@ -219,6 +239,7 @@ class Commande(Base):
     client_id           = Column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=False)
     livreur_id          = Column(UUID(as_uuid=True), ForeignKey("livreurs.id"))
     adresse_id          = Column(UUID(as_uuid=True), ForeignKey("adresses.id"))
+    point_achat_id      = Column(UUID(as_uuid=True), ForeignKey("points_achat.id"))
     statut              = Column(String(30), default="brouillon")
     creneau             = Column(String(30))
     date_livraison      = Column(Date)
@@ -228,6 +249,8 @@ class Commande(Base):
     total_fcfa          = Column(Integer, default=0)
     points_gagnes       = Column(Integer, default=0)
     payee_at            = Column(DateTime(timezone=True))
+    prete_at            = Column(DateTime(timezone=True))
+    preparee_par_id     = Column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"))
     assignee_at         = Column(DateTime(timezone=True))
     marche_at           = Column(DateTime(timezone=True))
     en_livraison_at     = Column(DateTime(timezone=True))
@@ -240,7 +263,9 @@ class Commande(Base):
     updated_at          = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     client   = relationship("Utilisateur", back_populates="commandes", foreign_keys=[client_id])
     livreur  = relationship("Livreur", back_populates="commandes", foreign_keys=[livreur_id])
+    preparee_par = relationship("Utilisateur", foreign_keys=[preparee_par_id])
     adresse  = relationship("Adresse")
+    point_achat = relationship("PointAchat", back_populates="commandes")
     lignes   = relationship("CommandeLigne", back_populates="commande", cascade="all, delete-orphan")
     paiements = relationship("Paiement", back_populates="commande")
     evaluation = relationship("Evaluation", back_populates="commande", uselist=False)

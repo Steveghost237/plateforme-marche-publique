@@ -48,6 +48,13 @@ python fix_ingredients_menus.py
 echo "[2d/3] Vérification récompenses fidélité..."
 python seed_recompenses.py
 
+# 2e. Points d'achat (marchés) + colonnes point_achat_id + agent test
+#     (migration idempotente — ajoute les colonnes si absentes, seed les marchés)
+echo "[2e/3] Migration points d'achat..."
+python migrate_points_achat.py
+python migrate_poids_produits.py
+python migrate_ingredients_bornes.py
+
 # 3. Démarrer Uvicorn
 echo "[3/3] Demarrage du serveur Uvicorn..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

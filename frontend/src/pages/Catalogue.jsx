@@ -614,17 +614,24 @@ export function ProduitDetail() {
     const qMax = Number(ing.quantite_max || 100)
     const pMin = Number(ing.prix_min_fcfa || 0)
     const pMax = Number(ing.prix_max_fcfa || 0)
-    
-    // Si pas de variation de prix ou quantité invalide
-    if (qMax === qMin || pMax === pMin) return Math.min(Math.max(pMin, 50), 100000)
-    
-    // Calculer le ratio de la quantité actuelle par rapport à la plage
-    const ratio = Math.max(0, Math.min(1, (qte - qMin) / (qMax - qMin)))
-    
-    // Calculer le prix proportionnel, borné entre 50 et 100 000 FCFA
-    const prix = Math.min(Math.max(Math.round(pMin + ratio * (pMax - pMin)), 50), 100000)
-    
-    return prix
+    const qDef = Number(ing.quantite_defaut || 0)
+    const pDef = Number(ing.prix_defaut_fcfa || 0)
+
+    const interp = (qa, pa, qb, pb) => {
+      if (qb === qa) return pb
+      const r = Math.max(0, Math.min(1, (qte - qa) / (qb - qa)))
+      return pa + r * (pb - pa)
+    }
+
+    // Courbe par morceaux : min→défaut→max — le prix au défaut est exactement prix_defaut_fcfa
+    let prix
+    if (pDef > 0 && qMin < qDef && qDef < qMax) {
+      prix = qte <= qDef ? interp(qMin, pMin, qDef, pDef) : interp(qDef, pDef, qMax, pMax)
+    } else {
+      // Pas de prix défaut renseigné : interpolation linéaire min→max
+      prix = interp(qMin, pMin, qMax, pMax)
+    }
+    return Math.min(Math.max(Math.round(prix), 50), 100000)
   }
 
   if (loading) return (
@@ -639,7 +646,8 @@ export function ProduitDetail() {
   const img      = getImageUrl(produit.image_url) || meta.fallbacks[0]
   const prixBase = produit.prix_base_fcfa || 0
   const prixIngs = Object.values(config).reduce((a, c) => a + (c.prix || 0), 0)
-  const prixUnit = prixBase + prixIngs
+  // Menu : le prix payé = somme des ingrédients choisis (prix_base = somme aux défauts, affichage carte)
+  const prixUnit = produit.est_menu ? prixIngs : prixBase
   const total    = prixUnit * qty
   const points   = Math.floor(total / 500)
 

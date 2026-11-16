@@ -2,20 +2,17 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, Search, Camera, Upload, X, Check, Image as ImageIcon, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api from '../utils/api'
+import api, { getImageUrl } from '../utils/api'
 
-const SECTIONS = [
-  { code: '',                  label: 'Toutes les sections', emoji: '📦' },
-  { code: 'menus_ingredients', label: 'Menus & Ingrédients', emoji: '🥘' },
-  { code: 'fruits',            label: 'Fruits & Légumes',    emoji: '🍊' },
-  { code: 'boissons',          label: 'Boissons',            emoji: '🥤' },
-  { code: 'boulangerie',       label: 'Boulangerie',         emoji: '🍞' },
-  { code: 'epices',            label: 'Épices & Condiments', emoji: '🌶️' },
-]
+const SECTION_EMOJI = {
+  menus_ingredients: '🥘', fruits: '🍊', boissons: '🥤', boulangerie: '🍞',
+  epices: '🌶️', epicerie: '🛒', entretien: '🧹', cosmetique: '🧴', ma_liste: '📝',
+}
 
 function imgSrc(url) {
-  if (!url) return null
-  return url
+  // getImageUrl préfixe l'origine du backend et encode les segments —
+  // sans lui, /static/... se résout sur le serveur Vite (5173) → 404
+  return getImageUrl(url)
 }
 
 export default function AdminImages() {
@@ -25,6 +22,7 @@ export default function AdminImages() {
   const [total, setTotal]       = useState(0)
   const [page, setPage]         = useState(1)
   const [loading, setLoading]   = useState(true)
+  const [sections, setSections] = useState([])
   const [uploading, setUploading] = useState(null)
   const fileRef = useRef(null)
   const [targetId, setTargetId] = useState(null)
@@ -40,6 +38,15 @@ export default function AdminImages() {
     } catch { toast.error('Erreur chargement') }
     finally { setLoading(false) }
   }, [section, q, page])
+
+  useEffect(() => {
+    api.get('/catalogue/sections')
+      .then(({ data }) => setSections([
+        { code: '', nom: 'Toutes les sections', emoji: '📦' },
+        ...data.map(s => ({ code: s.code, nom: s.nom, emoji: SECTION_EMOJI[s.code] || '📦' })),
+      ]))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -111,7 +118,7 @@ export default function AdminImages() {
           <select
             className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#0D2137]"
             value={section} onChange={e => { setSection(e.target.value); setPage(1) }}>
-            {SECTIONS.map(s => <option key={s.code} value={s.code}>{s.emoji} {s.label}</option>)}
+            {sections.map(s => <option key={s.code} value={s.code}>{s.emoji} {s.nom}</option>)}
           </select>
         </div>
 

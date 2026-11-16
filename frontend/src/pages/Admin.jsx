@@ -1,30 +1,45 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Users, Bike, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity, RefreshCw, ArrowUpRight, AlertCircle } from 'lucide-react'
+import { LayoutDashboard, Package, Users, Bike, TrendingUp, ShoppingBag, CheckCircle, XCircle, Clock, LogOut, Lightbulb, DollarSign, Truck, Camera, Activity, RefreshCw, ArrowUpRight, AlertCircle, UserCog, ShieldCheck, Store } from 'lucide-react'
 import api from '../utils/api'
 import { useAuth } from '../store'
 
 const MENU = [
-  { to:'/admin',              icon:<LayoutDashboard size={16}/>, label:'Dashboard',     group:'principal' },
-  { to:'/admin/commandes',    icon:<Package size={16}/>,         label:'Commandes',     group:'principal' },
-  { to:'/admin/livreurs',     icon:<Bike size={16}/>,            label:'Livreurs',      group:'principal' },
-  { to:'/admin/clients',      icon:<Users size={16}/>,           label:'Clients',       group:'principal' },
-  { to:'/admin/stats',        icon:<TrendingUp size={16}/>,      label:'Statistiques',  group:'principal' },
-  { to:'/admin/monitoring',   icon:<Activity size={16}/>,        label:'Monitoring',    group:'principal',  badge:'live' },
-  { to:'/admin/suggestions',  icon:<Lightbulb size={16}/>,       label:'Suggestions',   group:'catalogue',  badge:'new' },
-  { to:'/admin/prix',         icon:<DollarSign size={16}/>,      label:'Gestion Prix',  group:'catalogue' },
-  { to:'/admin/images',       icon:<Camera size={16}/>,          label:'Photos Produits', group:'catalogue' },
-  { to:'/admin/livraison',    icon:<Truck size={16}/>,           label:'Livraison',     group:'catalogue' },
+  { to:'/admin',                 icon:<LayoutDashboard size={16}/>, label:'Dashboard',      group:'principal' },
+  { to:'/admin/commandes',       icon:<Package size={16}/>,         label:'Commandes',      group:'principal' },
+  { to:'/admin/livreurs',        icon:<Bike size={16}/>,            label:'Livreurs',       group:'principal' },
+  { to:'/admin/clients',         icon:<Users size={16}/>,           label:'Clients',        group:'principal' },
+  { to:'/admin/stats',           icon:<TrendingUp size={16}/>,      label:'Statistiques',   group:'principal' },
+  { to:'/admin/monitoring',      icon:<Activity size={16}/>,        label:'Monitoring',     group:'principal',  badge:'live' },
+  { to:'/admin/suggestions',     icon:<Lightbulb size={16}/>,       label:'Suggestions',    group:'catalogue',  badge:'new' },
+  { to:'/admin/prix',            icon:<DollarSign size={16}/>,      label:'Gestion Prix',   group:'catalogue' },
+  { to:'/admin/images',          icon:<Camera size={16}/>,          label:'Photos Produits',group:'catalogue' },
+  { to:'/admin/livraison',       icon:<Truck size={16}/>,           label:'Livraison',      group:'catalogue' },
+  { to:'/admin/points-achat',    icon:<Store size={16}/>,           label:'Points d\'achat', group:'equipe',    adminOnly:true },
+  { to:'/admin/agents',          icon:<UserCog size={16}/>,         label:'Agents commerciaux', group:'equipe', adminOnly:true },
+  { to:'/admin/administrateurs', icon:<ShieldCheck size={16}/>,     label:'Administrateurs',   group:'equipe', adminOnly:true },
 ]
+
+const GROUP_LABEL = { catalogue:'Catalogue', equipe:'Équipe & marchés' }
 
 export function AdminLayout({ children, title }) {
   const { pathname } = useLocation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
+  const isAdmin = ['admin','super_admin'].includes(user?.role)
+
   useEffect(() => {
-    if (user && !['admin','super_admin'].includes(user?.role)) navigate('/')
+    if (user && !['admin','super_admin','agent'].includes(user?.role)) navigate('/')
   }, [user])
+
+  // Bloquer l'accès direct aux pages admin-only pour un agent (URL tapée à la main)
+  const adminOnlyPaths = ['/admin/agents', '/admin/administrateurs', '/admin/points-achat']
+  useEffect(() => {
+    if (user?.role === 'agent' && adminOnlyPaths.some(p => pathname.startsWith(p))) navigate('/admin')
+  }, [user, pathname])
+
+  const menu = MENU.filter(m => !m.adminOnly || isAdmin)
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -32,18 +47,18 @@ export function AdminLayout({ children, title }) {
       <aside className="w-56 bg-navy min-h-screen shrink-0 flex flex-col">
         <div className="p-5 border-b border-white/10">
           <div className="font-serif text-white text-lg font-bold">MARCHÉ·CM</div>
-          <div className="text-amber text-xs font-semibold">Administration</div>
+          <div className="text-amber text-xs font-semibold">{user?.role === 'agent' ? 'Espace Agent' : 'Administration'}</div>
         </div>
         <nav className="p-3 flex-1 space-y-1">
-          {MENU.map((m, i) => {
+          {menu.map((m, i) => {
             const isActive = pathname === m.to || (m.to !== '/admin' && pathname.startsWith(m.to))
-            const prevGroup = i > 0 ? MENU[i-1].group : m.group
+            const prevGroup = i > 0 ? menu[i-1].group : m.group
             const showSep   = i > 0 && m.group !== prevGroup
             return (
               <div key={m.to}>
                 {showSep && (
                   <div className="pt-2 pb-1 px-3">
-                    <p className="text-white/25 text-[9px] font-bold uppercase tracking-widest">Catalogue</p>
+                    <p className="text-white/25 text-[9px] font-bold uppercase tracking-widest">{GROUP_LABEL[m.group] || m.group}</p>
                   </div>
                 )}
                 <Link to={m.to}
@@ -113,6 +128,7 @@ export function AdminDashboard() {
   const STATUT_COLOR = {
     livree:              'text-green-700 bg-green-50',
     payee:               'text-blue-700 bg-blue-50',
+    prete:               'text-emerald-700 bg-emerald-50',
     en_livraison:        'text-cyan-700 bg-cyan-50',
     assignee:            'text-indigo-700 bg-indigo-50',
     en_cours_marche:     'text-orange-700 bg-orange-50',
@@ -123,7 +139,7 @@ export function AdminDashboard() {
   }
 
   const STATUT_LABEL = {
-    livree:'Livrée', payee:'Confirmée', en_livraison:'En livraison',
+    livree:'Livrée', payee:'Confirmée', prete:'Prête', en_livraison:'En livraison',
     assignee:'Assignée', en_cours_marche:'Au marché', annulee:'Annulée',
     brouillon:'Brouillon', en_attente_paiement:'En attente paiement',
     en_attente:'En attente',

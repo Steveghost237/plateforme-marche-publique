@@ -6,13 +6,14 @@ import api from '../utils/api'
 
 const STATUTS_TIMELINE = [
   { key: 'payee',           label: 'Commande confirmée', emoji: '✅', desc: 'Votre commande a été validée' },
+  { key: 'prete',           label: 'Commande prête',     emoji: '🛍️', desc: 'Vos produits sont prêts au marché — un livreur vient les récupérer' },
   { key: 'assignee',        label: 'Livreur assigné',    emoji: '🛵', desc: 'Un livreur se dirige vers le marché' },
-  { key: 'en_cours_marche', label: 'Au marché',          emoji: '🛒', desc: 'Votre livreur achète vos produits' },
+  { key: 'en_cours_marche', label: 'Au marché',          emoji: '🛒', desc: 'Votre livreur récupère vos produits' },
   { key: 'en_livraison',    label: 'En route',           emoji: '🚀', desc: 'Votre commande est en chemin' },
   { key: 'livree',          label: 'Livré !',            emoji: '🎉', desc: 'Commande livrée avec succès' },
 ]
 
-const STATUT_ORDER = ['payee', 'assignee', 'en_cours_marche', 'en_livraison', 'livree']
+const STATUT_ORDER = ['payee', 'prete', 'assignee', 'en_cours_marche', 'en_livraison', 'livree']
 
 function getStatutIndex(statut) {
   return STATUT_ORDER.indexOf(statut)
@@ -21,7 +22,7 @@ function getStatutIndex(statut) {
 // Simulation GPS dots
 function GPSMap({ statut, livreurNom = 'Livreur' }) {
   const [dots, setDots] = useState([
-    { id: 1, x: 30, y: 60, type: 'marche', label: 'Marché Mokolo' },
+    { id: 1, x: 30, y: 60, type: 'marche', label: 'Marché' },
     { id: 2, x: 70, y: 35, type: 'client', label: 'Votre adresse' },
     { id: 3, x: 45, y: 50, type: 'livreur', label: 'Livreur', moving: true },
   ])
@@ -61,7 +62,7 @@ function GPSMap({ statut, livreurNom = 'Livreur' }) {
       {/* Marché */}
       <div className="absolute text-center" style={{left:'27%', top:'55%', transform:'translate(-50%,-50%)'}}>
         <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center text-sm shadow-lg border-2 border-white">🏪</div>
-        <p className="text-[8px] font-bold text-amber-700 mt-0.5 whitespace-nowrap">Marché Mokolo</p>
+        <p className="text-[8px] font-bold text-amber-700 mt-0.5 whitespace-nowrap">Marché</p>
       </div>
       {/* Client */}
       <div className="absolute text-center" style={{left:'67%', top:'30%', transform:'translate(-50%,-50%)'}}>
@@ -83,6 +84,7 @@ function GPSMap({ statut, livreurNom = 'Livreur' }) {
         <p className="text-[9px] font-bold text-[#0D2137]">
           {statut === 'en_livraison' ? '🟢 En route · ~15 min' :
            statut === 'en_cours_marche' ? '🟡 Au marché · ~25 min' :
+           statut === 'prete' ? '🛍️ Prête · en attente du livreur' :
            statut === 'assignee' ? '🔵 Vers le marché' : '⏳ En attente'}
         </p>
       </div>
@@ -165,6 +167,7 @@ export default function SuiviCommande() {
                 <p className="text-white text-xs font-bold">
                   {commande.statut === 'en_livraison' ? 'Livraison estimée dans ~15 min' :
                    commande.statut === 'en_cours_marche' ? 'Livreur au marché · ~25 min' :
+                   commande.statut === 'prete' ? 'Commande prête — un livreur va la récupérer' :
                    'Livreur en route vers le marché'}
                 </p>
                 <p className="text-white/40 text-[10px]">Créneau : {commande.creneau?.replace(/_/g,' ')}</p>
