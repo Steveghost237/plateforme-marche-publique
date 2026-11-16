@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, Star, Zap } from 'lucide-react'
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, Star, Zap, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
@@ -22,7 +22,6 @@ export function Panier() {
     lignes: s.lignes, setQty: s.setQty, remove: s.remove,
     toggleSelect: s.toggleSelect, setAllSelected: s.setAllSelected
   }))
->>>>>>> 4cef1ac (chore: reorganisation des scripts backend + mises a jour frontend/mobile)
 
   // Le client choisit quels articles commander — les décochés restent au panier
   const selectionnes = lignes.filter(l => l.selected !== false)
