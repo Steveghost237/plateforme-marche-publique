@@ -522,7 +522,7 @@ def admin_get_zones(db: Session = Depends(get_db), _=Depends(get_current_staff))
 def admin_creer_zone(body: dict, db: Session = Depends(get_db), _=Depends(get_current_staff)):
     if not (body.get("nom") or "").strip():
         raise HTTPException(400, "Nom de zone requis")
-    frais_base = int(body.get("frais_base_fcfa") or 200)
+    frais_base = int(body.get("frais_base_fcfa") or body.get("frais_fcfa") or 200)
     z = ZoneLivraison(
         nom=body["nom"].strip(),
         ville=body.get("ville", "Yaoundé"),
