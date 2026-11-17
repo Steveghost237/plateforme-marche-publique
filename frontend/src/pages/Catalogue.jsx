@@ -703,7 +703,7 @@ function ProduitCard({ produit: p, fallback }) {
         <div className="flex items-center justify-between gap-2">
           <div>
             <span className="text-amber-500 font-bold text-sm">{(p.prix_base_fcfa||0).toLocaleString()} F</span>
-            {p.prix_max_fcfa && p.prix_max_fcfa !== p.prix_base_fcfa && (
+            {p.est_menu && p.prix_max_fcfa && p.prix_max_fcfa !== p.prix_base_fcfa && (
               <span className="text-gray-300 text-xs ml-1">– {p.prix_max_fcfa.toLocaleString()}</span>
             )}
           </div>
@@ -874,7 +874,7 @@ export function ProduitDetail() {
                 {produit.est_menu && prixUnit !== prixBase && (
                   <span className="text-gray-400 text-sm">défaut {prixBase.toLocaleString()} F</span>
                 )}
-                {produit.prix_max_fcfa && produit.prix_max_fcfa !== prixBase && (
+                {produit.est_menu && produit.prix_max_fcfa && produit.prix_max_fcfa !== prixBase && (
                   <span className="text-gray-400 text-sm">jusqu'à {produit.prix_max_fcfa.toLocaleString()} F</span>
                 )}
               </div>
