@@ -77,6 +77,7 @@ export function Inscription() {
   const [email, setEmail] = useState('')
   const [op, setOp] = useState('MTN')
   const [otp, setOtp] = useState(['','','','','',''])
+  const [otpCanal, setOtpCanal] = useState('email')
   const [form, setForm] = useState({ nom_complet:'', mot_de_passe:'', role:'client', tel2:'' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
