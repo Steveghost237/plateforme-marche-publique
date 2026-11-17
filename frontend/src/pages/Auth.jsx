@@ -133,6 +133,23 @@ export function Inscription() {
     if (val && i < 5) document.getElementById(`otp-${i+1}`)?.focus()
   }
 
+  const handleOtpPaste = (e) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const next = ['','','','','','']
+    pasted.split('').forEach((c, i) => { next[i] = c })
+    setOtp(next)
+    const lastIdx = Math.min(pasted.length, 5)
+    document.getElementById(`otp-${lastIdx}`)?.focus()
+  }
+
+  const handleOtpKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !otp[i] && i > 0) {
+      document.getElementById(`otp-${i-1}`)?.focus()
+    }
+  }
+
   return (
     <AuthLayout title="Créer un compte" subtitle="Rejoignez notre communauté">
       {/* Steps indicator */}
@@ -193,10 +210,15 @@ export function Inscription() {
           </div>
           <div className="flex gap-2 justify-center">
             {otp.map((d, i) => (
-              <input key={i} id={`otp-${i}`} maxLength={1} value={d} onChange={e => handleOtp(i, e.target.value)}
+              <input key={i} id={`otp-${i}`} maxLength={1} value={d}
+                onChange={e => handleOtp(i, e.target.value)}
+                onPaste={i === 0 ? handleOtpPaste : e => e.preventDefault() || handleOtpPaste(e)}
+                onKeyDown={e => handleOtpKeyDown(i, e)}
+                inputMode="numeric" autoComplete={i === 0 ? 'one-time-code' : 'off'}
                 className="w-11 h-14 border-2 border-gray-200 focus:border-navy rounded-xl text-center text-xl font-bold text-navy focus:outline-none transition-colors"/>
             ))}
           </div>
+          <p className="text-xs text-gray-400 text-center">Collez le code directement depuis l'email</p>
           <button type="submit" disabled={loading || otp.join('').length < 6} className="btn-primary w-full flex items-center justify-center gap-2">
             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>Vérifier <ArrowRight size={16}/></>}
           </button>

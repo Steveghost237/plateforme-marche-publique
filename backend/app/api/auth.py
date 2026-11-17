@@ -164,15 +164,12 @@ def demande_otp(request: Request, p: DemandeOTPIn, db: Session = Depends(get_db)
 
     # ── Envoi OTP par EMAIL (canal principal) ──
     email_result = send_otp_email(p.email, user.nom_complet or "", otp, contexte="inscription")
-    sms_result = {"success": False}
-    # ── Secours SMS en parallèle : uniquement si le provider SMS est configuré (prod) ──
-    if not email_result.get("success") and INFOBIP_CONFIGURE:
-        sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
+    # ── Envoi OTP par SMS en parallèle (toujours tenté si provider configuré) ──
+    sms_result = _send_otp_sms_sync(p.telephone, otp, contexte="inscription")
     if not email_result.get("success") and not sms_result.get("success"):
-        # Le code ne doit JAMAIS être exposé dans l'interface : si l'envoi
-        # échoue, on refuse et l'utilisateur réessaie (code en console serveur pour le dev)
         raise HTTPException(503, "Impossible d'envoyer le code de vérification. Vérifiez votre adresse email et réessayez.")
-    resp = {"message": "OTP envoyé par email"}
+    canal = "email et SMS" if email_result.get("success") and sms_result.get("success") and not sms_result.get("simulation") else ("SMS" if sms_result.get("success") and not sms_result.get("simulation") else "email")
+    resp = {"message": f"OTP envoyé par {canal}"}
     if debug:
         resp["email_status"] = email_result
         resp["sms_status"] = sms_result
