@@ -14,7 +14,6 @@ export const useAuth = create(persist((set, get) => ({
     set({ user, isAuth: true })
     hydraterPanier()   // restaure le panier sauvegardé en base (multi-appareils)
   },
-  setUser: (user) => set({ user }),
   logout: () => {
     // Tokens retirés AVANT de vider le panier local : la sync serveur est
     // désactivée sans token → le panier persisté en base reste intact.

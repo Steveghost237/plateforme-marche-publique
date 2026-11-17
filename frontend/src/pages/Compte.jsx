@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Package, Star, Bell, MapPin, LogOut, ChevronRight, HelpCircle } from 'lucide-react'
+import { Package, Star, Bell, MapPin, LogOut, ChevronRight, Check, Clock, Truck, XCircle, Heart, HelpCircle, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuth } from '../store'
@@ -18,9 +18,7 @@ const NIVEAUX_INFO = {
 
 // ── PROFIL ─────────────────────────────────────────────────────
 export function Profil() {
-  const user    = useAuth(s => s.user)
-  const logout  = useAuth(s => s.logout)
-  const setUser = useAuth(s => s.setUser)
+  const { user, logout } = useAuth(s => ({ user:s.user, logout:s.logout }))
   const navigate = useNavigate()
   const [form, setForm] = useState({ nom_complet: user?.nom_complet || '', email: user?.email || '', telephone_secondaire: user?.telephone_secondaire || '' })
   const [loading, setLoading] = useState(false)
@@ -31,10 +29,6 @@ export function Profil() {
   const [nbAdresses, setNbAdresses] = useState(0)
 
   useEffect(() => {
-    setForm({ nom_complet: user?.nom_complet || '', email: user?.email || '' })
-  }, [user])
-
-  useEffect(() => {
     api.get('/fidelite/compte').then(r => setFidelite(r.data)).catch(() => {})
     api.get('/commandes/mes-commandes').then(r => setNbCommandes(r.data?.length || 0)).catch(() => {})
     api.get('/adresses/').then(r => setNbAdresses(r.data?.length || 0)).catch(() => {})
@@ -43,8 +37,7 @@ export function Profil() {
   const save = async () => {
     setLoading(true)
     try {
-      const { data } = await api.put('/auth/me', form)
-      if (data?.id) setUser(data)
+      await api.put('/auth/me', form)
       toast.success('Profil mis à jour')
       setEditMode(false)
     } catch { toast.error('Erreur') } finally { setLoading(false) }

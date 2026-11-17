@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, Star, Zap, RefreshCw } from 'lucide-react'
+import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, MapPin, Clock, CreditCard, Check, Heart, ChevronRight, Star, Weight, RefreshCw, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api, { getImageUrl } from '../utils/api'
 import { usePanier, useAuth } from '../store'
@@ -499,9 +499,7 @@ export function Checkout() {
     { val:'especes',          label:t('payment_cash'), emoji:'💵' },
   ]
 
-  if (step === 4) {
-    const fact = factureSnap || { sousTotal, fraisLiv, total, points }
-    return (
+  if (step === 4) return (
     <div className="min-h-screen bg-[#F5EFE6] flex items-center justify-center px-4 py-10">
       <div className="bg-white rounded-2xl shadow-sm w-full max-w-sm">
         {/* En-tête confirmation */}
@@ -622,8 +620,7 @@ export function Checkout() {
         </div>
       </div>
     </div>
-    )
-  }
+  )
 
   return (
     <div className="min-h-screen bg-[#F5EFE6]">
@@ -746,7 +743,7 @@ export function Checkout() {
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm hover:border-[#0D2137] transition-colors">← Retour</button>
                 <button onClick={() => setStep(3)} disabled={!sel.creneau || !sel.date}
-                  className="flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+                  className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
                   Paiement <ArrowRight size={14}/>
                 </button>
               </div>
@@ -800,7 +797,7 @@ export function Checkout() {
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-500 font-medium py-3 rounded-xl text-sm">← {t('checkout_back')}</button>
                 <button onClick={passer} disabled={loading}
-                  className="flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
+                  className="flex-2 flex-1 bg-[#0D2137] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-amber-400 hover:text-gray-900 transition-all disabled:opacity-40">
                   {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <>{aPrixMarche ? '📋 Enregistrer la commande' : <>✅ {t('checkout_confirm')}</>}</>}
                 </button>
               </div>
